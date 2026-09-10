@@ -1,1 +1,28 @@
-/* You can add global styles to this file, and also import other style files */
+/* ========================================
+   Fratelli's Restaurante - Estilos Globales
+   ======================================== */
+
+:root {
+  --color-primario: #8B0000;
+  --color-secundario: #FFD700;
+  --color-fondo: #f5f5f5;
+  --color-texto: #333;
+  --color-blanco: #fff;
+  --color-exito: #28a745;
+  --color-error: #dc3545;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --radius: 8px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, var(--color-fondo) 0%, #e0e0e0 100%);
+  min-height: 100vh;
+  color: var(--color-texto);
+}
