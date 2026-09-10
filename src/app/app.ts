@@ -17,7 +17,7 @@ export class App implements OnInit {
   private http = inject(HttpClient);
 
   ngOnInit() {
-    this.http.get<{ respuesta: string }>('http://localhost:3000/api/mensaje')
+    this.http.get<{ respuesta: string }>('https://polleria-backend-6kym.onrender.com/api/mensaje')
       .subscribe({
         next: (data) => {
           this.respuesta.set(data.respuesta);
