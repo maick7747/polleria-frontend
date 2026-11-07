@@ -1,0 +1,203 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
+import { CuentasService } from '../../core/data/cuentas.service';
+import { MesasService } from '../../core/data/mesas.service';
+import { MOCK_USUARIOS } from '../../core/data/mock-data';
+import type { Cuenta, Mesa } from '../../core/models';
+import {
+  abreviarNombre,
+  formatearMoneda,
+  minutosEntre,
+  round2,
+} from '../../core/utils/format';
+import { ChipComponent } from '../../shared/components/chip/chip';
+import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
+import { IconComponent } from '../../shared/components/icon/icon';
+import { PanelComponent } from '../../shared/components/panel/panel';
+import { SectionHeaderComponent } from '../../shared/components/section-header/section-header';
+import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
+
+type FiltroMesas = 'todas' | 'libres' | 'ocupadas';
+
+interface MesaVista {
+  mesa: Mesa;
+  cuenta: Cuenta | null;
+  minutos: number;
+}
+
+interface MesaDetalle extends MesaVista {
+  rondas: number;
+  mozo: string;
+  subtotal: number;
+  igv: number;
+}
+
+const TAMANO_FILA = 5;
+
+@Component({
+  selector: 'app-venta-local-page',
+  standalone: true,
+  imports: [
+    RouterLink,
+    AppShellComponent,
+    ChipComponent,
+    DarkPanelComponent,
+    IconComponent,
+    PanelComponent,
+    SectionHeaderComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './venta-local.page.html',
+  styleUrl: './venta-local.page.css',
+})
+export class VentaLocalPage {
+  private readonly mesas = inject(MesasService);
+  private readonly cuentas = inject(CuentasService);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+
+  private readonly ahora = Date.now();
+
+  readonly fecha = "Fratelli's · miércoles 14 de octubre · turno tarde";
+  readonly filtro = signal<FiltroMesas>('todas');
+  readonly seleccionadaId = signal<number | null>(
+    this.mesas.mesas().find((mesa) => mesa.numero === 4)?.id ??
+      this.mesas.mesas().find((mesa) => mesa.estado === 'ocupada')?.id ??
+      null,
+  );
+
+  readonly totalMesas = computed(() => this.mesas.mesas().length);
+  readonly libres = this.mesas.libres;
+  readonly ocupadas = this.mesas.ocupadas;
+  readonly cuentasAbiertas = this.cuentas.abiertas;
+  readonly totalAbierto = this.cuentas.totalAbierto;
+  readonly moneda = formatearMoneda;
+
+  readonly tarjetas = computed<MesaVista[]>(() => {
+    const ahora = this.ahora;
+    return this.mesas.mesas().map((mesa) => {
+      const cuenta = this.cuentas.cuentaDeMesa(mesa.id) ?? null;
+      return {
+        mesa,
+        cuenta,
+        minutos: cuenta ? minutosEntre(cuenta.fechaApertura, ahora) : 0,
+      };
+    });
+  });
+
+  readonly filas = computed<MesaVista[][]>(() => {
+    const filtro = this.filtro();
+    const visibles = this.tarjetas().filter((item) => {
+      if (filtro === 'libres') {
+        return item.mesa.estado === 'libre';
+      }
+      if (filtro === 'ocupadas') {
+        return item.mesa.estado === 'ocupada';
+      }
+      return true;
+    });
+    const filas: MesaVista[][] = [];
+    for (let indice = 0; indice < visibles.length; indice += TAMANO_FILA) {
+      filas.push(visibles.slice(indice, indice + TAMANO_FILA));
+    }
+    return filas;
+  });
+
+  readonly seleccionada = computed<MesaDetalle | null>(() => {
+    const id = this.seleccionadaId();
+    if (id === null) {
+      return null;
+    }
+    const tarjeta = this.tarjetas().find((item) => item.mesa.id === id);
+    if (!tarjeta) {
+      return null;
+    }
+    const total = tarjeta.cuenta?.total ?? 0;
+    const subtotal = round2(total / 1.18);
+    const usuario = MOCK_USUARIOS.find(
+      (candidato) => candidato.id === tarjeta.cuenta?.usuarioAperturaId,
+    );
+    return {
+      ...tarjeta,
+      rondas: tarjeta.cuenta?.rondas.length ?? 0,
+      mozo: usuario ? abreviarNombre(usuario.nombre) : '—',
+      subtotal,
+      igv: round2(total - subtotal),
+    };
+  });
+
+  readonly promedioRondas = computed(() => {
+    const abiertas = this.cuentas.abiertas();
+    if (abiertas.length === 0) {
+      return 0;
+    }
+    const total = abiertas.reduce((suma, cuenta) => suma + cuenta.rondas.length, 0);
+    return Math.round(total / abiertas.length);
+  });
+
+  readonly dineroTotalAbierto = computed(() => formatearMoneda(this.totalAbierto()));
+  readonly subtotalSeleccionado = computed(() =>
+    formatearMoneda(this.seleccionada()?.subtotal ?? 0),
+  );
+  readonly igvSeleccionado = computed(() => formatearMoneda(this.seleccionada()?.igv ?? 0));
+
+  constructor() {
+    void this.cargar();
+  }
+
+  private async cargar(): Promise<void> {
+    await Promise.all([this.mesas.cargar(), this.cuentas.cargar()]);
+    const actual = this.seleccionadaId();
+    const existe = actual !== null && this.mesas.porId(actual) !== undefined;
+    if (!existe) {
+      const ocupada = this.mesas.mesas().find((mesa) => mesa.estado === 'ocupada');
+      this.seleccionadaId.set(ocupada?.id ?? this.mesas.mesas()[0]?.id ?? null);
+    }
+  }
+
+  async seleccionar(mesa: Mesa): Promise<void> {
+    this.seleccionadaId.set(mesa.id);
+    try {
+      if (!this.cuentas.cuentaDeMesa(mesa.id)) {
+        await this.cuentas.abrirCuenta(mesa.id, this.auth.usuario()?.id ?? 3);
+      }
+      await this.router.navigate(['/venta-local/pedido', mesa.id]);
+    } catch {
+      this.seleccionadaId.set(mesa.id);
+    }
+  }
+
+  async irAPedido(): Promise<void> {
+    const id = this.seleccionadaId();
+    if (id === null) {
+      return;
+    }
+    try {
+      if (!this.cuentas.cuentaDeMesa(id)) {
+        await this.cuentas.abrirCuenta(id, this.auth.usuario()?.id ?? 3);
+      }
+      await this.router.navigate(['/venta-local/pedido', id]);
+    } catch {
+      this.seleccionadaId.set(id);
+    }
+  }
+
+  cambiarFiltro(filtro: FiltroMesas): void {
+    this.filtro.set(filtro);
+  }
+
+  esSeleccionada(id: number): boolean {
+    return this.seleccionadaId() === id;
+  }
+
+  numeroMesa(numero: number): string {
+    return String(numero).padStart(2, '0');
+  }
+}

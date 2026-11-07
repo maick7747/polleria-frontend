@@ -1,0 +1,192 @@
+<app-shell title="Mantenimiento de activos" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/activos/alertas">
+      <app-icon name="bell-ringing" [size]="14" />
+      Alertas
+    </a>
+    <a class="btn-dark" routerLink="/activos/registrar">
+      <app-icon name="plus" [size]="14" />
+      Registrar activo
+    </a>
+  </div>
+
+  @if (proximos().length > 0) {
+    <section class="banner">
+      <div class="banner__left">
+        <app-icon name="warning-circle" [size]="16" />
+        <span class="banner__title">
+          {{ proximos().length }} activos por vencer esta semana
+        </span>
+        <span class="banner__divider"></span>
+        <span class="banner__names">{{ nombresProximos() }}</span>
+      </div>
+      <div class="banner__right">
+        <a class="banner__link" routerLink="/activos/alertas">
+          <app-icon name="arrow-right" [size]="12" />
+          Ver alertas
+        </a>
+        <span class="banner__meta">Última revisión 09 oct</span>
+      </div>
+    </section>
+  }
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="tabla">
+        <div class="tabla__head">
+          <span class="col-activo">ACTIVO</span>
+          <span class="col-categoria">CATEGORÍA</span>
+          <span class="col-estado">ESTADO</span>
+          <span class="col-proximo">PRÓXIMO</span>
+          <span class="col-costo">COSTO</span>
+        </div>
+
+        <div class="tabla__body">
+          @for (activo of lista(); track activo.id) {
+            <button
+              type="button"
+              class="fila"
+              [class.is-selected]="seleccionado()?.id === activo.id"
+              (click)="seleccionar(activo.id)"
+            >
+              <span class="col-activo fila__activo">
+                <span class="fila__icon">
+                  <app-icon [name]="categoria(activo).icono" [size]="16" />
+                </span>
+                <span class="fila__text">
+                  <span class="fila__name">{{ activo.nombre }}</span>
+                  <span class="fila__code">{{ codigo(activo) }} · {{ categoria(activo).label }}</span>
+                </span>
+              </span>
+
+              <span class="col-categoria fila__categoria">
+                {{ categoria(activo).label }}
+              </span>
+
+              <span class="col-estado">
+                <app-chip [variant]="estado(activo).tono">{{ estado(activo).label }}</app-chip>
+              </span>
+
+              <span
+                class="col-proximo fila__proximo"
+                [class.is-warning]="proximoPorVencer(activo)"
+                [class.is-danger]="proximoVencido(activo)"
+              >
+                {{ proximoTexto(activo) }}
+              </span>
+
+              <span class="col-costo fila__costo">{{ moneda(activo.costoAdquisicion) }}</span>
+            </button>
+          } @empty {
+            <div class="tabla__empty">Sin activos registrados.</div>
+          }
+        </div>
+
+        <footer class="tabla__foot">
+          <span>Selecciona un activo para ver su ficha</span>
+          <span>{{ lista().length }} de {{ lista().length }}</span>
+        </footer>
+      </div>
+    </app-panel>
+
+    @if (seleccionado(); as activo) {
+      <app-dark-panel class="detalle">
+        <div class="detalle__inner">
+          <header class="detalle__head">
+            <h2 class="detalle__title">Activo seleccionado</h2>
+            <span class="detalle__badge">{{ codigo(activo) }}</span>
+          </header>
+
+          <span class="detalle__nombre">{{ activo.nombre }}</span>
+          <span class="detalle__meta">
+            {{ categoria(activo).label }} · {{ activo.cantidad }} unidad{{
+              activo.cantidad === 1 ? '' : 'es'
+            }}
+          </span>
+
+          <div class="detalle__chips">
+            <app-chip [variant]="estado(activo).tono">{{ estado(activo).label }}</app-chip>
+            @if (proximoVencido(activo)) {
+              <span class="dchip dchip--danger">Mantenimiento vencido</span>
+            } @else if (proximoPorVencer(activo)) {
+              <span class="dchip dchip--warning">
+                Por vencer · {{ diasProximo(activo) }} días
+              </span>
+            } @else {
+              <span class="dchip">Preventivo</span>
+            }
+          </div>
+
+          <span class="dark-sep"></span>
+
+          <div class="detalle__rows">
+            <div>
+              <span>Fecha de compra</span>
+              <strong>{{ fechaDetalle(activo.fechaAdquisicion) }}</strong>
+            </div>
+            <div>
+              <span>Vida útil</span>
+              <strong>{{ activo.vidaUtilMeses }} meses</strong>
+            </div>
+            <div>
+              <span>Garantía</span>
+              <strong [class.is-warning]="garantiaVencida(activo)">
+                {{ garantiaTexto(activo) }}
+              </strong>
+            </div>
+            <div>
+              <span>Último servicio</span>
+              <strong>{{ fechaDetalle(activo.ultimoMantenimiento) }}</strong>
+            </div>
+            <div>
+              <span>Próximo servicio</span>
+              <strong [class.is-warning]="proximoPorVencer(activo) || proximoVencido(activo)">
+                {{ proximoTexto(activo) }}
+              </strong>
+            </div>
+            <div>
+              <span>Proveedor</span>
+              <strong>{{ activo.proveedor ?? '—' }}</strong>
+            </div>
+          </div>
+
+          @if (activo.observaciones) {
+            <p class="detalle__obs">{{ activo.observaciones }}</p>
+          }
+
+          <div class="detalle__costo">
+            <span>Costo de adquisición</span>
+            <strong>{{ moneda(activo.costoAdquisicion) }}</strong>
+          </div>
+
+          <div class="detalle__grow"></div>
+
+          <button type="button" class="btn-brand" (click)="registrarMantenimiento()">
+            <app-icon name="wrench" [size]="15" />
+            Registrar mantenimiento
+          </button>
+          <span class="detalle__foot">El costo se registra como egreso del turno</span>
+        </div>
+      </app-dark-panel>
+    }
+  </div>
+
+  <div class="pie">
+    <span class="pie__item">
+      <app-icon name="check-circle" [size]="12" />
+      {{ operativos() }} activos operativos · {{ enMantenimiento() }} en mantenimiento ·
+      {{ deBaja() }} fuera de servicio
+    </span>
+    <span class="pie__item">
+      <app-icon name="clock" [size]="12" />
+      Los mantenimientos vencidos generan alerta al dueño
+    </span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

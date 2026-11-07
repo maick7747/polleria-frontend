@@ -1,0 +1,210 @@
+<app-shell title="Pedidos listos" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="live-chip">
+      <app-icon name="bell-ringing" [size]="12" />
+      Cocina avisó hace 2 min
+    </span>
+    <button type="button" class="ghost-btn" (click)="actualizar()">
+      <app-icon name="arrow-clockwise" [size]="14" />
+      Actualizar
+    </button>
+  </div>
+
+  <div class="resumen">
+    <div class="resumen__bloque">
+      <app-icon name="check-circle" [size]="19" class="resumen__icon resumen__icon--ok" />
+      <div class="resumen__data">
+        <span class="resumen__label resumen__label--ok">Listos para servir</span>
+        <div class="resumen__valor">
+          <strong>{{ total() }}</strong>
+          <span>pedidos</span>
+        </div>
+      </div>
+    </div>
+
+    <span class="resumen__sep"></span>
+
+    <div class="resumen__bloque">
+      <app-icon name="bell-ringing" [size]="19" class="resumen__icon resumen__icon--brand" />
+      <div class="resumen__data">
+        <span class="resumen__label resumen__label--brand">Avisos al mozo</span>
+        <div class="resumen__valor">
+          <strong class="resumen__valor--brand">{{ total() }}</strong>
+          <span>sin entregar</span>
+        </div>
+      </div>
+    </div>
+
+    <span class="resumen__sep"></span>
+
+    <div class="resumen__bloque">
+      <app-icon name="clock" [size]="19" class="resumen__icon resumen__icon--warning" />
+      <div class="resumen__data">
+        <span class="resumen__label resumen__label--warning">Mayor espera</span>
+        <div class="resumen__valor">
+          <strong class="resumen__valor--warning">{{ mayorEspera() }}</strong>
+          <span>min en barra</span>
+        </div>
+      </div>
+    </div>
+
+    <span class="resumen__sep"></span>
+
+    <div class="resumen__bloque">
+      <app-icon name="users" [size]="19" class="resumen__icon" />
+      <div class="resumen__data">
+        <span class="resumen__label">Mozo en turno</span>
+        <div class="resumen__valor">
+          <strong>2</strong>
+          <span>Mozo + Cajero</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <app-section-header title="Tablero de entrega" [meta]="metaTablero()" />
+
+        @for (pedido of pedidos(); track pedido.id; let primero = $first) {
+          <article class="entrega" [class.entrega--first]="primero">
+            <header class="entrega__head">
+              <span class="entrega__etiqueta">{{ pedido.etiqueta }}</span>
+              <span class="chip chip--success">
+                <app-icon name="bell-ringing" [size]="10" />
+                Cocina avisó
+              </span>
+              @if (pedido.tipo === 'llevar') {
+                <span class="chip chip--neutral">
+                  <app-icon name="package" [size]="10" />
+                  Para llevar
+                </span>
+              }
+              <span class="entrega__spacer"></span>
+              <span class="entrega__hora">
+                <strong>{{ pedido.hora }}</strong>
+                <span>listo</span>
+              </span>
+            </header>
+
+            <div class="entrega__platos">
+              @for (plato of pedido.items; track plato.nombre) {
+                <div class="plato">
+                  <app-icon [name]="iconoPlato(plato.nombre)" [size]="13" class="plato__icon" />
+                  <span class="plato__nombre" [class.plato__nombre--obs]="plato.nota">
+                    {{ plato.nombre }}
+                  </span>
+                  <span class="plato__qty">{{ plato.nota ? plato.nota : '×' + plato.cantidad }}</span>
+                </div>
+              }
+            </div>
+
+            <footer class="entrega__foot">
+              <span class="entrega__meta">
+                {{ pedido.meta }} · hace {{ pedido.minutos }} min
+              </span>
+              <button type="button" class="btn-entregar" (click)="entregar(pedido.id)">
+                <app-icon name="check" [size]="13" />
+                Entregar
+              </button>
+            </footer>
+          </article>
+        } @empty {
+          <div class="vacio">
+            <app-empty-state
+              icon="check-circle"
+              title="Sin pedidos listos"
+              description="Los avisos de cocina aparecerán aquí cuando el KDS marque un plato como listo."
+            />
+          </div>
+        }
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aviso">
+      <div class="aviso__inner">
+        <header class="aviso__head">
+          <span class="aviso__kicker">AVISO DE COCINA</span>
+          <span class="aviso__icon">
+            <app-icon name="bell-ringing" [size]="14" />
+          </span>
+        </header>
+
+        <div class="aviso__cifra">
+          <strong>{{ total() }}</strong>
+          <span>{{ total() === 1 ? 'pedido listo' : 'pedidos listos' }}</span>
+        </div>
+
+        <p class="aviso__texto">
+          Cocina marcó los platos como terminados. Retira en barra y entrega al cliente.
+        </p>
+
+        <span class="aviso__chip">
+          <span class="aviso__dot"></span>
+          Cocina avisó hace 2 min
+        </span>
+
+        <span class="aviso__sep"></span>
+
+        <div class="aviso__lista">
+          @for (pedido of pedidos(); track pedido.id) {
+            <div class="aviso__fila">
+              <span class="aviso__punto"></span>
+              <span class="aviso__fila-nombre">{{ pedido.etiqueta }}</span>
+              <span class="aviso__fila-meta">
+                {{ pedido.tipo === 'llevar' ? 'Para llevar' : pedido.ronda }}
+              </span>
+              <span class="aviso__fila-hora">{{ pedido.hora }}</span>
+            </div>
+          } @empty {
+            <span class="aviso__vacio">Sin avisos pendientes</span>
+          }
+        </div>
+
+        <span class="aviso__sep"></span>
+
+        <div class="aviso__row">
+          <span>Tiempo máximo en barra</span>
+          <strong>{{ mayorEspera() }} min</strong>
+        </div>
+
+        <p class="aviso__info">
+          <app-icon name="warning-circle" [size]="13" />
+          Al entregar se archiva el aviso. No se cobra ahora: el cobro es al cerrar la
+          cuenta.
+        </p>
+
+        <span class="aviso__grow"></span>
+
+        <button
+          type="button"
+          class="accion accion--brand"
+          [disabled]="total() === 0"
+          (click)="marcarEntregado()"
+        >
+          <app-icon name="check-circle" [size]="16" />
+          Marcar entregado
+        </button>
+        <a class="accion accion--ghost" routerLink="/comandas">
+          <app-icon name="clock" [size]="15" />
+          Ver comandas
+        </a>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__note">
+      Cocina notifica al mozo cuando un plato está listo (SLA 30 min en KDS)
+    </span>
+    <span class="pie__meta">{{ metaPie() }}</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

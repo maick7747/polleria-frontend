@@ -1,0 +1,79 @@
+/* ============================================================
+   Fratelli's — Design tokens v3
+   Fuente: prueba/rediseno_v3/GUIA_ESTILO.md + _referencia_v3.html
+   ============================================================ */
+
+:root {
+  /* Marca */
+  --c-brand: #e8262c;
+  --c-brand-soft: #fdebea;
+  --c-brand-text: #c41e23;
+
+  /* Neutros */
+  --c-ink: #15151a;
+  --c-carbon: #2a2a32;
+  --c-white: #ffffff;
+  --c-bg: #f4f4f6;
+
+  /* Superficies y bordes */
+  --c-border: #e7e7ec;
+  --c-border-2: #e9e9ee;
+  --c-hairline: #e1e1e6;
+  --c-sep: #f0f0f4;
+  --c-neutral-soft: #f2f2f5;
+  --c-dark-line: #2a2a32;
+  --c-dark-soft: rgba(255, 255, 255, 0.08);
+
+  /* Texto */
+  --c-text: #15151a;
+  --c-text-2: #7c7c88;
+  --c-text-3: #a3a3ad;
+  --c-on-dark: #ffffff;
+  --c-on-dark-2: #8a8a94;
+  --c-on-dark-3: #6f6f7a;
+
+  /* Semánticos */
+  --c-success: #0e9f6e;
+  --c-success-soft: #e7f6ef;
+  --c-warning: #b45309;
+  --c-warning-soft: #fef3e2;
+  --c-info: #1e40af;
+  --c-info-soft: #eff6ff;
+  --c-danger: #c41e23;
+  --c-danger-soft: #fdebea;
+
+  /* Tipografía */
+  --font-display: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --fs-page-title: 26px;
+  --fs-section: 15px;
+  --fs-hero: 62px;
+  --fs-kpi: 32px;
+  --fs-body: 13px;
+  --fs-label: 11.5px;
+  --fs-meta: 11px;
+
+  /* Radios */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-xl: 20px;
+  --r-pill: 999px;
+
+  /* Sombras */
+  --sh-panel: 0 1px 2px rgba(21, 21, 26, 0.04), 0 10px 30px rgba(21, 21, 26, 0.05);
+  --sh-dark: 0 12px 32px rgba(21, 21, 26, 0.22);
+  --sh-ring: 0 0 0 5px rgba(232, 38, 44, 0.1);
+
+  /* Layout */
+  --rail-w: 76px;
+  --header-h: 56px;
+  --page-pad-x: 40px;
+  --page-pad-y: 24px;
+  --gap-page: 18px;
+
+  /* Movimiento */
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur: 160ms;
+}

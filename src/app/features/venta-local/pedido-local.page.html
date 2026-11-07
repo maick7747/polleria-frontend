@@ -1,0 +1,208 @@
+<app-shell [title]="titulo()" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <app-chip variant="success" [dot]="true">Caja abierta</app-chip>
+    <a class="ghost-link" routerLink="/venta-local">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a mesas
+    </a>
+  </div>
+
+  <div class="categorias">
+    <div class="categorias__chips" role="group" aria-label="Categorías del menú">
+      @for (categoria of categorias(); track categoria) {
+        <button
+          type="button"
+          class="cat"
+          [class.is-active]="categoriaActiva() === categoria"
+          (click)="categoriaActiva.set(categoria)"
+        >
+          {{ categoria }}
+        </button>
+      }
+    </div>
+    <label class="buscador">
+      <app-icon name="magnifying-glass" [size]="14" />
+      <input
+        type="search"
+        placeholder="Buscar plato"
+        [value]="busqueda()"
+        (input)="onBusqueda($event)"
+        aria-label="Buscar plato"
+      />
+    </label>
+  </div>
+
+  <div class="board">
+    <app-panel class="menu">
+      <div class="menu__inner">
+        <header class="menu__head">
+          <div class="menu__title">
+            <span class="bar"></span>
+            <h2>Menú</h2>
+          </div>
+          <span class="menu__meta">{{ platosVisibles().length }} platos</span>
+        </header>
+
+        <div class="menu__grid">
+          @for (plato of platosVisibles(); track plato.id) {
+            <article class="plato">
+              <div class="plato__top">
+                <h3 class="plato__name">{{ plato.nombre }}</h3>
+                <div class="plato__tags">
+                  <app-chip [variant]="stockDe(plato).tono">
+                    {{ stockDe(plato).etiqueta }}
+                  </app-chip>
+                  @if (cantidadEnRonda(plato.id) > 0) {
+                    <app-chip variant="brand">x{{ cantidadEnRonda(plato.id) }}</app-chip>
+                  }
+                </div>
+              </div>
+              <div class="plato__grow"></div>
+              <div class="plato__foot">
+                <div class="plato__price">
+                  <span class="cur">S/</span>
+                  <span class="amount">{{ plato.precioVenta.toFixed(2) }}</span>
+                </div>
+                <button
+                  type="button"
+                  class="plato__add"
+                  [attr.aria-label]="'Agregar ' + plato.nombre"
+                  (click)="agregar(plato)"
+                >
+                  <app-icon name="plus" [size]="14" />
+                </button>
+              </div>
+            </article>
+          } @empty {
+            <p class="menu__vacio">No hay platos para este filtro.</p>
+          }
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="cuenta">
+      <div class="cuenta__inner">
+        <header class="cuenta__head">
+          <h2 class="cuenta__title">Cuenta · Mesa {{ numeroMesa() }}</h2>
+          <span class="cuenta__ronda">Ronda {{ rondaActual() }}</span>
+        </header>
+
+        <div class="cuenta__previas">
+          <app-icon name="clipboard-text" [size]="12" />
+          @if (rondasPrevias() > 0) {
+            Rondas 1-{{ rondasPrevias() }} cerradas · {{ moneda(cuenta()?.total ?? 0) }}
+          } @else {
+            Aún no hay rondas cerradas
+          }
+        </div>
+
+        <span class="cuenta__sep"></span>
+
+        <div class="cuenta__items">
+          @for (item of items(); track item.id) {
+            <div class="linea">
+              <button
+                type="button"
+                class="linea__minus"
+                [attr.aria-label]="'Quitar ' + item.nombre"
+                (click)="quitar(item.id)"
+              >
+                <app-icon name="x" [size]="11" />
+              </button>
+              <span class="linea__name">{{ item.nombre }}</span>
+              <span class="linea__qty">x{{ item.cantidad }}</span>
+              <span class="linea__price">{{ moneda(item.subtotal) }}</span>
+            </div>
+          } @empty {
+            <p class="cuenta__vacio">Agrega platos del menú para armar la ronda.</p>
+          }
+        </div>
+
+        <span class="cuenta__sep"></span>
+
+        <div class="totales">
+          <div>
+            <span>Subtotal</span>
+            <span>{{ moneda(subtotalRonda()) }}</span>
+          </div>
+          <div>
+            <span>IGV (18%)</span>
+            <span>{{ moneda(igvRonda()) }}</span>
+          </div>
+          <div class="totales__fuerte">
+            <span>Total ronda</span>
+            <span>{{ moneda(totalRonda()) }}</span>
+          </div>
+        </div>
+
+        <span class="cuenta__sep"></span>
+
+        <div class="cuenta__total">
+          <span class="cuenta__total-label">Total de la cuenta al cerrar</span>
+          <div class="cuenta__amount">
+            <span class="cur">S/</span>
+            <span class="big">{{ totalCuenta().toFixed(2) }}</span>
+          </div>
+          <span class="cuenta__meta">
+            Rondas previas + ronda {{ rondaActual() }} · comprobante único
+          </span>
+        </div>
+
+        <div class="cliente">
+          <div class="cliente__info">
+            <app-icon name="user" [size]="13" />
+            Cliente · {{ clienteNombre() }}
+          </div>
+          <a
+            class="cliente__link"
+            [routerLink]="['/venta-local/cliente']"
+            [queryParams]="{ mesaId: mesaId }"
+          >
+            <app-icon name="plus" [size]="11" />
+            {{ clienteAccion() }}
+          </a>
+        </div>
+
+        <label class="observaciones">
+          <span>Observaciones para cocina</span>
+          <textarea
+            rows="3"
+            placeholder="Sin ají, papas bien cocidas"
+            [value]="observacion()"
+            (input)="onObservacion($event)"
+          ></textarea>
+        </label>
+
+        <div class="cuenta__grow"></div>
+
+        <button
+          type="button"
+          class="enviar"
+          [disabled]="!puedeEnviar()"
+          (click)="enviar()"
+        >
+          <app-icon name="flame" [size]="16" />
+          Enviar a cocina
+        </button>
+        <p class="cuenta__nota">No se cobra ahora. Se cobra al cerrar la cuenta.</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    @if (stockBajoTexto()) {
+      <span class="pie__warn">
+        <app-icon name="warning-circle" [size]="11" />
+        {{ stockBajoTexto() }}
+      </span>
+    }
+    <span class="pie__note">Los platos descuentan stock al confirmar.</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

@@ -1,0 +1,177 @@
+<app-shell title="Agregar ingredientes" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/fichas-tecnicas">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a la ficha
+    </a>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <div class="toolbar">
+          <label class="buscador">
+            <app-icon name="magnifying-glass" [size]="14" />
+            <input
+              type="search"
+              placeholder="Buscar ingrediente por nombre o categoría"
+              aria-label="Buscar ingrediente"
+              [value]="busqueda()"
+              (input)="onBuscar($event)"
+            />
+          </label>
+          <span class="toolbar__meta">
+            <app-icon name="filter" [size]="13" />
+            Ordenado por costo
+          </span>
+        </div>
+
+        <div class="categorias">
+          <div class="chips" role="group" aria-label="Filtrar por categoría">
+            @for (item of categorias(); track item.valor) {
+              <button
+                type="button"
+                class="chip"
+                [class.is-active]="categoria() === item.valor"
+                (click)="cambiarCategoria(item.valor)"
+              >
+                {{ item.label }} <span class="chip__count">{{ item.total }}</span>
+              </button>
+            }
+          </div>
+          <span class="categorias__meta">{{ insumos().length }} ingredientes</span>
+        </div>
+
+        <div class="grid grid--head">
+          <span></span>
+          <span>INGREDIENTE</span>
+          <span class="right">COSTO UNITARIO</span>
+          <span class="right">ESTADO</span>
+        </div>
+
+        <div class="rows">
+          @for (insumo of filtrados(); track insumo.id) {
+            <button
+              type="button"
+              class="grid item"
+              [class.is-on]="insumo.enFicha || estaSeleccionado(insumo.id)"
+              [class.is-locked]="insumo.enFicha"
+              [disabled]="insumo.enFicha"
+              (click)="alternar(insumo)"
+            >
+              <span class="check" [class.check--on]="insumo.enFicha || estaSeleccionado(insumo.id)">
+                @if (insumo.enFicha || estaSeleccionado(insumo.id)) {
+                  <app-icon name="check" [size]="11" />
+                }
+              </span>
+              <span class="ing">
+                <span class="ing__name">{{ insumo.nombre }}</span>
+                <span class="ing__meta">{{ insumo.categoria }} · último precio de compra</span>
+              </span>
+              <span class="costo">{{ moneda(insumo.costo) }} / {{ insumo.unidad }}</span>
+              <span class="estado-cell">
+                <span [class]="'estado estado--' + (insumo.enFicha ? 'locked' : 'free')">
+                  {{ insumo.enFicha ? 'En ficha' : 'Disponible' }}
+                </span>
+              </span>
+            </button>
+          } @empty {
+            <div class="rows__empty">
+              <app-empty-state
+                icon="filter"
+                title="Sin ingredientes"
+                description="No hay insumos que coincidan con la categoría o la búsqueda."
+              />
+            </div>
+          }
+        </div>
+
+        <div class="panel__foot">
+          <span>Los costos usan el último precio de compra registrado</span>
+          <span>{{ filtrados().length }} de {{ insumos().length }}</span>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aside">
+      <div class="seleccion">
+        <header class="seleccion__head">
+          <div class="seleccion__title">
+            <span class="seleccion__bar"></span>
+            <h2>Seleccionados</h2>
+          </div>
+          <span class="seleccion__badge">
+            {{ seleccionadosVista().length }} ítem{{ seleccionadosVista().length === 1 ? '' : 's' }}
+          </span>
+        </header>
+
+        <div class="seleccion__list">
+          @for (insumo of seleccionadosVista(); track insumo.id) {
+            <div class="sel">
+              <div class="sel__info">
+                <span class="sel__name">{{ insumo.nombre }}</span>
+                <span class="sel__meta">
+                  {{ cantidad(base(insumo.unidad)) }} {{ insumo.unidad }} · {{ moneda(insumo.costo) }}/{{ insumo.unidad }}
+                </span>
+              </div>
+              <span class="sel__cost">{{ moneda(insumo.aporte) }}</span>
+            </div>
+          } @empty {
+            <span class="seleccion__empty">Aún no seleccionaste ingredientes nuevos.</span>
+          }
+        </div>
+
+        <span class="seleccion__divider"></span>
+
+        <div class="seleccion__rows">
+          <div class="seleccion__row">
+            <span>Costo de lo seleccionado</span>
+            <strong>{{ moneda(costoSeleccionado()) }}</strong>
+          </div>
+          <div class="seleccion__row">
+            <span>Nuevo costo de ficha</span>
+            <strong>{{ moneda(nuevoCosto()) }}</strong>
+          </div>
+          <div class="seleccion__row">
+            <span>Food cost resultante</span>
+            <strong [class]="alertaFoodCost() ? 'seleccion__warn' : 'seleccion__ok'">
+              {{ porcentaje(foodCost()) }}
+            </strong>
+          </div>
+        </div>
+
+        @if (alertaFoodCost()) {
+          <div class="seleccion__alert">
+            <app-icon name="warning-circle" [size]="12" />
+            <p>El food cost supera el objetivo de 30%. Revisa cantidades antes de guardar.</p>
+          </div>
+        }
+
+        <span class="grow"></span>
+
+        <button
+          type="button"
+          class="btn-primary"
+          [disabled]="seleccionadosVista().length === 0"
+          (click)="agregar()"
+        >
+          <app-icon name="plus" [size]="15" />
+          Agregar a ficha
+        </button>
+        <p class="seleccion__foot">Las cantidades se ajustan después de agregar</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>Cada ingrediente agregado descuenta stock cuando se vende el plato</span>
+    <span>Solo el Dueño/Admin puede editar fichas técnicas</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check-circle" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

@@ -1,0 +1,336 @@
+<app-shell title="Compra de insumos" [subtitle]="'Sugerencia por stock bajo · ' + proveedores().length + ' proveedores · turno tarde'">
+  <div actions class="header-actions">
+    <button type="button" class="ghost-link" (click)="cambiarTab('ordenes')">
+      <app-icon name="clipboard-text" [size]="14" />
+      Órdenes
+    </button>
+    <button type="button" class="dark-link" (click)="cambiarTab('entradas')">
+      <app-icon name="download" [size]="15" />
+      Registrar entrada
+    </button>
+  </div>
+
+  <div class="toolbar">
+    <div class="tabs" role="tablist" aria-label="Secciones de compras">
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        [class.is-active]="tab() === 'sugerencia'"
+        [attr.aria-selected]="tab() === 'sugerencia'"
+        (click)="cambiarTab('sugerencia')"
+      >
+        Sugerencia <span class="tab__count">{{ conteos().sugerencias }}</span>
+      </button>
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        [class.is-active]="tab() === 'ordenes'"
+        [attr.aria-selected]="tab() === 'ordenes'"
+        (click)="cambiarTab('ordenes')"
+      >
+        Órdenes <span class="tab__count">{{ conteos().ordenes }}</span>
+      </button>
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        [class.is-active]="tab() === 'entradas'"
+        [attr.aria-selected]="tab() === 'entradas'"
+        (click)="cambiarTab('entradas')"
+      >
+        Entradas <span class="tab__count">{{ conteos().entradas }}</span>
+      </button>
+    </div>
+
+    <div class="toolbar__right">
+      <label class="buscador">
+        <app-icon name="magnifying-glass" [size]="14" />
+        <input
+          type="search"
+          placeholder="Buscar insumo"
+          aria-label="Buscar insumo"
+          [value]="busqueda()"
+          (input)="onBuscar($event)"
+        />
+      </label>
+      <label class="filtro-proveedor">
+        <app-icon name="filter" [size]="13" />
+        <select aria-label="Filtrar por proveedor" [value]="proveedorFiltro()" (change)="onProveedor($event)">
+          <option value="todos">Todos los proveedores</option>
+          @for (proveedor of proveedores(); track proveedor) {
+            <option [value]="proveedor">{{ proveedor }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="board">
+    @if (tab() === 'sugerencia') {
+      <app-panel class="panel">
+        <div class="panel__inner">
+          <header class="panel__head">
+            <div class="panel__title">
+              <span class="panel__bar"></span>
+              <h2>Sugerencia de compra</h2>
+            </div>
+            <span class="panel__meta">calculada con stock mínimo y consumo de 7 días</span>
+          </header>
+
+          <div class="stats">
+            <div class="stat">
+              <span class="stat__label">Insumos sugeridos</span>
+              <div class="stat__value">
+                {{ conteos().sugerencias }} <span class="stat__hint">de 24</span>
+              </div>
+            </div>
+            <span class="stats__sep"></span>
+            <div class="stat">
+              <span class="stat__label">Estimado sin IGV</span>
+              <div class="stat__value stat__value--money">
+                <span class="stat__cur">S/</span>
+                {{ monto(subtotal()) }}
+              </div>
+            </div>
+            <span class="stats__sep"></span>
+            <div class="stat">
+              <span class="stat__label">Proveedores</span>
+              <div class="stat__value">
+                {{ proveedores().length }} <span class="stat__hint">activos</span>
+              </div>
+            </div>
+            <span class="stats__grow"></span>
+            <span class="coverage">
+              <app-icon name="warning-circle" [size]="11" />
+              2 días de cobertura
+            </span>
+          </div>
+
+          <div class="grid grid--head">
+            <span></span>
+            <span>INSUMO</span>
+            <span>ESTADO</span>
+            <span>STOCK</span>
+            <span>SUGERIDO</span>
+            <span class="right">P. UNIT.</span>
+            <span class="right">SUBTOTAL</span>
+          </div>
+
+          <div class="rows">
+            @for (fila of filasSugerencia(); track fila.id) {
+              <div class="grid row" [class.is-off]="!fila.seleccionada">
+                <label class="check">
+                  <input
+                    type="checkbox"
+                    [checked]="fila.seleccionada"
+                    [attr.aria-label]="'Incluir ' + fila.nombre"
+                    (change)="alternar(fila.id)"
+                  />
+                </label>
+                <div class="insumo">
+                  <span class="insumo__name">{{ fila.nombre }}</span>
+                  <span class="insumo__meta">{{ fila.proveedor }} · {{ fila.categoria }}</span>
+                </div>
+                <span class="estado">
+                  <app-chip [variant]="tonoEstado(fila.estado)">{{ textoEstado(fila.estado) }}</app-chip>
+                </span>
+                <span class="stock">{{ cantidad(fila.stock, fila.unidad) }}</span>
+                <span class="sugerido">{{ cantidad(fila.sugerido, fila.unidad) }}</span>
+                <span class="price">{{ moneda(fila.precioUnitario) }}</span>
+                <span class="subtotal">{{ moneda(fila.sugerido * fila.precioUnitario) }}</span>
+              </div>
+            } @empty {
+              <div class="rows__empty">
+                <app-empty-state
+                  icon="shopping-cart"
+                  title="Sin insumos"
+                  description="No hay sugerencias que coincidan con la búsqueda o el proveedor seleccionado."
+                />
+              </div>
+            }
+          </div>
+
+          <div class="panel__foot">
+            <span>{{ conteos().seleccionadas }} de {{ conteos().sugerencias }} insumos · precios sin IGV</span>
+            <span>La entrada actualiza el stock</span>
+          </div>
+        </div>
+      </app-panel>
+    } @else if (tab() === 'ordenes') {
+      <app-panel class="panel">
+        <div class="panel__inner">
+          <header class="panel__head">
+            <div class="panel__title">
+              <span class="panel__bar"></span>
+              <h2>Órdenes de compra</h2>
+            </div>
+            <span class="panel__meta">{{ conteos().ordenes }} registradas · última OC-0148</span>
+          </header>
+
+          <div class="grid grid--orden grid--head">
+            <span>ORDEN</span>
+            <span>PROVEEDOR</span>
+            <span>ENTREGA</span>
+            <span>ÍTEMS</span>
+            <span>ESTADO</span>
+            <span class="right">TOTAL</span>
+          </div>
+
+          <div class="rows">
+            @for (orden of filasOrdenes(); track orden.id) {
+              <div class="grid grid--orden row row--simple">
+                <span class="orden__codigo">{{ orden.codigo }}</span>
+                <span class="orden__proveedor">{{ orden.proveedor }}</span>
+                <span class="orden__meta">{{ orden.entrega }}</span>
+                <span class="orden__meta">{{ orden.items }} ítems</span>
+                <span class="estado">
+                  <app-chip [variant]="tonoOrden(orden.estado)">{{ textoOrden(orden.estado) }}</app-chip>
+                </span>
+                <span class="subtotal">{{ moneda(orden.total) }}</span>
+              </div>
+            } @empty {
+              <div class="rows__empty">
+                <app-empty-state
+                  icon="clipboard-text"
+                  title="Sin órdenes"
+                  description="No hay órdenes que coincidan con la búsqueda."
+                />
+              </div>
+            }
+          </div>
+
+          <div class="panel__foot">
+            <span>Las órdenes enviadas quedan a la espera de la entrada de mercadería</span>
+            <span>{{ filasOrdenes().length }} de {{ conteos().ordenes }}</span>
+          </div>
+        </div>
+      </app-panel>
+    } @else {
+      <app-panel class="panel">
+        <div class="panel__inner">
+          <header class="panel__head">
+            <div class="panel__title">
+              <span class="panel__bar"></span>
+              <h2>Entradas de mercadería</h2>
+            </div>
+            <span class="panel__meta">{{ conteos().entradas }} registradas · actualizan el stock</span>
+          </header>
+
+          <div class="grid grid--entrada grid--head">
+            <span>ENTRADA</span>
+            <span>PROVEEDOR</span>
+            <span>FECHA</span>
+            <span>ÍTEMS</span>
+            <span class="right">TOTAL</span>
+          </div>
+
+          <div class="rows">
+            @for (entrada of filasEntradas(); track entrada.id) {
+              <div class="grid grid--entrada row row--simple">
+                <span class="orden__codigo">{{ entrada.codigo }}</span>
+                <span class="orden__proveedor">{{ entrada.proveedor }}</span>
+                <span class="orden__meta">{{ entrada.fecha }}</span>
+                <span class="orden__meta">{{ entrada.items }} ítems</span>
+                <span class="subtotal">{{ moneda(entrada.total) }}</span>
+              </div>
+            } @empty {
+              <div class="rows__empty">
+                <app-empty-state
+                  icon="package"
+                  title="Sin entradas"
+                  description="No hay entradas que coincidan con la búsqueda."
+                />
+              </div>
+            }
+          </div>
+
+          <div class="panel__foot">
+            <span>Cada entrada genera un movimiento de inventario por insumo</span>
+            <span>{{ filasEntradas().length }} de {{ conteos().entradas }}</span>
+          </div>
+        </div>
+      </app-panel>
+    }
+
+    <app-dark-panel class="aside">
+      <div class="orden">
+        <header class="orden__head">
+          <h2>Orden de compra</h2>
+          <span class="orden__code">{{ ordenActiva()?.codigo ?? 'OC-0148' }}</span>
+        </header>
+
+        <div class="orden__rows">
+          <div class="orden__row">
+            <span>Proveedor</span>
+            <strong>{{ ordenActiva()?.proveedor ?? 'Distribuidora El Sol' }}</strong>
+          </div>
+          <div class="orden__row">
+            <span>Entrega</span>
+            <strong>{{ ordenActiva()?.entrega ?? 'Mañana 07:00' }}</strong>
+          </div>
+          <div class="orden__row">
+            <span>Condición</span>
+            <strong>{{ ordenActiva()?.condicion ?? 'Crédito 15 días' }}</strong>
+          </div>
+          <div class="orden__row">
+            <span>Insumos</span>
+            <strong>{{ conteos().seleccionadas }} ítems</strong>
+          </div>
+        </div>
+
+        <span class="orden__divider"></span>
+
+        <div class="totales">
+          <div><span>Subtotal</span><strong>{{ moneda(subtotal()) }}</strong></div>
+          <div><span>IGV (18%)</span><strong>{{ moneda(igv()) }}</strong></div>
+          <div class="totales__fuerte"><span>Total</span><strong>{{ moneda(total()) }}</strong></div>
+        </div>
+
+        <div class="orden__amount">
+          <span class="orden__label">Total estimado de la orden</span>
+          <div class="orden__big">
+            <span class="orden__cur">S/</span>
+            <strong>{{ numero(total()) }}</strong>
+          </div>
+          <span class="orden__hint">Incluye IGV · precios de lista del proveedor</span>
+        </div>
+
+        <span class="orden__divider"></span>
+
+        <div class="orden__warn">
+          <span class="orden__warn-icon">
+            <app-icon name="warning-circle" [size]="14" />
+          </span>
+          <p>Pollo y papa quedan bajo mínimo si no entra la orden hoy.</p>
+        </div>
+
+        <span class="orden__grow"></span>
+
+        <button type="button" class="btn-primary" (click)="generarOrden()">
+          <app-icon name="clipboard-text" [size]="16" />
+          Generar OC
+        </button>
+        <a class="btn-secondary" routerLink="/compras/plantilla">
+          <app-icon name="phone" [size]="16" />
+          Enviar por WhatsApp
+        </a>
+
+        <p class="orden__note">El stock se actualiza al registrar la entrada.</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>La sugerencia se calcula por stock mínimo y consumo promedio.</span>
+    <span>{{ proveedores().length }} proveedores · actualizado 17:42</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check-circle" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

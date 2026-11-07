@@ -1,0 +1,277 @@
+<app-shell title="Autorizar reparación o reemplazo" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="status-chip">
+      <span class="status-dot"></span>
+      Pendiente de autorización
+    </span>
+    <a class="ghost-link" routerLink="/activos">
+      <app-icon name="arrow-clockwise" [size]="14" />
+      Historial del activo
+    </a>
+  </div>
+
+  @if (activo(); as actual) {
+    <section class="strip">
+      <div class="strip__asset">
+        <app-icon name="wrench" [size]="20" />
+        <div class="strip__text">
+          <span class="strip__name">{{ actual.nombre }}</span>
+          <span class="strip__meta">
+            {{ codigo() }} · {{ actual.cantidad }} unidad{{ actual.cantidad === 1 ? '' : 'es' }} ·
+            comprado {{ fechaAdquisicion() }} · vida útil {{ actual.vidaUtilMeses }} meses
+          </span>
+        </div>
+      </div>
+      <div class="strip__facts">
+        <div class="strip__fact">
+          <span class="fact__label">Solicitud</span>
+          <span class="fact__value">MO-024 · 14 oct</span>
+        </div>
+        <span class="fact__sep"></span>
+        <div class="strip__fact">
+          <span class="fact__label">Solicitado por</span>
+          <span class="fact__value">Yair S. · Cocinero</span>
+        </div>
+        <span class="fact__sep"></span>
+        <div class="strip__fact">
+          <span class="fact__label">Garantía</span>
+          <span class="fact__value" [class.is-danger]="garantiaVencida()">
+            {{ garantiaTexto() }}
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <div class="board">
+      <app-panel class="panel">
+        <div class="cmp">
+          <header class="cmp__head">
+            <div class="cmp__title">
+              <span class="bar"></span>
+              <h2>Comparación de opciones</h2>
+            </div>
+            <span class="cmp__meta">
+              Cotizaciones sin IGV · {{ actual.proveedor ?? 'Proveedor' }}
+            </span>
+          </header>
+
+          <div class="cmp__table">
+            <div class="cmp__row cmp__row--head">
+              <span class="cmp__concept">CONCEPTO</span>
+              <div class="cmp__col">
+                <span class="cmp__col-title">Reparar</span>
+                <span class="cmp__col-note">servicio técnico</span>
+              </div>
+              <div class="cmp__col">
+                <span class="cmp__col-title">Reemplazar</span>
+                @if (recomendacion() === 'reemplazar') {
+                  <span class="tag tag--brand">Recomendado</span>
+                } @else {
+                  <span class="tag tag--ok">Recomendado</span>
+                }
+              </div>
+            </div>
+
+            <div class="cmp__row">
+              <span class="cmp__concept">Costo estimado</span>
+              <div class="cmp__col">
+                <span class="cmp__value">{{ moneda(costoReparacion()) }}</span>
+                <span class="cmp__note">incluye mano de obra</span>
+              </div>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--brand">{{ moneda(costoReposicion()) }}</span>
+                <span class="cmp__note">incluye instalación y retiro</span>
+              </div>
+            </div>
+
+            <div class="cmp__row">
+              <span class="cmp__concept">Fuera de servicio</span>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm">5 días</span>
+                <span class="cmp__note">se usa equipo de respaldo</span>
+              </div>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm">12 días</span>
+                <span class="cmp__note">incluye instalación</span>
+              </div>
+            </div>
+
+            <div class="cmp__row">
+              <span class="cmp__concept">Vida útil restante</span>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm is-warning">1 a 2 años</span>
+                <span class="cmp__note">equipo ya amortizado</span>
+              </div>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm is-ok">{{ vidaReemplazo() }}</span>
+                <span class="cmp__note">depreciación {{ actual.vidaUtilMeses }} meses</span>
+              </div>
+            </div>
+
+            <div class="cmp__row">
+              <span class="cmp__concept">Garantía</span>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm">3 meses</span>
+                <span class="cmp__note">solo repuesto cambiado</span>
+              </div>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm is-ok">{{ garantiaReemplazo() }}</span>
+                <span class="cmp__note">cobertura total</span>
+              </div>
+            </div>
+
+            <div class="cmp__row">
+              <span class="cmp__concept">Riesgo de falla</span>
+              <div class="cmp__col">
+                <span class="pill pill--danger">Alto</span>
+              </div>
+              <div class="cmp__col">
+                <span class="pill pill--ok">Bajo</span>
+              </div>
+            </div>
+
+            <div class="cmp__row">
+              <span class="cmp__concept">Impacto en caja del mes</span>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm">{{ moneda(costoReparacion()) }}</span>
+                <span class="cmp__note">egreso único</span>
+              </div>
+              <div class="cmp__col">
+                <span class="cmp__value cmp__value--sm">{{ moneda(impactoReemplazo()) }}</span>
+                <span class="cmp__note">{{ moneda(costoReposicion()) }} ÷ 6 meses</span>
+              </div>
+            </div>
+          </div>
+
+          <footer class="cmp__foot">
+            <div class="cmp__note-box">
+              <app-icon name="warning-circle" [size]="14" />
+              <span>{{ justificacion() }}</span>
+            </div>
+            <div class="cmp__saving">
+              <span class="saving__label">Ahorro estimado a 12 meses</span>
+              <span class="saving__value">{{ moneda(ahorro()) }}</span>
+            </div>
+          </footer>
+        </div>
+      </app-panel>
+
+      <app-dark-panel class="decision">
+        <div class="dec">
+          <header class="dec__head">
+            <h2 class="dec__title">Decisión</h2>
+            <span class="dec__badge">Requiere firma</span>
+          </header>
+
+          <div class="dec__options">
+            <button
+              type="button"
+              class="option"
+              [class.is-active]="decision() === 'reparar'"
+              (click)="elegir('reparar')"
+            >
+              <span class="option__label">Reparar</span>
+              <span class="option__value">{{ moneda(costoReparacion()) }}</span>
+            </button>
+            <button
+              type="button"
+              class="option"
+              [class.is-active]="decision() === 'reemplazar'"
+              (click)="elegir('reemplazar')"
+            >
+              <span class="option__label">Reemplazar</span>
+              <span class="option__value">{{ moneda(costoReposicion()) }}</span>
+            </button>
+          </div>
+
+          <span class="dec__eyebrow">OPCIÓN SELECCIONADA</span>
+          <h3 class="dec__choice">{{ tituloSeleccionado() }}</h3>
+          <p class="dec__detail">{{ detalleSeleccionado() }}</p>
+
+          <div class="dec__amount">
+            <span class="dec__currency">S/</span>
+            <span class="dec__big">{{ numero(costoSeleccionado()) }}</span>
+          </div>
+          <p class="dec__amount-note">{{ notaSeleccionada() }}</p>
+
+          <div class="dark-sep"></div>
+
+          <div class="dec__rows">
+            <div>
+              <span>Presupuesto de mantenimiento</span>
+              <strong>{{ moneda(presupuesto) }}</strong>
+            </div>
+            <div>
+              <span>Costo de la decisión</span>
+              <strong class="is-danger">- {{ moneda(costoSeleccionado()) }}</strong>
+            </div>
+            <div>
+              <span>Saldo del fondo de activos</span>
+              <strong class="is-ok">{{ moneda(fondo) }}</strong>
+            </div>
+          </div>
+
+          <div class="dark-sep"></div>
+
+          @if (decision() === 'reemplazar') {
+            <div class="dec__discarded">
+              <div>
+                <span>Reparar · {{ moneda(costoReparacion()) }}</span>
+                <span class="dec__discarded-note">vida útil 1 a 2 años</span>
+              </div>
+              <span class="dec__discarded-tag">Descartada</span>
+            </div>
+          } @else {
+            <div class="dec__discarded">
+              <div>
+                <span>Reemplazar · {{ moneda(costoReposicion()) }}</span>
+                <span class="dec__discarded-note">vida útil {{ vidaReemplazo() }}</span>
+              </div>
+              <span class="dec__discarded-tag">Descartada</span>
+            </div>
+          }
+
+          <div class="dec__grow"></div>
+
+          <button type="button" class="btn-brand" (click)="autorizar()">
+            <app-icon name="check" [size]="15" />
+            Autorizar {{ decision() }}
+          </button>
+
+          <button type="button" class="btn-outline" (click)="adjuntar()">
+            <app-icon name="note-pencil" [size]="14" />
+            Adjuntar cotización
+          </button>
+
+          <p class="dec__foot">
+            La autorización genera el egreso del turno y archiva el activo
+          </p>
+        </div>
+      </app-dark-panel>
+    </div>
+
+    <div class="pie">
+      <span class="pie__item">
+        <app-icon name="wrench" [size]="12" />
+        El activo permanece fuera de servicio hasta la autorización
+      </span>
+      <span class="pie__item">
+        <app-icon name="check-circle" [size]="12" />
+        Solo Dueño/Admin puede autorizar compras de activos
+      </span>
+    </div>
+  } @else {
+    <app-empty-state
+      icon="wrench"
+      title="Sin activos para autorizar"
+      description="Registra un activo con mantenimiento pendiente para comparar reparar o reemplazar."
+    />
+  }
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

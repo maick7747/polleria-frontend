@@ -1,0 +1,220 @@
+<app-shell title="Mesas abiertas" subtitle="Cerrar cuenta · comprobante único">
+  <div actions class="header-actions">
+    <span class="caja">
+      <span class="caja__dot"></span>
+      Caja abierta · turno tarde
+    </span>
+    <a class="ghost-link" routerLink="/dashboard">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver al pulso
+    </a>
+  </div>
+
+  <app-section-header
+    title="Cuentas abiertas"
+    [meta]="totalCuentas() + ' mesas · ' + dineroAbierto() + ' por cobrar'"
+  >
+    <div class="filtros" role="group" aria-label="Filtrar cuentas">
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'todas'"
+        (click)="cambiarFiltro('todas')"
+      >
+        Todas <span>{{ totalCuentas() }}</span>
+      </button>
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'demora'"
+        (click)="cambiarFiltro('demora')"
+      >
+        +30 min <span>{{ enDemora() }}</span>
+      </button>
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'mayor'"
+        (click)="cambiarFiltro('mayor')"
+      >
+        Mayor total
+      </button>
+    </div>
+  </app-section-header>
+
+  <div class="board">
+    <div class="grid">
+      @for (item of vistas(); track item.cuenta.id) {
+        <button
+          type="button"
+          class="cuenta"
+          [class.is-sel]="esSeleccionada(item.cuenta.id)"
+          [attr.aria-pressed]="esSeleccionada(item.cuenta.id)"
+          [attr.aria-label]="'Cuenta de la mesa ' + item.numero"
+          (click)="seleccionar(item.cuenta.id)"
+        >
+          <header class="cuenta__head">
+            <div class="cuenta__titles">
+              <h3 class="cuenta__mesa">Mesa {{ item.numero }}</h3>
+              <span class="cuenta__sub">Salón principal</span>
+            </div>
+            <div class="cuenta__chips">
+              @if (item.prioritaria) {
+                <app-chip variant="warning" [dot]="true">
+                  +{{ item.minutos - umbral }} min
+                </app-chip>
+              }
+              <app-chip variant="danger">Ocupada</app-chip>
+            </div>
+          </header>
+
+          <span class="cuenta__label">Total acumulado</span>
+          <div class="cuenta__total">
+            <span class="cuenta__cur">S/</span>
+            <strong>{{ item.cuenta.total.toFixed(2) }}</strong>
+          </div>
+
+          <span class="cuenta__divider"></span>
+
+          <div class="cuenta__rows">
+            <div class="cuenta__row">
+              <span>Tiempo abierta</span>
+              <strong [class.cuenta__alert]="item.prioritaria">{{ item.minutos }} min</strong>
+            </div>
+            <div class="cuenta__row">
+              <span>Rondas</span>
+              <strong>{{ item.rondas }}</strong>
+            </div>
+            <div class="cuenta__row">
+              <span>Mozo</span>
+              <strong>{{ item.mozo }}</strong>
+            </div>
+          </div>
+
+          <span class="cuenta__grow"></span>
+
+          <div class="cuenta__foot">
+            <span class="cuenta__hint">Cobro único al cerrar</span>
+            <app-icon name="caret-right" [size]="13" />
+          </div>
+        </button>
+      } @empty {
+        <div class="vacio">
+          <app-empty-state
+            icon="cash-register"
+            title="Sin cuentas en este filtro"
+            description="No hay mesas ocupadas que coincidan con el filtro seleccionado."
+          />
+        </div>
+      }
+
+      <div class="leyenda">
+        <span class="leyenda__title">Leyenda</span>
+        <div class="leyenda__items">
+          <span class="leyenda__item">
+            <span class="punto punto--ocupada"></span>
+            Ocupada
+          </span>
+          <span class="leyenda__item">
+            <span class="punto punto--demora"></span>
+            +30 min
+          </span>
+          <span class="leyenda__item">
+            <span class="punto punto--sel"></span>
+            Seleccionada
+          </span>
+        </div>
+        <p class="leyenda__hint">
+          <app-icon name="caret-right" [size]="13" />
+          Selecciona una mesa para revisar su cuenta y cobrar.
+        </p>
+        <span class="leyenda__grow"></span>
+        <div class="leyenda__foot">
+          <span>{{ totalCuentas() }} cuentas abiertas</span>
+          <strong>{{ promedioRondas() }} rondas promedio</strong>
+        </div>
+      </div>
+    </div>
+
+    <app-dark-panel class="resumen">
+      @if (seleccionada(); as sel) {
+        <div class="resumen__inner">
+          <header class="resumen__head">
+            <h2 class="resumen__title">Cobro</h2>
+            <span class="resumen__pill">Cuenta única</span>
+          </header>
+
+          <div class="resumen__mesa">
+            <span class="resumen__eyebrow">MESA</span>
+            <div class="resumen__mesa-row">
+              <h3>Mesa {{ sel.numero }}</h3>
+              <span [class]="'resumen__estado' + (sel.prioritaria ? ' resumen__estado--alert' : '')">
+                {{ sel.minutos }} min
+              </span>
+            </div>
+          </div>
+
+          <span class="resumen__divider"></span>
+
+          <div class="resumen__rows">
+            <div class="resumen__row">
+              <span>Rondas</span>
+              <strong>{{ sel.rondas }}</strong>
+            </div>
+            <div class="resumen__row">
+              <span>Mozo</span>
+              <strong>{{ sel.mozo }}</strong>
+            </div>
+            <div class="resumen__row">
+              <span>Estado</span>
+              <strong>Ocupada</strong>
+            </div>
+            <div class="resumen__row">
+              <span>Comprobante</span>
+              <strong>{{ sel.cuenta.comprobanteTipo === 'ticket' ? 'Ticket' : 'Boleta' }}</strong>
+            </div>
+          </div>
+
+          <span class="resumen__grow"></span>
+
+          <div class="resumen__total">
+            <span class="resumen__total-label">Total por cobrar</span>
+            <div class="resumen__amount">
+              <span class="resumen__cur">S/</span>
+              <strong>{{ sel.cuenta.total.toFixed(2) }}</strong>
+            </div>
+            <span class="resumen__meta">
+              Subtotal {{ moneda(sel.subtotal) }} · IGV 18% {{ moneda(sel.igv) }}
+            </span>
+          </div>
+
+          <span class="resumen__divider"></span>
+
+          <div class="resumen__global">
+            <span>{{ totalCuentas() }} cuentas abiertas</span>
+            <strong>{{ dineroAbierto() }}</strong>
+          </div>
+
+          <button type="button" class="cobrar" (click)="cobrar()">
+            <app-icon name="cash-register" [size]="16" />
+            Cobrar
+          </button>
+          <p class="resumen__note">Un solo comprobante · sin split · SUNAT simulado.</p>
+        </div>
+      } @else {
+        <app-empty-state
+          icon="cash-register"
+          title="Sin cuentas abiertas"
+          description="Cuando una mesa tenga consumos aparecerá aquí para cobrar."
+        />
+      }
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>
+      {{ totalCuentas() }} cuentas abiertas · {{ dineroAbierto() }} · {{ enDemora() }} en demora
+    </span>
+    <span class="pie__note">El cobro se realiza una sola vez al cerrar la cuenta.</span>
+  </div>
+</app-shell>

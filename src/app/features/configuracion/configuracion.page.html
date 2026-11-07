@@ -1,0 +1,430 @@
+<app-shell title="Configuración" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="lock-chip">
+      <app-icon name="gear" [size]="11" />
+      Solo Dueño/Admin
+    </span>
+    <button type="button" class="ghost-link" (click)="auditoria()">
+      <app-icon name="arrow-clockwise" [size]="14" />
+      Auditoría
+    </button>
+  </div>
+
+  <div class="tabs">
+    <div class="tabs__left">
+      @for (item of tabs; track item.id) {
+        <button
+          type="button"
+          class="tab"
+          [class.is-active]="tab() === item.id"
+          (click)="cambiarTab(item.id)"
+        >
+          <span class="tab__label">{{ item.label }}</span>
+          <span class="tab__count">
+            @switch (item.id) {
+              @case ('parametros') {
+                7
+              }
+              @case ('canales') {
+                {{ canales().length }}
+              }
+              @default {
+                {{ pagos().length }}
+              }
+            }
+          </span>
+        </button>
+      }
+    </div>
+    <span class="tabs__meta">Los cambios aplican a todos los turnos desde el próximo pedido</span>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="cfg">
+        <header class="cfg__head">
+          <div class="cfg__title">
+            <span class="bar"></span>
+            <h2>
+              @switch (tab()) {
+                @case ('parametros') {
+                  Parámetros operativos
+                }
+                @case ('canales') {
+                  Canales de venta
+                }
+                @default {
+                  Métodos de pago
+                }
+              }
+            </h2>
+          </div>
+          <span class="cfg__meta">
+            @switch (tab()) {
+              @case ('parametros') {
+                IGV · KDS · comisiones · delivery
+              }
+              @case ('canales') {
+                Los canales activos aceptan pedidos nuevos
+              }
+              @default {
+                Efectivo · tarjeta · Yape · Plin
+              }
+            }
+          </span>
+        </header>
+
+        @switch (tab()) {
+          @case ('parametros') {
+            <div class="rows">
+              <div class="row">
+                <div class="row__text">
+                  <span class="row__title">Impuesto general a las ventas (IGV)</span>
+                  <span class="row__hint">
+                    Se muestra desglosado en el comprobante: Total = Subtotal + IGV
+                  </span>
+                  @if (errores().igv) {
+                    <span class="row__error">Rango permitido: 0 a 30 %</span>
+                  }
+                </div>
+                <div class="field" [class.is-error]="errores().igv">
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    step="0.1"
+                    [value]="igv()"
+                    (input)="onIgv($event)"
+                    aria-label="IGV en porcentaje"
+                  />
+                  <span class="field__suffix">%</span>
+                </div>
+                <span class="switch is-on is-locked" title="Siempre activo">
+                  <span class="knob"></span>
+                </span>
+              </div>
+
+              <div class="row">
+                <div class="row__text">
+                  <span class="row__title">SLA de cocina (KDS)</span>
+                  <span class="row__hint">
+                    Al superar el umbral el plato se marca PRIORITARIO
+                  </span>
+                  @if (errores().kds) {
+                    <span class="row__error">Minutos enteros entre 5 y 120</span>
+                  }
+                </div>
+                <div class="field" [class.is-error]="errores().kds">
+                  <input
+                    type="number"
+                    min="5"
+                    max="120"
+                    step="1"
+                    [value]="kds()"
+                    (input)="onKds($event)"
+                    aria-label="SLA de cocina en minutos"
+                  />
+                  <span class="field__suffix">min</span>
+                </div>
+                <span class="switch is-on is-locked" title="Siempre activo">
+                  <span class="knob"></span>
+                </span>
+              </div>
+
+              <div class="row">
+                <div class="row__text">
+                  <span class="row__title">Comisión Rappi</span>
+                  <span class="row__hint">
+                    Se descuenta al liquidar el pedido del canal externo
+                  </span>
+                  @if (errores().rappi) {
+                    <span class="row__error">Rango permitido: 0 a 50 %</span>
+                  }
+                </div>
+                <div class="field" [class.is-error]="errores().rappi">
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="0.1"
+                    [value]="rappi()"
+                    (input)="onRappi($event)"
+                    aria-label="Comisión Rappi en porcentaje"
+                  />
+                  <span class="field__suffix">%</span>
+                </div>
+                <span class="switch is-on is-locked" title="Siempre activo">
+                  <span class="knob"></span>
+                </span>
+              </div>
+
+              <div class="row">
+                <div class="row__text">
+                  <span class="row__title">Comisión LlamaFood</span>
+                  <span class="row__hint">
+                    Se descuenta al liquidar el pedido del canal externo
+                  </span>
+                  @if (errores().llamafood) {
+                    <span class="row__error">Rango permitido: 0 a 50 %</span>
+                  }
+                </div>
+                <div class="field" [class.is-error]="errores().llamafood">
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="0.1"
+                    [value]="llamafood()"
+                    (input)="onLlamaFood($event)"
+                    aria-label="Comisión LlamaFood en porcentaje"
+                  />
+                  <span class="field__suffix">%</span>
+                </div>
+                <span class="switch is-on is-locked" title="Siempre activo">
+                  <span class="knob"></span>
+                </span>
+              </div>
+
+              <div class="row">
+                <div class="row__text">
+                  <span class="row__title">Tarifa de delivery propio</span>
+                  <span class="row__hint">
+                    Se suma al total del pedido por WhatsApp o teléfono
+                  </span>
+                  @if (errores().delivery) {
+                    <span class="row__error">Rango permitido: S/ 0 a S/ 50</span>
+                  }
+                </div>
+                <div class="field" [class.is-error]="errores().delivery">
+                  <span class="field__prefix">S/</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="0.5"
+                    [value]="delivery()"
+                    (input)="onDelivery($event)"
+                    aria-label="Tarifa de delivery propio"
+                  />
+                </div>
+                <span class="switch is-on is-locked" title="Siempre activo">
+                  <span class="knob"></span>
+                </span>
+              </div>
+
+              <div class="row">
+                <div class="row__text">
+                  <span class="row__title">Redondeo de totales</span>
+                  <span class="row__hint">
+                    Ajusta el total al sol más cercano en efectivo
+                  </span>
+                </div>
+                <span class="row__state" [class.is-on]="redondeo()">
+                  {{ redondeo() ? 'Activado' : 'Desactivado' }}
+                </span>
+                <button
+                  type="button"
+                  class="switch"
+                  [class.is-on]="redondeo()"
+                  role="switch"
+                  [attr.aria-checked]="redondeo()"
+                  aria-label="Redondeo de totales"
+                  (click)="toggleRedondeo()"
+                >
+                  <span class="knob"></span>
+                </button>
+              </div>
+
+              <div class="row">
+                <div class="row__text">
+                  <span class="row__title">Aviso al mozo cuando el plato está listo</span>
+                  <span class="row__hint">
+                    Cocina notifica al mozo desde el KDS; la comanda pasa a Lista
+                  </span>
+                </div>
+                <span class="row__state" [class.is-on]="aviso()">
+                  {{ aviso() ? 'Activado' : 'Desactivado' }}
+                </span>
+                <button
+                  type="button"
+                  class="switch"
+                  [class.is-on]="aviso()"
+                  role="switch"
+                  [attr.aria-checked]="aviso()"
+                  aria-label="Aviso al mozo"
+                  (click)="toggleAviso()"
+                >
+                  <span class="knob"></span>
+                </button>
+              </div>
+            </div>
+
+            <div class="cfg__foot">
+              <span>El IGV y las comisiones no se pueden desactivar, solo editar su valor</span>
+              <span class="cfg__edit">
+                <app-icon name="note-pencil" [size]="11" />
+                Editar valores
+              </span>
+            </div>
+          }
+
+          @case ('canales') {
+            <div class="rows">
+              @for (canal of canales(); track canal.clave) {
+                <div class="row">
+                  <div class="row__text">
+                    <span class="row__title">{{ canal.nombre }}</span>
+                    <span class="row__hint">{{ canal.detalle }}</span>
+                  </div>
+                  <span class="row__state" [class.is-on]="canal.activo">
+                    {{ canal.activo ? 'Activado' : 'Desactivado' }}
+                  </span>
+                  <button
+                    type="button"
+                    class="switch"
+                    [class.is-on]="canal.activo"
+                    role="switch"
+                    [attr.aria-checked]="canal.activo"
+                    [attr.aria-label]="canal.nombre"
+                    (click)="toggleCanal(canal.clave)"
+                  >
+                    <span class="knob"></span>
+                  </button>
+                </div>
+              }
+            </div>
+
+            <div class="cfg__foot">
+              <span>Un canal desactivado deja de aceptar pedidos nuevos</span>
+              <span class="cfg__edit">
+                <app-icon name="storefront" [size]="11" />
+                {{ canales().length }} canales
+              </span>
+            </div>
+          }
+
+          @default {
+            <div class="rows">
+              @for (pago of pagos(); track pago.clave) {
+                <div class="row">
+                  <div class="row__text">
+                    <span class="row__title">{{ pago.nombre }}</span>
+                    <span class="row__hint">{{ pago.detalle }}</span>
+                  </div>
+                  <span class="row__state" [class.is-on]="pago.activo">
+                    {{ pago.activo ? 'Activado' : 'Desactivado' }}
+                  </span>
+                  <button
+                    type="button"
+                    class="switch"
+                    [class.is-on]="pago.activo"
+                    role="switch"
+                    [attr.aria-checked]="pago.activo"
+                    [attr.aria-label]="pago.nombre"
+                    (click)="togglePago(pago.clave)"
+                  >
+                    <span class="knob"></span>
+                  </button>
+                </div>
+              }
+            </div>
+
+            <div class="cfg__foot">
+              <span>Los métodos activos aparecen al cerrar la cuenta</span>
+              <span class="cfg__edit">
+                <app-icon name="credit-card" [size]="11" />
+                {{ pagos().length }} métodos
+              </span>
+            </div>
+          }
+        }
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="save-card">
+      <div class="save">
+        <header class="save__head">
+          <h2 class="save__title">Guardar cambios</h2>
+          <span class="save__badge" [class.is-dirty]="hayCambios()">
+            {{ hayCambios() ? 'Sin guardar' : 'Guardado' }}
+          </span>
+        </header>
+
+        <span class="save__eyebrow">CAMBIOS PENDIENTES</span>
+        <div class="save__hero">
+          <span class="save__big">{{ cambios().length }}</span>
+          <span class="save__hero-note">
+            {{ cambios().length === 1 ? 'parámetro editado' : 'parámetros editados' }}
+          </span>
+        </div>
+
+        @if (hayCambios()) {
+          <div class="changes">
+            @for (cambio of cambios(); track cambio.etiqueta) {
+              <div class="change">
+                <span class="change__dot"></span>
+                <span class="change__label">{{ cambio.etiqueta }}</span>
+                <span class="change__values">
+                  {{ cambio.antes }}
+                  <span class="change__arrow">→</span>
+                  <strong>{{ cambio.ahora }}</strong>
+                </span>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="save__clean">Todo está guardado.</p>
+        }
+
+        <div class="dark-sep"></div>
+
+        <div class="save__rows">
+          <div>
+            <span>Nuevos pedidos</span>
+            <strong>desde el próximo pedido</strong>
+          </div>
+          <div>
+            <span>Pedidos abiertos</span>
+            <strong class="is-warning">conservan el valor anterior</strong>
+          </div>
+          <div>
+            <span>Registro</span>
+            <strong>auditoría · Dueño/Admin</strong>
+          </div>
+        </div>
+
+        <div class="save__grow"></div>
+
+        <button type="button" class="btn-brand" (click)="guardar()">
+          <app-icon name="check" [size]="15" />
+          Guardar cambios
+        </button>
+
+        <button type="button" class="btn-outline" (click)="descartar()">
+          <app-icon name="arrow-clockwise" [size]="14" />
+          Descartar cambios
+        </button>
+
+        <p class="save__foot">Solo Dueño/Admin · todo cambio queda en auditoría</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__item">
+      <app-icon name="receipt" [size]="12" />
+      El comprobante es simulación SUNAT, no tiene validez tributaria
+    </span>
+    <span class="pie__item">
+      <app-icon name="credit-card" [size]="12" />
+      Métodos activos: efectivo, tarjeta, Yape y Plin
+    </span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

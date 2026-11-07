@@ -1,0 +1,219 @@
+<app-shell title="Apertura de caja" [subtitle]="'Cuadre de caja · miércoles 14 de octubre · turno tarde'">
+  <div actions class="header-actions">
+    @if (abierta()) {
+      <app-chip variant="success" [dot]="true">Caja abierta</app-chip>
+    } @else {
+      <app-chip variant="neutral" [dot]="true">Caja cerrada</app-chip>
+    }
+    <span class="pill-action">
+      <app-icon name="clock" [size]="14" />
+      Turno anterior cerrado
+    </span>
+  </div>
+
+  <div class="stepper">
+    <div class="stepper__pasos">
+      <span class="paso paso--activo">1</span>
+      <span class="paso__label paso__label--activo">Apertura</span>
+      <span class="paso__linea"></span>
+      <span class="paso">2</span>
+      <span class="paso__label">Operación</span>
+      <span class="paso__linea"></span>
+      <span class="paso">3</span>
+      <span class="paso__label">Cierre</span>
+    </div>
+    <span class="stepper__meta">El cuadre es diario · umbral de diferencia S/ 0</span>
+  </div>
+
+  <div class="board">
+    <app-panel class="turno-panel">
+      <div class="turno-panel__inner">
+        <header class="panel-head">
+          <div class="panel-title">
+            <span class="bar"></span>
+            <h2>Datos del turno</h2>
+          </div>
+          <span class="panel-meta">Caja 01 · turno tarde</span>
+        </header>
+
+        <div class="turno-layout">
+          <div class="turno-col">
+            <div class="campo-row">
+              <div class="campo">
+                <span class="campo__label">Fecha</span>
+                <div class="readonly">
+                  <app-icon name="clock" [size]="14" />
+                  <span>{{ fecha }}</span>
+                </div>
+              </div>
+              <div class="campo">
+                <span class="campo__label">Turno</span>
+                <div class="readonly">
+                  <app-icon name="clock" [size]="14" />
+                  <span>{{ turno }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="campo">
+              <span class="campo__label">Responsable</span>
+              <div class="readonly readonly--split">
+                <app-icon name="user" [size]="14" />
+                <span>{{ responsable() }}</span>
+                <span class="rol-chip">{{ rolesResponsable() }}</span>
+              </div>
+            </div>
+
+            <div class="campo">
+              <span class="campo__top">
+                <span class="campo__label">Fondo inicial</span>
+                <span class="campo__meta">Sugerido S/ 200.00</span>
+              </span>
+              <div class="fondo" [class.fondo--warn]="!coincide()">
+                <span class="fondo__cur">S/</span>
+                <input
+                  class="fondo__input"
+                  type="text"
+                  inputmode="decimal"
+                  [value]="fondoInicial().toFixed(2)"
+                  (change)="onFondo($event)"
+                  aria-label="Fondo inicial"
+                />
+                <span class="fondo__chip" [class.fondo__chip--warn]="!coincide()">
+                  {{ coincide() ? 'Coincide' : 'Difiere' }}
+                </span>
+              </div>
+            </div>
+
+            <label class="campo campo--grow">
+              <span class="campo__label">Observaciones</span>
+              <textarea
+                class="observaciones"
+                [value]="observaciones()"
+                (input)="onObservacion($event)"
+                aria-label="Observaciones del turno"
+              ></textarea>
+            </label>
+          </div>
+
+          <span class="col-sep"></span>
+
+          <aside class="denoms">
+            <header class="denoms__head">
+              <span class="denoms__title">Denominaciones</span>
+              <span class="denoms__meta">Conteo de apertura</span>
+            </header>
+
+            <div class="denoms__row denoms__row--head">
+              <span class="denoms__billete">BILLETE</span>
+              <span class="denoms__cant">CANT.</span>
+              <span class="denoms__subtotal">SUBTOTAL</span>
+            </div>
+
+            @for (denominacion of denominaciones(); track denominacion.valor; let i = $index) {
+              <div class="denoms__row">
+                <span class="denoms__billete">S/ {{ denominacion.valor }}</span>
+                <input
+                  class="denoms__input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  [value]="denominacion.cantidad"
+                  (input)="onCantidad(i, $event)"
+                  [attr.aria-label]="'Cantidad de billetes de ' + denominacion.valor"
+                />
+                <span class="denoms__subtotal">{{ moneda(subtotal(denominacion)) }}</span>
+              </div>
+            }
+
+            <div class="denoms__total">
+              <span>Total contado</span>
+              <strong>{{ moneda(totalContado()) }}</strong>
+            </div>
+
+            @if (coincide()) {
+              <p class="denoms__nota">
+                <app-icon name="check" [size]="12" />
+                El conteo coincide con el fondo inicial declarado.
+              </p>
+            } @else {
+              <p class="denoms__nota denoms__nota--warn">
+                <app-icon name="warning-circle" [size]="12" />
+                El conteo no coincide con el fondo inicial declarado.
+              </p>
+            }
+          </aside>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="resumen">
+      <div class="resumen__inner">
+        <header class="resumen__head">
+          <h2 class="resumen__title">Turno</h2>
+          <span class="resumen__badge">{{ abierta() ? 'Caja abierta' : 'Caja cerrada' }}</span>
+        </header>
+
+        <span class="resumen__sep"></span>
+
+        <div class="resumen__rows">
+          <div>
+            <span>Fecha</span>
+            <strong>{{ fechaLarga }}</strong>
+          </div>
+          <div>
+            <span>Turno</span>
+            <strong>{{ turno }}</strong>
+          </div>
+          <div>
+            <span>Responsable</span>
+            <strong>{{ responsable() }}</strong>
+          </div>
+          <div>
+            <span>Caja</span>
+            <strong>01 · principal</strong>
+          </div>
+        </div>
+
+        <span class="resumen__sep"></span>
+
+        <div class="resumen__fondo">
+          <span class="resumen__label">Fondo inicial declarado</span>
+          <div class="resumen__amount">
+            <span class="cur">S/</span>
+            <span class="big">{{ fondoInicial().toFixed(2) }}</span>
+          </div>
+          <span class="resumen__meta">Efectivo en caja al iniciar el turno</span>
+        </div>
+
+        <p class="resumen__info">
+          <app-icon name="warning-circle" [size]="12" />
+          Con la caja cerrada no se registran ventas ni gastos. El cobro se hace al cerrar cada
+          cuenta.
+        </p>
+
+        <div class="resumen__grow"></div>
+
+        <button type="button" class="abrir" [disabled]="!puedeAbrir()" (click)="abrir()">
+          Abrir caja
+        </button>
+        <span class="resumen__nota">Al cerrar, cualquier diferencia genera una alerta.</span>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__warn">
+      <app-icon name="warning-circle" [size]="12" />
+      El fondo inicial debe coincidir con el conteo de denominaciones.
+    </span>
+    <span class="pie__note">Umbral de diferencia · S/ 0.00</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

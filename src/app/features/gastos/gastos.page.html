@@ -1,0 +1,209 @@
+<app-shell title="Registro de gastos" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="badge-success">
+      <span class="badge-success__dot"></span>
+      Caja chica {{ moneda(saldoActual()) }} disponible
+    </span>
+    <button type="button" class="ghost-link" (click)="exportar()">
+      <app-icon name="download" [size]="14" />
+      Exportar
+    </button>
+  </div>
+
+  <div class="cuerpo">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Nuevo gasto</h2>
+            <span class="pill">{{ siguienteCodigo() }}</span>
+          </div>
+          <span class="pill pill--danger">Egreso de caja chica</span>
+        </header>
+
+        <div class="form">
+          <span class="campo__label">Categoría</span>
+          <div class="chips" role="group" aria-label="Categoría del gasto">
+            @for (c of categorias; track c.id) {
+              <button
+                type="button"
+                class="chip"
+                [class.is-active]="categoria() === c.id"
+                (click)="elegirCategoria(c.id)"
+              >
+                {{ c.label }}
+              </button>
+            }
+          </div>
+
+          <div class="monto-box">
+            <div class="monto-box__info">
+              <span class="campo__label">Monto del gasto</span>
+              <span class="monto-box__hint">Se descuenta de la caja chica del turno</span>
+            </div>
+            <div class="monto-box__input">
+              <span>S/</span>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                inputmode="decimal"
+                aria-label="Monto del gasto"
+                [value]="monto()"
+                (input)="onMonto($event)"
+              />
+            </div>
+          </div>
+
+          <div class="fila fila--info">
+            <label class="campo">
+              <span class="campo__label">Descripción</span>
+              <input
+                class="input"
+                type="text"
+                [value]="descripcion()"
+                (input)="onDescripcion($event)"
+                placeholder="Detalle del gasto"
+              />
+            </label>
+            <label class="campo campo--md">
+              <span class="campo__label">Comprobante</span>
+              <input
+                class="input"
+                type="text"
+                [value]="comprobante()"
+                (input)="onComprobante($event)"
+                placeholder="Boleta / factura"
+              />
+            </label>
+            <label class="campo campo--sm">
+              <span class="campo__label">Fecha</span>
+              <input class="input" type="date" [value]="fecha()" (input)="onFecha($event)" />
+            </label>
+          </div>
+
+          <div class="fila fila--info">
+            <div class="campo">
+              <span class="campo__label">Registrado por</span>
+              <strong class="dato">{{ registradoPor() }}</strong>
+            </div>
+            <div class="campo">
+              <span class="campo__label">Turno</span>
+              <strong class="dato">Tarde</strong>
+            </div>
+            <div class="campo">
+              <span class="campo__label">Método de pago</span>
+              <strong class="dato">Efectivo · caja chica</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="nota">
+          <app-icon name="warning-circle" [size]="13" />
+          Todo gasto exige comprobante · el egreso se refleja al cerrar la caja
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="caja">
+      <div class="caja__inner">
+        <header class="caja__head">
+          <span class="caja__bar"></span>
+          <h2>Caja chica</h2>
+          <span class="caja__pill">Turno tarde</span>
+        </header>
+
+        <div class="caja__rows">
+          <div class="caja__row">
+            <span>Saldo inicial</span>
+            <strong>{{ moneda(saldoInicial) }}</strong>
+          </div>
+          <div class="caja__row">
+            <span>Egresos del turno</span>
+            <strong class="caja__negative">− {{ moneda(egresosTurno()) }}</strong>
+          </div>
+          <div class="caja__row">
+            <span>Este gasto</span>
+            <strong class="caja__negative">− {{ moneda(montoNumero()) }}</strong>
+          </div>
+        </div>
+
+        <span class="caja__sep"></span>
+
+        <div class="caja__block">
+          <span class="caja__label">Saldo después del gasto</span>
+          <div class="caja__amount">
+            <span>S/</span>
+            <strong>{{ saldoDespues().toFixed(2) }}</strong>
+          </div>
+        </div>
+
+        <span class="caja__grow"></span>
+
+        <button
+          type="button"
+          class="btn-brand"
+          [disabled]="!puedeRegistrar()"
+          (click)="registrar()"
+        >
+          <app-icon name="check" [size]="15" />
+          Registrar gasto
+        </button>
+        <button type="button" class="btn-ghost-dark" (click)="descartar()">
+          <app-icon name="x" [size]="15" />
+          Descartar
+        </button>
+
+        <p class="caja__note">El egreso se descuenta al cerrar la caja</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <section class="recientes">
+    <app-section-header title="Gastos recientes" [meta]="recientesMeta()" />
+
+    <div class="tabla">
+      <div class="tabla__head">
+        <span>FECHA</span>
+        <span>CATEGORÍA</span>
+        <span class="col-desc">DESCRIPCIÓN</span>
+        <span class="col-comp">COMPROBANTE</span>
+        <span>REGISTRADO POR</span>
+        <span class="right">MONTO</span>
+      </div>
+
+      @for (g of lista(); track g.id) {
+        <div class="tabla__row">
+          <span class="meta">{{ fechaCorta(g.fecha) }}</span>
+          <span>
+            <app-chip [variant]="tonoCategoria(g.categoria)">
+              {{ etiquetaCategoria(g.categoria) }}
+            </app-chip>
+          </span>
+          <span class="col-desc">{{ g.descripcion }}</span>
+          <span class="col-comp">{{ g.comprobanteUrl ?? 'Sin comprobante' }}</span>
+          <span class="meta">{{ registradoPorGasto(g) }}</span>
+          <span class="right monto">{{ moneda(g.monto) }}</span>
+        </div>
+      } @empty {
+        <div class="tabla__empty">
+          <app-empty-state
+            icon="money"
+            title="Sin gastos"
+            description="No hay gastos registrados en el turno."
+          />
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="pie">
+    <span>Los gastos y reembolsos se descuentan de la caja al cierre del turno</span>
+    <span>Cuadre diario · cualquier diferencia genera alerta</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">{{ toast() }}</div>
+  }
+</app-shell>

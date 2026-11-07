@@ -1,0 +1,196 @@
+<app-shell title="Usuarios y roles" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="multi-chip">
+      <app-icon name="users" [size]="11" />
+      Multi-rol activo
+    </span>
+    <button type="button" class="btn-dark" (click)="nuevoUsuario()">
+      <app-icon name="plus" [size]="14" />
+      Nuevo usuario
+    </button>
+  </div>
+
+  <div class="filters">
+    <div class="filters__left">
+      <label class="search">
+        <app-icon name="magnifying-glass" [size]="14" />
+        <input
+          type="search"
+          placeholder="Buscar usuario o correo"
+          [value]="busqueda()"
+          (input)="onBusqueda($event)"
+        />
+      </label>
+
+      @for (item of filtros; track item.id) {
+        <button
+          type="button"
+          class="filter"
+          [class.is-active]="filtroRol() === item.id"
+          (click)="filtrar(item.id)"
+        >
+          <span class="filter__label">{{ item.label }}</span>
+          <span class="filter__count">{{ conteos()[item.id] }}</span>
+        </button>
+      }
+    </div>
+    <span class="filters__meta">Un usuario puede tener varios roles a la vez</span>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="team">
+        <header class="team__head">
+          <div class="team__title">
+            <span class="bar"></span>
+            <h2>Equipo</h2>
+          </div>
+          <span class="team__meta">Sede El Tambo · últimos accesos de hoy</span>
+        </header>
+
+        <div class="team__cols">
+          <span class="col-user">USUARIO</span>
+          <span class="col-mail">CORREO</span>
+          <span class="col-roles">ROLES</span>
+          <span class="col-state">ESTADO</span>
+          <span class="col-access">ACCESO</span>
+        </div>
+
+        <div class="team__body">
+          @for (usuario of visibles(); track usuario.id) {
+            <button
+              type="button"
+              class="row"
+              [class.is-selected]="seleccionado()?.id === usuario.id"
+              (click)="seleccionar(usuario)"
+            >
+              <span class="col-user row__user">
+                <span class="avatar" [class.is-session]="esSesion(usuario)">
+                  {{ iniciales(usuario.nombre) }}
+                </span>
+                <span class="row__text">
+                  <span class="row__name">
+                    {{ usuario.nombre }}
+                    @if (esSesion(usuario)) {
+                      <span class="row__you">Tu sesión</span>
+                    }
+                  </span>
+                  <span class="row__detail">{{ detalle(usuario) }}</span>
+                </span>
+              </span>
+
+              <span class="col-mail row__mail">{{ usuario.email }}</span>
+
+              <span class="col-roles row__roles">
+                @for (rol of usuario.roles; track rol) {
+                  <span [class]="'role ' + rolClase(rol)">{{ rol }}</span>
+                }
+              </span>
+
+              <span class="col-state">
+                <app-chip [variant]="usuario.activo ? 'success' : 'neutral'">
+                  {{ usuario.activo ? 'Activo' : 'Inactivo' }}
+                </app-chip>
+              </span>
+
+              <span class="col-access row__access">{{ acceso(usuario) }}</span>
+            </button>
+          } @empty {
+            <div class="team__empty">No hay usuarios que coincidan con la búsqueda.</div>
+          }
+        </div>
+
+        <footer class="team__foot">
+          <span>Selecciona un usuario para revisar sus roles y permisos</span>
+          <span>{{ visibles().length }} de {{ usuarios().length }}</span>
+        </footer>
+      </div>
+    </app-panel>
+
+    @if (seleccionado(); as actual) {
+      <app-dark-panel class="permisos">
+        <div class="perm">
+          <header class="perm__head">
+            <h2 class="perm__title">Permisos</h2>
+            <span class="perm__badge">{{ abreviar(actual.nombre) }}</span>
+          </header>
+
+          <h3 class="perm__name">{{ actual.nombre }}</h3>
+          <p class="perm__mail">{{ actual.email }} · {{ detalle(actual) }}</p>
+
+          <div class="perm__roles">
+            @for (rol of roles; track rol) {
+              <button
+                type="button"
+                [class]="'role ' + rolClase(rol) + (rolesDraft().includes(rol) ? ' is-on' : '')"
+                [attr.aria-pressed]="rolesDraft().includes(rol)"
+                (click)="toggleRol(rol)"
+              >
+                {{ rol }}
+              </button>
+            }
+          </div>
+
+          @if (errorRoles()) {
+            <p class="perm__error">Selecciona al menos un rol para guardar.</p>
+          }
+
+          <div class="dark-sep"></div>
+
+          <span class="perm__eyebrow">PERMISOS GRANULARES</span>
+
+          <div class="perm__list">
+            @for (permiso of permisos; track permiso.codigo) {
+              @let otorgado = permisosDraft().includes(permiso.codigo);
+              <div class="perm__row" [class.is-off]="!otorgado">
+                <span class="perm__grant">
+                  <app-icon
+                    [name]="otorgado ? 'check-circle' : 'x'"
+                    [size]="13"
+                    [class]="otorgado ? 'grant--on' : 'grant--off'"
+                  />
+                  <span class="perm__label">{{ permiso.descripcion }}</span>
+                </span>
+                <span class="perm__source">
+                  {{ otorgado ? origen(permiso.codigo) : 'requiere rol' }}
+                </span>
+              </div>
+            }
+          </div>
+
+          <div class="perm__grow"></div>
+
+          <div class="perm__info">
+            <app-icon name="warning-circle" [size]="12" />
+            <span>Un usuario puede tener varios roles: sus permisos son la suma de todos.</span>
+          </div>
+
+          <button type="button" class="btn-brand" (click)="guardar()">
+            <app-icon name="check" [size]="15" />
+            Guardar {{ hayCambios() ? 'cambios' : 'roles' }}
+          </button>
+
+          <p class="perm__foot">El cambio se aplica al iniciar la próxima sesión</p>
+        </div>
+      </app-dark-panel>
+    }
+  </div>
+
+  <div class="pie">
+    <span class="pie__item">
+      <app-icon name="users" [size]="12" />
+      Roles del sistema: Mozo, Cajero, Cocinero, Repartidor, Dueño/Admin y Admin
+    </span>
+    <span class="pie__item">
+      <app-icon name="check-circle" [size]="12" />
+      La asignación de roles queda registrada en auditoría
+    </span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

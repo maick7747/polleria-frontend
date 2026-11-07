@@ -1,0 +1,185 @@
+<app-shell title="Verificar stock" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="diff-chip">
+      <app-icon name="warning-circle" [size]="12" />
+      {{ resumen().conDiferencia }} diferencias
+    </span>
+    <a class="ghost-link" routerLink="/inventario">
+      <app-icon name="arrow-left" [size]="14" />
+      Cancelar
+    </a>
+  </div>
+
+  <div class="info">
+    <div class="info__chips">
+      <span class="info__chip">
+        <app-icon name="user" [size]="13" />
+        Responsable: {{ usuarioNombre() }}
+      </span>
+      <span class="info__chip">
+        <app-icon name="clock" [size]="13" />
+        17:45 · miércoles 14
+      </span>
+    </div>
+    <span class="info__meta">Última verificación: hace 3 días</span>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Conteo físico</h2>
+          </div>
+          <span class="panel__meta">
+            {{ filas().length }} de 24 insumos · ajusta al guardar
+          </span>
+        </header>
+
+        <div class="grid grid--head">
+          <span>INSUMO</span>
+          <span>STOCK SISTEMA</span>
+          <span>CONTEO FÍSICO</span>
+          <span>DIFERENCIA</span>
+        </div>
+
+        <div class="rows">
+          @for (fila of filas(); track fila.insumoId) {
+            <div class="grid row" [class.row--alert]="diferencia(fila) < 0">
+              <div class="insumo">
+                <span class="insumo__name">{{ fila.nombre }}</span>
+                <span class="insumo__meta">{{ fila.categoria }} · unidad {{ fila.unidad }}</span>
+              </div>
+              <span class="sistema">{{ cantidad(fila.stock) }} {{ fila.unidad }}</span>
+              <div class="conteo">
+                <button
+                  type="button"
+                  class="conteo__btn"
+                  [attr.aria-label]="'Restar 0.5 a ' + fila.nombre"
+                  (click)="ajustarConteo(fila.insumoId, -0.5)"
+                >
+                  <span class="conteo__sign">−</span>
+                </button>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  [value]="fila.conteo"
+                  [attr.aria-label]="'Conteo físico de ' + fila.nombre"
+                  (input)="onConteo(fila.insumoId, $event)"
+                />
+                <span class="conteo__unit">{{ fila.unidad }}</span>
+                <button
+                  type="button"
+                  class="conteo__btn"
+                  [attr.aria-label]="'Sumar 0.5 a ' + fila.nombre"
+                  (click)="ajustarConteo(fila.insumoId, 0.5)"
+                >
+                  <span class="conteo__sign">+</span>
+                </button>
+              </div>
+              <span [class]="'diff diff--' + claseDiferencia(fila)">
+                {{ textoDiferencia(fila) }}
+              </span>
+            </div>
+          }
+        </div>
+
+        <div class="panel__foot">
+          <span>El conteo reemplaza el stock del sistema al guardar</span>
+          <span>
+            {{ resumen().conDiferencia }} con diferencia · {{ resumen().sinDiferencia }} sin
+            diferencia
+          </span>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aside">
+      <div class="cierre">
+        <header class="cierre__head">
+          <h2>Cerrar verificación</h2>
+          <span class="cierre__badge">Borrador</span>
+        </header>
+
+        <span class="cierre__divider"></span>
+
+        <div class="cierre__stats">
+          <div class="cierre__stat">
+            <span>Contados</span>
+            <strong>{{ resumen().contados }}</strong>
+          </div>
+          <div class="cierre__stat">
+            <span>Con diferencia</span>
+            <strong class="cierre__stat--danger">{{ resumen().conDiferencia }}</strong>
+          </div>
+          <div class="cierre__stat">
+            <span>Sin diferencia</span>
+            <strong>{{ resumen().sinDiferencia }}</strong>
+          </div>
+        </div>
+
+        <span class="cierre__divider"></span>
+
+        <div class="cierre__rows">
+          <div class="cierre__row">
+            <span>Insumos faltantes</span>
+            <strong class="cierre__row--danger">{{ resumen().faltantes }}</strong>
+          </div>
+          <div class="cierre__row">
+            <span>Insumos sobrantes</span>
+            <strong class="cierre__row--warning">{{ resumen().sobrantes }}</strong>
+          </div>
+          <div class="cierre__row">
+            <span>Movimientos a generar</span>
+            <strong>{{ resumen().conDiferencia }} ajustes</strong>
+          </div>
+        </div>
+
+        <span class="cierre__divider"></span>
+
+        <div class="cierre__amount">
+          <span class="cierre__label">Diferencia valorizada</span>
+          <div class="cierre__big">
+            <span class="cierre__cur">S/</span>
+            <strong>{{ monto(resumen().valorizado) }}</strong>
+          </div>
+          <span class="cierre__hint">{{ textoValorizado() }}</span>
+        </div>
+
+        <span class="cierre__grow"></span>
+
+        <div class="cierre__warn">
+          <span class="cierre__warn-icon">
+            <app-icon name="warning-circle" [size]="14" />
+          </span>
+          <p>El ajuste genera un movimiento y queda en el historial.</p>
+        </div>
+
+        <button type="button" class="btn-primary" (click)="guardar()">
+          <app-icon name="check-circle" [size]="16" />
+          Guardar ajuste
+        </button>
+        <button type="button" class="btn-secondary" (click)="descartar()">
+          <app-icon name="x" [size]="15" />
+          Descartar conteo
+        </button>
+
+        <p class="cierre__note">Requiere aprobación del Dueño/Admin.</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>El ajuste genera un movimiento de inventario por cada insumo.</span>
+    <span>Diferencias valorizadas {{ moneda(resumen().valorizado) }}</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check-circle" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

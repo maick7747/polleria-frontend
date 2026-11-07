@@ -1,0 +1,327 @@
+<app-shell title="Ajustar stock mínimo" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="alert-chip">
+      <app-icon name="warning-circle" [size]="12" />
+      {{ bajoMinimo() }} insumos bajo mínimo
+    </span>
+    <a class="ghost-link" routerLink="/inventario">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a inventario
+    </a>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Insumos</h2>
+          </div>
+          <span class="panel__meta">
+            {{ insumos().length }} insumos · {{ bajoMinimo() }} bajo · {{ criticos() }} crítico
+          </span>
+        </header>
+
+        <div class="panel__body">
+          <div class="lista">
+            <div class="lista__search">
+              <app-icon name="magnifying-glass" [size]="13" />
+              <input
+                type="search"
+                placeholder="Buscar insumo"
+                aria-label="Buscar insumo"
+                [value]="busqueda()"
+                (input)="onBuscar($event)"
+              />
+            </div>
+
+            <div class="lista__head">
+              <span>INSUMO · MÍNIMO ACTUAL</span>
+              <span>STOCK</span>
+            </div>
+
+            <div class="lista__rows">
+              @for (insumo of filtrados(); track insumo.id) {
+                <button
+                  type="button"
+                  class="item"
+                  [class.is-active]="insumo.id === insumoId()"
+                  (click)="seleccionar(insumo)"
+                >
+                  <span class="item__info">
+                    <span class="item__name">{{ insumo.nombre }}</span>
+                    <span class="item__meta">
+                      {{ insumo.categoria }} · {{ insumo.unidad }} · mín.
+                      {{ cantidad(insumo.minimo) }}
+                    </span>
+                  </span>
+                  <span class="item__right">
+                    <span class="item__stock">{{ cantidad(insumo.stock) }} {{ insumo.unidad }}</span>
+                    <app-chip [variant]="tonoEstado(insumo.estado)">
+                      {{ textoEstado(insumo.estado) }}
+                    </app-chip>
+                  </span>
+                </button>
+              } @empty {
+                <div class="lista__empty">
+                  <app-empty-state
+                    icon="filter"
+                    title="Sin insumos"
+                    description="No hay insumos que coincidan con la búsqueda."
+                  />
+                </div>
+              }
+            </div>
+
+            <div class="lista__note">
+              <app-icon name="warning-circle" [size]="12" />
+              <p>El mínimo se calcula con el consumo de los últimos 7 días y el tiempo de entrega del proveedor.</p>
+            </div>
+          </div>
+
+          <div class="form">
+            @if (seleccionado(); as insumo) {
+              <div class="form__head">
+                <span class="form__label">Insumo seleccionado</span>
+                <div class="form__title">
+                  <h2>{{ insumo.nombre }}</h2>
+                  <app-chip [variant]="tonoEstado(insumo.estado)">
+                    {{ textoEstado(insumo.estado) }} mínimo
+                  </app-chip>
+                </div>
+                <span class="form__meta">
+                  {{ insumo.categoria }} · {{ insumo.unidad }} · Mercado Mayorista · turno tarde
+                </span>
+              </div>
+
+              <span class="hr"></span>
+
+              <div class="metrics">
+                <div class="metric">
+                  <span class="metric__label">Mínimo actual</span>
+                  <div class="metric__row">
+                    <strong>{{ cantidad(insumo.minimo) }}</strong>
+                    <span>{{ insumo.unidad }}</span>
+                  </div>
+                </div>
+                <div class="metric">
+                  <span class="metric__label">Stock actual</span>
+                  <div class="metric__row">
+                    <strong>{{ cantidad(insumo.stock) }}</strong>
+                    <span>{{ insumo.unidad }}</span>
+                  </div>
+                </div>
+                <div class="metric">
+                  <span class="metric__label">Consumo 7 días</span>
+                  <div class="metric__row">
+                    <strong>{{ cantidad(consumo7()) }}</strong>
+                    <span>{{ insumo.unidad }}</span>
+                  </div>
+                </div>
+                <div class="metric metric--accent">
+                  <button type="button" class="metric__label metric__apply" (click)="aplicarSugerido()">
+                    Sugerido · usar
+                  </button>
+                  <div class="metric__row">
+                    <strong>{{ cantidad(sugerido()) }}</strong>
+                    <span>{{ insumo.unidad }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field">
+                <span class="field__label">Nuevo stock mínimo</span>
+                <div class="field__row">
+                  <div class="stepper">
+                    <button
+                      type="button"
+                      class="stepper__btn"
+                      [attr.aria-label]="'Restar a ' + insumo.nombre"
+                      (click)="ajustarNuevo(-paso())"
+                    >
+                      <span class="stepper__sign">−</span>
+                    </button>
+                    <div class="stepper__value">
+                      <input
+                        type="number"
+                        min="0"
+                        [step]="paso()"
+                        [value]="nuevoMinimo()"
+                        [attr.aria-label]="'Nuevo stock mínimo de ' + insumo.nombre"
+                        (input)="onNuevoMinimo($event)"
+                      />
+                      <span>{{ insumo.unidad }}</span>
+                    </div>
+                    <button
+                      type="button"
+                      class="stepper__btn stepper__btn--dark"
+                      [attr.aria-label]="'Sumar a ' + insumo.nombre"
+                      (click)="ajustarNuevo(paso())"
+                    >
+                      <span class="stepper__sign">+</span>
+                    </button>
+                  </div>
+                  <span [class]="'delta delta--' + deltaTono()">{{ deltaTexto() }}</span>
+                </div>
+              </div>
+
+              <div class="hint">
+                <app-icon name="warning-circle" [size]="14" />
+                <p>
+                  Con {{ cantidad(nuevoMinimo()) }} {{ insumo.unidad }} cubres
+                  <strong>{{ cobertura() }} días</strong> de venta alta. El sistema sugiere
+                  {{ cantidad(sugerido()) }} {{ insumo.unidad }} según el consumo reciente.
+                </p>
+              </div>
+
+              <div class="field">
+                <span class="field__label">Motivo del ajuste</span>
+                <div class="motivos">
+                  <button
+                    type="button"
+                    class="motivo"
+                    [class.is-active]="motivo() === 'temporada'"
+                    (click)="cambiarMotivo('temporada')"
+                  >
+                    @if (motivo() === 'temporada') {
+                      <app-icon name="check" [size]="12" />
+                    }
+                    Temporada alta
+                  </button>
+                  <button
+                    type="button"
+                    class="motivo"
+                    [class.is-active]="motivo() === 'proveedor'"
+                    (click)="cambiarMotivo('proveedor')"
+                  >
+                    @if (motivo() === 'proveedor') {
+                      <app-icon name="check" [size]="12" />
+                    }
+                    Proveedor irregular
+                  </button>
+                  <button
+                    type="button"
+                    class="motivo"
+                    [class.is-active]="motivo() === 'merma'"
+                    (click)="cambiarMotivo('merma')"
+                  >
+                    @if (motivo() === 'merma') {
+                      <app-icon name="check" [size]="12" />
+                    }
+                    Merma recurrente
+                  </button>
+                </div>
+              </div>
+
+              <div class="field">
+                <span class="field__label">Comentario (opcional)</span>
+                <textarea
+                  class="comentario"
+                  rows="2"
+                  placeholder="Ej. subimos el mínimo por el feriado largo"
+                  [value]="comentario()"
+                  (input)="onComentario($event)"
+                ></textarea>
+              </div>
+
+              <span class="grow"></span>
+
+              <div class="last">
+                <app-icon name="clock" [size]="12" />
+                Último cambio: 02 oct 2026 · Dueño/Admin
+              </div>
+            } @else {
+              <app-empty-state
+                icon="package"
+                title="Selecciona un insumo"
+                description="Elige un insumo de la lista para calibrar su stock mínimo."
+              />
+            }
+          </div>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aside">
+      <div class="impacto">
+        <header class="impacto__head">
+          <span class="impacto__bar"></span>
+          <h2>Impacto del cambio</h2>
+        </header>
+
+        <div class="impacto__big">
+          <strong>{{ activadas().length }}</strong>
+          <span>alertas se<br />activarían</span>
+        </div>
+
+        @if (desactivadas().length > 0) {
+          <span class="impacto__soft">{{ desactivadas().length }} alerta(s) se desactivarían</span>
+        }
+
+        <span class="impacto__divider"></span>
+
+        <div class="impacto__list">
+          @for (impacto of impactos(); track impacto.clave) {
+            <div class="impacto__row">
+              <div class="impacto__info">
+                <span class="impacto__name">{{ impacto.titulo }}</span>
+                <span class="impacto__detail">{{ impacto.detalle }}</span>
+              </div>
+              <app-chip [variant]="impacto.tono">{{ impacto.chip }}</app-chip>
+            </div>
+          }
+        </div>
+
+        <span class="impacto__divider"></span>
+
+        <div class="impacto__rows">
+          <div class="impacto__data">
+            <span>Mínimo actual</span>
+            <strong>{{ cantidad(seleccionado()?.minimo ?? 0) }} {{ seleccionado()?.unidad }}</strong>
+          </div>
+          <div class="impacto__data">
+            <span>Nuevo mínimo</span>
+            <strong class="impacto__strong--white">
+              {{ cantidad(nuevoMinimo()) }} {{ seleccionado()?.unidad }}
+            </strong>
+          </div>
+          <div class="impacto__data">
+            <span>Diferencia</span>
+            <strong [class]="'impacto__strong--' + deltaTono()">{{ deltaTexto() }}</strong>
+          </div>
+        </div>
+
+        <div class="impacto__note">
+          <app-icon name="warning-circle" [size]="12" />
+          <p>El mínimo no descuenta stock: solo define cuándo se generan las alertas de compra.</p>
+        </div>
+
+        <span class="grow"></span>
+
+        <button
+          type="button"
+          class="btn-primary"
+          [disabled]="!seleccionado()"
+          (click)="guardar()"
+        >
+          <app-icon name="check-circle" [size]="15" />
+          Guardar mínimo
+        </button>
+        <p class="impacto__foot">El cambio aplica desde el próximo movimiento</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>El mínimo define las alertas de stock bajo y crítico del inventario</span>
+    <span>Cada ajuste queda registrado en el historial de movimientos</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check-circle" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

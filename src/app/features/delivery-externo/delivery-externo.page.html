@@ -1,0 +1,218 @@
+<app-shell
+  [title]="'Delivery externo · ' + etiquetaPlataforma()"
+  [subtitle]="numeroPedido + ' · recibido 17:04 · la plataforma cobra al cliente'"
+>
+  <div actions class="header-actions">
+    <span class="live">
+      <span class="live__dot"></span>
+      En vivo · 2 pedidos externos
+    </span>
+    <a class="ghost-link" routerLink="/dashboard">
+      <app-icon name="clock" [size]="14" />
+      Actualizar
+    </a>
+  </div>
+
+  <div class="plataformas">
+    <div class="plataformas__chips" role="group" aria-label="Plataforma externa">
+      <button
+        type="button"
+        class="plat"
+        [class.is-active]="plataforma() === 'rappi'"
+        (click)="plataforma.set('rappi')"
+      >
+        <app-icon name="package" [size]="12" />
+        Rappi
+        <span class="plat__pct">25%</span>
+      </button>
+      <button
+        type="button"
+        class="plat"
+        [class.is-active]="plataforma() === 'llamafood'"
+        (click)="plataforma.set('llamafood')"
+      >
+        <app-icon name="package" [size]="12" />
+        LlamaFood
+        <span class="plat__pct">20%</span>
+      </button>
+    </div>
+    <span class="plataformas__meta">
+      Sin cobro en el local · la comisión se descuenta al depositar
+    </span>
+  </div>
+
+  <div class="board">
+    <app-panel class="pedido">
+      <div class="pedido__inner">
+        <header class="pedido__head">
+          <span class="pedido__numero">{{ numeroPedido }}</span>
+          <span class="tag tag--info">{{ etiquetaPlataforma() }}</span>
+          <span class="tag tag--warning">En cocina</span>
+          <span class="pedido__recibido">Recibido 17:04 · hace 12 min</span>
+        </header>
+
+        <span class="sep"></span>
+
+        <div class="datos">
+          <div class="datos__col">
+            <div class="dato">
+              <span class="dato__label">Cliente</span>
+              <strong class="dato__valor">{{ clienteNombre }}</strong>
+            </div>
+            <div class="dato">
+              <span class="dato__label">Teléfono</span>
+              <span class="dato__valor">{{ clienteTelefono }}</span>
+            </div>
+            <div class="dato">
+              <span class="dato__label">Dirección</span>
+              <span class="dato__valor">{{ direccion }}</span>
+            </div>
+            <div class="dato">
+              <span class="dato__label">Referencia</span>
+              <span class="dato__valor dato__valor--muted">{{ referencia }}</span>
+            </div>
+          </div>
+
+          <span class="col-sep"></span>
+
+          <aside class="repartidor">
+            <span class="repartidor__label">Repartidor asignado</span>
+            <div class="repartidor__row">
+              <span class="repartidor__avatar">RC</span>
+              <div class="repartidor__data">
+                <span class="repartidor__nombre">Repartidor Rappi</span>
+                <span class="repartidor__meta">Asignado por la app</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <span class="sep"></span>
+
+        <div class="items__head">
+          <h2>Ítems del pedido</h2>
+          <span>3 ítems · plaza Rappi</span>
+        </div>
+
+        @for (item of items; track item.id; let i = $index) {
+          <div class="item">
+            <span class="item__idx">{{ i + 1 }}</span>
+            <app-icon name="flame" [size]="15" class="item__icon" />
+            <div class="item__data">
+              <span class="item__name">{{ item.nombre }}</span>
+              <span class="item__notas">{{ item.notas }}</span>
+            </div>
+            <span class="item__price">{{ moneda(item.subtotal) }}</span>
+          </div>
+        }
+
+        <p class="obs">
+          <app-icon name="warning-circle" [size]="13" />
+          Observaciones: {{ observaciones }}
+        </p>
+
+        <div class="pedido__grow"></div>
+
+        <span class="sep"></span>
+
+        <div class="total">
+          <span>Total del pedido</span>
+          <div class="total__amount">
+            <span class="cur">S/</span>
+            <span class="big">{{ total().toFixed(2) }}</span>
+          </div>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="liquidacion">
+      <div class="liquidacion__inner">
+        <header class="liquidacion__head">
+          <span class="liquidacion__kicker">LIQUIDACIÓN</span>
+          <span class="liquidacion__plat">
+            <span class="liquidacion__dot"></span>
+            {{ etiquetaPlataforma() }} {{ comisionPct() }}%
+          </span>
+        </header>
+
+        <span class="liquidacion__label">Total que paga el cliente</span>
+        <div class="liquidacion__amount">
+          <span class="cur">S/</span>
+          <span class="big">{{ total().toFixed(2) }}</span>
+        </div>
+
+        <span class="liquidacion__sep"></span>
+
+        <div class="comisiones">
+          @for (fila of comisiones(); track fila.etiqueta) {
+            <div class="comision">
+              <div class="comision__info">
+                <span class="comision__name" [class.comision__name--muted]="!fila.activa">
+                  {{ fila.etiqueta }}
+                </span>
+                <span class="comision__pct">{{ fila.pct }}% sobre el total</span>
+              </div>
+              @if (fila.activa) {
+                <span class="comision__monto">- {{ moneda(fila.monto) }}</span>
+              } @else {
+                <span class="comision__monto comision__monto--muted">{{ moneda(0) }}</span>
+              }
+            </div>
+          }
+        </div>
+
+        <span class="liquidacion__sep"></span>
+
+        <span class="liquidacion__label">Neto a depositar</span>
+        <div class="liquidacion__amount">
+          <span class="cur cur--brand">S/</span>
+          <span class="big big--neto">{{ neto().toFixed(2) }}</span>
+        </div>
+
+        <div class="margen">
+          <span>Margen sobre venta</span>
+          <strong>{{ margen() }}%</strong>
+        </div>
+
+        <span class="liquidacion__sep"></span>
+
+        <p class="liquidacion__info">
+          <app-icon name="warning-circle" [size]="13" />
+          La app cobra al cliente y deposita el neto en 24 h. El local solo prepara y despacha.
+        </p>
+
+        <div class="liquidacion__grow"></div>
+
+        <button
+          type="button"
+          class="aceptar"
+          [disabled]="!puedeAceptar()"
+          (click)="aceptar()"
+        >
+          <app-icon name="check" [size]="16" />
+          Aceptar pedido
+        </button>
+        <button type="button" class="rechazar" (click)="rechazar()">
+          <app-icon name="x" [size]="15" />
+          Rechazar pedido
+        </button>
+        <span class="liquidacion__pie">Pedido {{ numeroPedido }} · {{ etiquetaPlataforma() }}</span>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__note">
+      <app-icon name="warning-circle" [size]="12" />
+      La plataforma cobra al cliente · el local no registra pago en este canal.
+    </span>
+    <span class="pie__note">Si se cancela, el stock se revierte automáticamente</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

@@ -1,0 +1,211 @@
+﻿<app-shell title="Registrar reembolso" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/devoluciones">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a devoluciones
+    </a>
+  </div>
+
+  <div class="cuerpo">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Datos del reembolso</h2>
+            <span class="pill">DV-{{ codigo() }}</span>
+          </div>
+          <app-chip variant="success">Aprobado</app-chip>
+        </header>
+
+        <div class="form">
+          <div class="fila fila--info">
+            <div class="campo">
+              <span class="campo__label">Pedido</span>
+              <strong class="dato">{{ pedidoNumero }}</strong>
+            </div>
+            <div class="campo campo--sm">
+              <span class="campo__label">Total del pedido</span>
+              <strong class="dato">{{ moneda(montoAprobado) }}</strong>
+            </div>
+            <div class="campo">
+              <span class="campo__label">Motivo</span>
+              <strong class="dato">{{ motivo }}</strong>
+            </div>
+            <div class="campo campo--sm">
+              <span class="campo__label">Autoriza</span>
+              <strong class="dato">Dueño / Admin</strong>
+            </div>
+          </div>
+
+          <span class="campo__label">Método de devolución</span>
+          <div class="chips" role="group" aria-label="Método de devolución">
+            @for (m of metodos; track m.id) {
+              <button
+                type="button"
+                class="chip"
+                [class.is-active]="metodo() === m.id"
+                [attr.aria-pressed]="metodo() === m.id"
+                (click)="elegirMetodo(m.id)"
+              >
+                <app-icon [name]="m.icon" [size]="14" />
+                {{ m.label }}
+              </button>
+            }
+            <span class="chips__hint">El efectivo sale de la caja del turno</span>
+          </div>
+
+          <div class="monto-box">
+            <div class="monto-box__info">
+              <span class="campo__label">Monto a reembolsar</span>
+              <span class="monto-box__hint">No puede superar el total del pedido</span>
+            </div>
+            <div class="monto-box__input">
+              <span>S/</span>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                inputmode="decimal"
+                aria-label="Monto a reembolsar"
+                [value]="monto()"
+                (input)="onMonto($event)"
+              />
+            </div>
+          </div>
+
+          <div class="fila fila--info">
+            <div class="campo">
+              <span class="campo__label">Referencia</span>
+              <strong class="dato">{{ referencia() }}</strong>
+            </div>
+            <div class="campo campo--sm">
+              <span class="campo__label">Fecha</span>
+              <strong class="dato">{{ fechaTexto }}</strong>
+            </div>
+            <div class="campo campo--sm">
+              <span class="campo__label">Registrado por</span>
+              <strong class="dato">{{ registradoPor() }}</strong>
+            </div>
+            <div class="campo campo--sm">
+              <span class="campo__label">Estado</span>
+              <span class="dato">
+                <app-chip [variant]="estado() === 'Confirmado' ? 'success' : 'warning'">
+                  {{ estado() }}
+                </app-chip>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="nota">
+          <app-icon name="warning-circle" [size]="13" />
+          El comprobante original se mantiene · el reembolso se registra como egreso de caja
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="confirmar">
+      <div class="confirmar__inner">
+        <header class="confirmar__head">
+          <span class="confirmar__bar"></span>
+          <h2>Confirmar reembolso</h2>
+        </header>
+
+        <div class="confirmar__block">
+          <span class="confirmar__label">Total a devolver</span>
+          <div class="confirmar__amount">
+            <span>S/</span>
+            <strong>{{ montoNumero().toFixed(2) }}</strong>
+          </div>
+        </div>
+
+        <span class="confirmar__sep"></span>
+
+        <div class="confirmar__row">
+          <span>Método</span>
+          <strong>{{ textoMetodo(metodo()) }}</strong>
+        </div>
+        <div class="confirmar__row">
+          <span>Efectivo en caja</span>
+          <span class="confirmar__delta">
+            {{ moneda(saldoCaja()) }}
+            <app-icon name="arrow-right" [size]="11" />
+            <strong>{{ moneda(saldoDespues()) }}</strong>
+          </span>
+        </div>
+        <div class="confirmar__row">
+          <span>Pedido</span>
+          <strong>{{ pedidoNumero }}</strong>
+        </div>
+        <div class="confirmar__row">
+          <span>Referencia</span>
+          <strong>{{ referencia() }}</strong>
+        </div>
+
+        <span class="confirmar__grow"></span>
+
+        <button
+          type="button"
+          class="btn-brand"
+          [disabled]="!puedeConfirmar()"
+          (click)="confirmar()"
+        >
+          <app-icon name="check" [size]="15" />
+          Registrar reembolso
+        </button>
+        <button type="button" class="btn-ghost-dark" (click)="cancelar()">
+          <app-icon name="x" [size]="15" />
+          Cancelar
+        </button>
+
+        <p class="confirmar__note">Afecta el cuadre de caja del turno</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <section class="recientes">
+    <app-section-header title="Reembolsos del día" [meta]="reembolsosMeta()" />
+
+    <div class="tabla">
+      <div class="tabla__head">
+        <span>HORA</span>
+        <span>PEDIDO</span>
+        <span class="col-motivo">MOTIVO</span>
+        <span class="col-ref">REFERENCIA</span>
+        <span>ESTADO</span>
+        <span class="right">MONTO</span>
+      </div>
+
+      @for (d of reembolsosDia(); track d.id) {
+        <div class="tabla__row">
+          <span class="meta">{{ hora(d.fechaResolucion) }}</span>
+          <span class="fuerte">{{ d.pedidoNumero }}</span>
+          <span class="col-motivo">{{ d.motivo }}</span>
+          <span class="col-ref">{{ referenciaDe(d) }}</span>
+          <span>
+            <app-chip [variant]="tonoEstado(d)">{{ textoEstado(d) }}</app-chip>
+          </span>
+          <span class="right monto">{{ moneda(d.montoReembolsado) }}</span>
+        </div>
+      } @empty {
+        <div class="tabla__empty">
+          <app-empty-state
+            icon="money"
+            title="Sin reembolsos"
+            description="No hay reembolsos registrados en el día."
+          />
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="pie">
+    <span>Todo reembolso exige aprobación del Dueño/Admin y queda en el historial</span>
+    <span>Comprobante SUNAT simulado · método: efectivo, tarjeta, Yape, Plin</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">{{ toast() }}</div>
+  }
+</app-shell>

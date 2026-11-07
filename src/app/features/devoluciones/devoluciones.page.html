@@ -1,0 +1,226 @@
+<app-shell title="Devoluciones y quejas" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="badge-warning">
+      <span class="badge-warning__dot"></span>
+      {{ esDueno() ? 'Aprobación del dueño' : 'Requiere aprobación del dueño' }}
+    </span>
+    <a class="ghost-link" routerLink="/comandas">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a comandas
+    </a>
+  </div>
+
+  <div class="cuerpo">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Pedido observado</h2>
+            <span class="pill">{{ pedido()?.numero ?? '—' }}</span>
+          </div>
+          <span class="pill pill--danger">Queja registrada</span>
+        </header>
+
+        <div class="form">
+          <div class="fila">
+            <label class="campo">
+              <span class="campo__label">Pedido</span>
+              <select class="input" [value]="pedidoId()" (change)="onPedido($event)">
+                @for (p of pedidosDisponibles(); track p.id) {
+                  <option [value]="p.id">{{ p.numero }} · {{ textoCanalPedido(p) }}</option>
+                }
+              </select>
+            </label>
+            <div class="campo campo--sm">
+              <span class="campo__label">Total del pedido</span>
+              <strong class="dato">{{ moneda(total()) }}</strong>
+            </div>
+            <div class="campo campo--sm">
+              <span class="campo__label">Estado cocina</span>
+              <span class="dato">
+                <app-chip [variant]="estadoCocinaTono()">{{ estadoCocinaTexto() }}</app-chip>
+              </span>
+            </div>
+          </div>
+
+          <div class="fila fila--info">
+            <div class="campo">
+              <span class="campo__label">Canal</span>
+              <strong class="dato">{{ canalTexto() }}</strong>
+            </div>
+            <div class="campo">
+              <span class="campo__label">Plato afectado</span>
+              <strong class="dato">{{ platoAfectado() }}</strong>
+            </div>
+            <div class="campo">
+              <span class="campo__label">Mozo</span>
+              <strong class="dato">{{ mozo() }}</strong>
+            </div>
+          </div>
+
+          <span class="campo__label">Motivo de la devolución</span>
+          <div class="chips" role="group" aria-label="Motivo de la devolución">
+            @for (m of motivos; track m) {
+              <button
+                type="button"
+                class="chip"
+                [class.is-active]="motivo() === m"
+                (click)="elegirMotivo(m)"
+              >
+                {{ m }}
+              </button>
+            }
+          </div>
+
+          <span class="campo__label">Solución aplicada</span>
+          <div class="soluciones" role="radiogroup" aria-label="Solución aplicada">
+            @for (s of soluciones; track s.id) {
+              <button
+                type="button"
+                class="solucion"
+                role="radio"
+                [attr.aria-checked]="solucion() === s.id"
+                [class.is-sel]="solucion() === s.id"
+                (click)="elegirSolucion(s.id)"
+              >
+                <span class="solucion__radio"><span class="solucion__dot"></span></span>
+                <span class="solucion__info">
+                  <span class="solucion__title">{{ s.titulo }}</span>
+                  <span class="solucion__desc">{{ s.descripcion }}</span>
+                </span>
+                @if (s.id === 'reembolso_parcial') {
+                  <span class="solucion__monto">
+                    <span>S/</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      inputmode="decimal"
+                      aria-label="Monto del reembolso parcial"
+                      [value]="montoParcial()"
+                      (input)="onMontoParcial($event)"
+                    />
+                  </span>
+                } @else {
+                  <span class="solucion__monto">
+                    {{ s.id === 'reembolso_total' ? moneda(total()) : moneda(0) }}
+                  </span>
+                }
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="nota">
+          <app-icon name="warning-circle" [size]="13" />
+          Re-preparar y corregir no afectan el comprobante · el reembolso sí afecta el cuadre
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="resolver">
+      <div class="resolver__inner">
+        <header class="resolver__head">
+          <span class="resolver__bar"></span>
+          <h2>Resolver</h2>
+          <span class="resolver__pill">DV-{{ devolucionCodigo() }}</span>
+        </header>
+
+        <div class="resolver__block">
+          <span class="resolver__label">Solución seleccionada</span>
+          <strong class="resolver__title">{{ tituloSolucion() }}</strong>
+          <span class="resolver__hint">{{ descripcionSolucion() }}</span>
+        </div>
+
+        <span class="resolver__sep"></span>
+
+        <div class="resolver__row">
+          <span>Impacto en KDS</span>
+          <strong [class.resolver__warn]="solucion() === 're_preparar'">
+            {{ solucion() === 're_preparar' ? 'Prioritario · 30 min' : 'Normal' }}
+          </strong>
+        </div>
+        <div class="resolver__row">
+          <span>Costo asumido</span>
+          <strong>{{ moneda(montoSolucion()) }}</strong>
+        </div>
+        <div class="resolver__row">
+          <span>Stock</span>
+          <strong>{{ esReembolso() ? 'Reversa automática' : 'Sin reversa' }}</strong>
+        </div>
+        <div class="resolver__row">
+          <span>Comprobante</span>
+          <strong>{{ esReembolso() ? 'Se ajusta' : 'Se mantiene' }}</strong>
+        </div>
+        <div class="resolver__row">
+          <span>Aprobación</span>
+          <strong>{{ esDueno() ? 'Dueño / Admin' : 'Pendiente de dueño' }}</strong>
+        </div>
+
+        <span class="resolver__grow"></span>
+
+        <button
+          type="button"
+          class="btn-brand"
+          [disabled]="!puedeConfirmar()"
+          (click)="confirmar()"
+        >
+          <app-icon name="check" [size]="15" />
+          Confirmar solución
+        </button>
+        <button type="button" class="btn-ghost-dark" (click)="descartar()">
+          <app-icon name="x" [size]="15" />
+          Descartar
+        </button>
+
+        <p class="resolver__note">El dueño autoriza reembolsos caso por caso</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <section class="recientes">
+    <app-section-header title="Devoluciones del turno" [meta]="recientesMeta()" />
+
+    <div class="tabla">
+      <div class="tabla__head">
+        <span>HORA</span>
+        <span>PEDIDO</span>
+        <span class="col-motivo">MOTIVO</span>
+        <span class="col-solucion">SOLUCIÓN</span>
+        <span>ESTADO</span>
+        <span class="right">MONTO</span>
+      </div>
+
+      @for (d of devolucionesTurno(); track d.id) {
+        <div class="tabla__row">
+          <span class="meta">{{ hora(d.fechaReporte) }}</span>
+          <span class="fuerte">{{ d.pedidoNumero }}</span>
+          <span class="col-motivo">{{ d.motivo }}</span>
+          <span class="col-solucion">{{ textoSolucion(d.resolucion) }}</span>
+          <span>
+            <app-chip [variant]="tonoEstado(d.estado)">{{ textoEstado(d.estado) }}</app-chip>
+          </span>
+          <span class="right monto">{{ moneda(d.montoReembolsado) }}</span>
+        </div>
+      } @empty {
+        <div class="tabla__empty">
+          <app-empty-state
+            icon="arrow-left"
+            title="Sin devoluciones"
+            description="No hay devoluciones registradas en el turno."
+          />
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="pie">
+    <span>Re-preparar y corregir no afectan el comprobante · el reembolso sí afecta el cuadre</span>
+    <span>Sin split de cuenta · un comprobante por pedido</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">{{ toast() }}</div>
+  }
+</app-shell>

@@ -1,0 +1,218 @@
+<app-shell
+  title="Reportes"
+  subtitle="7 reportes disponibles · datos al 14 de octubre 2026 · turno tarde"
+>
+  <div actions class="header-actions">
+    <span class="rango-pill">
+      <app-icon name="clock" [size]="14" />
+      {{ rangoCorto() }}
+    </span>
+    <button type="button" class="ghost-link" (click)="actualizar()">
+      <app-icon name="arrow-clockwise" [size]="14" />
+      Actualizar
+    </button>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <aside class="lista">
+          <header class="lista__head">
+            <span class="eyebrow">TIPO DE REPORTE</span>
+            <span class="lista__count">{{ tipos.length }}</span>
+          </header>
+
+          <div class="lista__tiles" role="list">
+            @for (tipo of tipos; track tipo.id) {
+              <button
+                type="button"
+                class="tile"
+                [class.is-active]="seleccion() === tipo.id"
+                (click)="seleccionar(tipo.id)"
+              >
+                <app-icon [name]="tipo.icono" [size]="18" />
+                <span class="tile__text">
+                  <span class="tile__name">{{ tipo.nombre }}</span>
+                  <span class="tile__detail">{{ tipo.detalle }}</span>
+                </span>
+                <app-icon name="caret-right" [size]="14" />
+              </button>
+            }
+          </div>
+
+          <div class="lista__grow"></div>
+
+          <footer class="lista__foot">
+            Todos los reportes respetan el rango de fechas
+          </footer>
+        </aside>
+
+        <section class="preview">
+          <header class="preview__head">
+            <div class="preview__title">
+              <span class="bar"></span>
+              <h2>Vista previa · {{ tipoActual().nombre }}</h2>
+            </div>
+            <span class="pill">{{ rangoCorto() }}</span>
+          </header>
+
+          <div class="preview__kpis">
+            <div class="kpi-main">
+              <span class="kpi-label">{{ vista().kpiLabel }}</span>
+              <div class="kpi-value">
+                @if (vista().prefijo) {
+                  <span class="kpi-cur">{{ vista().prefijo }}</span>
+                }
+                <span class="kpi-big">{{ vista().kpiValor }}</span>
+              </div>
+              <div class="kpi-delta">
+                <span class="delta-chip">{{ vista().variacion }}</span>
+                <span class="kpi-note">vs período anterior</span>
+              </div>
+            </div>
+
+            <span class="kpi-sep"></span>
+
+            <div class="kpi-side">
+              <span class="kpi-label">{{ vista().secundarioUno.label }}</span>
+              <strong class="kpi-side__value">{{ vista().secundarioUno.valor }}</strong>
+            </div>
+
+            <span class="kpi-sep"></span>
+
+            <div class="kpi-side">
+              <span class="kpi-label">{{ vista().secundarioDos.label }}</span>
+              <strong class="kpi-side__value">{{ vista().secundarioDos.valor }}</strong>
+            </div>
+          </div>
+
+          <span class="hairline"></span>
+
+          <div class="preview__section">
+            <span class="preview__section-title">{{ vista().seccion }}</span>
+            <span class="preview__section-meta">{{ vista().seccionMeta }}</span>
+          </div>
+
+          <div class="bars">
+            @for (fila of vista().filas; track fila.label) {
+              <div class="bar-row">
+                <span class="bar-label">{{ fila.label }}</span>
+                <span class="bar-track">
+                  <span
+                    [class]="'bar-fill bar-fill--' + fila.tono"
+                    [style.width.%]="fila.pct"
+                  ></span>
+                </span>
+                <span class="bar-monto">{{ fila.monto }}</span>
+              </div>
+            }
+          </div>
+
+          <span class="hairline"></span>
+
+          <footer class="preview__foot">
+            <span>{{ vista().pieIzquierda }}</span>
+            <span>{{ vista().pieDerecha }}</span>
+          </footer>
+        </section>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="exportar">
+      <div class="exportar__inner">
+        <header class="exportar__head">
+          <h2 class="exportar__title">Exportar</h2>
+          <span class="exportar__badge">PDF · Excel</span>
+        </header>
+
+        <span class="eyebrow eyebrow--dark exportar__eyebrow">REPORTE SELECCIONADO</span>
+        <span class="exportar__nombre">{{ tipoActual().nombre }}</span>
+        <span class="exportar__detalle">{{ vista().resumen }}</span>
+
+        <span class="dark-sep"></span>
+
+        <span class="exportar__label">Rango de fechas</span>
+        <div class="fechas">
+          <label class="fecha">
+            <span>Desde</span>
+            <input type="date" [value]="fechaDesde()" (change)="onDesde($event)" />
+          </label>
+          <label class="fecha">
+            <span>Hasta</span>
+            <input type="date" [value]="fechaHasta()" (change)="onHasta($event)" />
+          </label>
+        </div>
+
+        <span class="exportar__label exportar__label--formato">Formato</span>
+        <div class="formatos">
+          <button
+            type="button"
+            class="formato"
+            [class.is-active]="formato() === 'PDF'"
+            (click)="exportar('PDF')"
+          >
+            <app-icon name="download" [size]="15" />
+            PDF
+          </button>
+          <button
+            type="button"
+            class="formato"
+            [class.is-active]="formato() === 'Excel'"
+            (click)="exportar('Excel')"
+          >
+            <app-icon name="download" [size]="15" />
+            Excel
+          </button>
+        </div>
+
+        <span class="dark-sep"></span>
+
+        <div class="checks">
+          <span class="check">
+            <app-icon name="check" [size]="12" />
+            IGV 18% desglosado por comprobante
+          </span>
+          <span class="check">
+            <app-icon name="check" [size]="12" />
+            Resumen por canal y método de pago
+          </span>
+          <span class="check">
+            <app-icon name="check" [size]="12" />
+            Detalle de pedidos y comisiones
+          </span>
+        </div>
+
+        <div class="exportar__grow"></div>
+
+        <div class="exportar__generados">
+          <span>Generados este mes</span>
+          <strong>{{ generados() }} reportes</strong>
+        </div>
+
+        <button type="button" class="btn-brand" (click)="generar()">
+          <app-icon name="download" [size]="15" />
+          Generar y descargar
+        </button>
+        <span class="exportar__foot">El archivo queda en el historial del turno</span>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__item">
+      <app-icon name="warning-circle" [size]="12" />
+      Los reportes se calculan sobre cuentas cerradas del período
+    </span>
+    <span class="pie__item">
+      <app-icon name="clock" [size]="12" />
+      Actualizado 17:45 · SUNAT simulado
+    </span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

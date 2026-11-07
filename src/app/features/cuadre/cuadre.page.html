@@ -1,0 +1,260 @@
+<app-shell
+  title="Cuadre de caja"
+  subtitle="Fratelli's · miércoles 14 de octubre · turno tarde · cajero Maick V."
+>
+  <div actions class="header-actions">
+    @if (abierta()) {
+      <app-chip variant="success" [dot]="true">Caja abierta · 11:00</app-chip>
+    } @else {
+      <app-chip variant="neutral" [dot]="true">Caja cerrada</app-chip>
+    }
+    <button type="button" class="ghost-link" (click)="imprimir()">
+      <app-icon name="printer" [size]="15" />
+      Imprimir arqueo
+    </button>
+  </div>
+
+  <div class="stepper">
+    <div class="stepper__pasos">
+      <a class="paso-done" routerLink="/cuadre-caja/apertura" title="Ir a apertura de caja">
+        <app-icon name="check" [size]="11" />
+      </a>
+      <a class="paso__label paso__label--link" routerLink="/cuadre-caja/apertura">Apertura</a>
+      <span class="paso__meta">{{ moneda(fondoInicial()) }}</span>
+      <span class="paso__linea"></span>
+      <span class="paso-done">
+        <app-icon name="check" [size]="11" />
+      </span>
+      <span class="paso__label">Operación</span>
+      <span class="paso__meta">{{ totalCobros() }} cobros</span>
+      <span class="paso__linea"></span>
+      <span class="paso paso--activo">3</span>
+      <span class="paso__label paso__label--activo">Cierre</span>
+      <span class="paso__meta">en curso</span>
+    </div>
+    <span class="stepper__meta">
+      Turno tarde · 11:00 – 22:00 · umbral de diferencia S/ 0.00
+    </span>
+  </div>
+
+  <div class="board">
+    <div class="board__left">
+      <app-panel class="arqueo-panel">
+        <div class="arqueo">
+          <header class="panel-head">
+            <div class="panel-title">
+              <span class="bar"></span>
+              <h2>Arqueo del turno</h2>
+            </div>
+            <span class="pill">Turno tarde</span>
+          </header>
+
+          <span class="hairline"></span>
+
+          <div class="arqueo__cols">
+            <div class="col">
+              <span class="eyebrow">MOVIMIENTO DEL TURNO</span>
+
+              <div class="row">
+                <span class="row__label">Ventas cobradas</span>
+                <strong class="row__value">{{ moneda(totalVentas()) }}</strong>
+              </div>
+              <div class="row">
+                <span class="row__label">Egresos y gastos</span>
+                <strong class="row__value row__value--negative">
+                  − {{ moneda(totalEgresos()) }}
+                </strong>
+              </div>
+              <div class="row">
+                <span class="row__label">Fondo inicial</span>
+                <strong class="row__value">{{ moneda(fondoInicial()) }}</strong>
+              </div>
+
+              <span class="hairline"></span>
+
+              <div class="row row--total">
+                <span class="row__label row__label--strong">Esperado en caja</span>
+                <strong class="row__big">{{ moneda(esperado()) }}</strong>
+              </div>
+              <span class="hint">Ventas − egresos + fondo inicial</span>
+            </div>
+
+            <span class="col-sep"></span>
+
+            <div class="col">
+              <span class="eyebrow">CONTEO FÍSICO</span>
+
+              <div class="row row--editable">
+                <span class="row__label">Efectivo contado</span>
+                <span class="inline-input">
+                  <span class="inline-input__cur">S/</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputmode="decimal"
+                    aria-label="Efectivo contado"
+                    [value]="efectivoContado()"
+                    (input)="onEfectivo($event)"
+                  />
+                </span>
+              </div>
+              <div class="row row--editable">
+                <span class="row__label">Digital (Yape · Plin · Tarjeta)</span>
+                <span class="inline-input">
+                  <span class="inline-input__cur">S/</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputmode="decimal"
+                    aria-label="Pagos digitales"
+                    [value]="pagosDigitales()"
+                    (input)="onDigitales($event)"
+                  />
+                </span>
+              </div>
+              <div class="row">
+                <span class="row__label">Total contado</span>
+                <strong class="row__value">{{ moneda(totalReal()) }}</strong>
+              </div>
+
+              <span class="hairline"></span>
+
+              <div class="row row--total">
+                <span class="row__label row__label--strong">Diferencia</span>
+                <strong
+                  class="row__big"
+                  [class.is-ok]="cuadrado()"
+                  [class.is-bad]="!cuadrado()"
+                >
+                  {{ moneda(diferencia()) }}
+                </strong>
+              </div>
+              @if (cuadrado()) {
+                <span class="nota nota--ok">
+                  <app-icon name="check-circle" [size]="12" />
+                  Cuadre exacto · sin faltante
+                </span>
+              } @else {
+                <span class="nota nota--bad">
+                  <app-icon name="warning-circle" [size]="12" />
+                  {{ diferencia() > 0 ? 'Sobrante en caja' : 'Faltante en caja' }}
+                </span>
+              }
+            </div>
+          </div>
+
+          <span class="hairline"></span>
+
+          <footer class="arqueo__foot">
+            <span>Conteo verificado por {{ responsable() }} · 18:02</span>
+            <span>{{ totalCobros() }} cobros del turno · 1 comprobante por cuenta</span>
+          </footer>
+        </div>
+      </app-panel>
+
+      <section class="desglose">
+        <app-section-header
+          title="Desglose de pagos"
+          [meta]="desglose().length + ' métodos · ' + totalCobros() + ' cobros'"
+        />
+        <div class="desglose__grid">
+          @for (item of desglose(); track item.metodo) {
+            <div class="desglose__item">
+              <span class="desglose__label">
+                <app-icon [name]="item.icono" [size]="12" />
+                {{ item.etiqueta }} · {{ item.cobros }} cobros
+              </span>
+              <strong class="desglose__monto">{{ moneda(item.monto) }}</strong>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+
+    <app-dark-panel class="diferencia">
+      <div class="diferencia__inner">
+        <header class="diferencia__head">
+          <h2 class="diferencia__title">Diferencia</h2>
+          <span class="diferencia__badge">Umbral S/ 0.00</span>
+        </header>
+
+        <div class="diferencia__result">
+          <span class="eyebrow eyebrow--dark">RESULTADO DEL ARQUEO</span>
+          <div class="diferencia__amount">
+            <span class="diferencia__cur">S/</span>
+            <span
+              class="diferencia__big"
+              [class.is-ok]="cuadrado()"
+              [class.is-bad]="!cuadrado()"
+            >
+              {{ diferenciaAbs().toFixed(2) }}
+            </span>
+          </div>
+          <span class="diferencia__note">{{ notaDiferencia() }}</span>
+        </div>
+
+        <span class="dark-sep"></span>
+
+        <div class="diferencia__rows">
+          <div>
+            <span>Esperado</span>
+            <strong>{{ moneda(esperado()) }}</strong>
+          </div>
+          <div>
+            <span>Contado</span>
+            <strong>{{ moneda(totalReal()) }}</strong>
+          </div>
+          <div>
+            <span>Diferencia</span>
+            <strong [class.is-ok]="cuadrado()" [class.is-bad]="!cuadrado()">
+              {{ moneda(diferencia()) }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="diferencia__grow"></div>
+
+        <div class="diferencia__info">
+          <app-icon name="warning-circle" [size]="14" />
+          <span>Cualquier diferencia distinta de S/ 0.00 genera una alerta al dueño.</span>
+        </div>
+
+        @if (confirmando()) {
+          <button type="button" class="btn-brand" (click)="cerrar()">
+            <app-icon name="check" [size]="15" />
+            Confirmar cierre
+          </button>
+          <button type="button" class="btn-ghost-dark" (click)="cancelarCierre()">
+            Cancelar
+          </button>
+        } @else {
+          <button type="button" class="btn-brand" (click)="cerrar()">
+            <app-icon name="cash-register" [size]="15" />
+            Cerrar caja
+          </button>
+        }
+        <span class="diferencia__foot">Al cerrar se archiva el turno y no se puede reabrir</span>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__item">
+      <app-icon name="receipt" [size]="12" />
+      {{ totalCobros() }} comprobantes del turno · SUNAT simulado
+    </span>
+    <span class="pie__item">
+      <app-icon name="clock" [size]="12" />
+      Cuadre diario · el turno siguiente requiere apertura
+    </span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

@@ -1,0 +1,235 @@
+<app-shell
+  title="Registrar activo"
+  subtitle="Ficha de activo fijo · el código M-0xx se asigna al guardar"
+>
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/activos">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a activos
+    </a>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="form">
+        <header class="form__head">
+          <div class="form__title">
+            <span class="bar"></span>
+            <h2>Datos del activo</h2>
+          </div>
+          <span class="pill">Nuevo · sin código</span>
+        </header>
+
+        <div class="campo">
+          <span class="campo__label">Nombre del activo</span>
+          <input
+            class="input"
+            [class.is-error]="mostrarErrores() && errores().nombre"
+            type="text"
+            [value]="nombre()"
+            (input)="onNombre($event)"
+            placeholder="Ej. Congeladora 500 L"
+          />
+          @if (mostrarErrores() && errores().nombre) {
+            <span class="campo__error">Ingresa el nombre del activo.</span>
+          }
+        </div>
+
+        <div class="campo">
+          <span class="campo__label">Categoría</span>
+          <div class="chips" role="group" aria-label="Categoría del activo">
+            @for (item of categorias; track item.id) {
+              <button
+                type="button"
+                class="chip"
+                [class.is-active]="categoria() === item.id"
+                (click)="elegirCategoria(item.id)"
+              >
+                {{ item.label }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="grid grid--2">
+          <label class="campo">
+            <span class="campo__label">Costo de compra</span>
+            <span class="input-wrap" [class.is-error]="mostrarErrores() && errores().costo">
+              <span class="input-cur">S/</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                inputmode="decimal"
+                [value]="costo()"
+                (input)="onCosto($event)"
+                aria-label="Costo de compra"
+              />
+            </span>
+            @if (mostrarErrores() && errores().costo) {
+              <span class="campo__error">El costo debe ser mayor a 0.</span>
+            }
+          </label>
+
+          <label class="campo">
+            <span class="campo__label">Proveedor</span>
+            <input
+              class="input"
+              type="text"
+              [value]="proveedor()"
+              (input)="onProveedor($event)"
+              placeholder="Proveedor del activo"
+            />
+          </label>
+        </div>
+
+        <div class="grid grid--2">
+          <label class="campo">
+            <span class="campo__label">Vida útil (meses)</span>
+            <input
+              class="input"
+              [class.is-error]="mostrarErrores() && errores().vidaUtil"
+              type="number"
+              min="1"
+              step="1"
+              [value]="vidaUtilMeses()"
+              (input)="onVidaUtil($event)"
+            />
+            @if (mostrarErrores() && errores().vidaUtil) {
+              <span class="campo__error">La vida útil debe ser mayor a 0 meses.</span>
+            }
+          </label>
+
+          <label class="campo">
+            <span class="campo__label">Fecha de compra</span>
+            <input
+              class="input"
+              [class.is-error]="mostrarErrores() && errores().fecha"
+              type="date"
+              [value]="fechaAdquisicion()"
+              (input)="onFecha($event)"
+            />
+            @if (mostrarErrores() && errores().fecha) {
+              <span class="campo__error">Selecciona la fecha de compra.</span>
+            }
+          </label>
+        </div>
+
+        <div class="grid grid--2">
+          <label class="campo">
+            <span class="campo__label">Garantía (meses)</span>
+            <input
+              class="input"
+              type="number"
+              min="0"
+              step="1"
+              [value]="garantiaMeses()"
+              (input)="onGarantia($event)"
+            />
+          </label>
+
+          <div class="campo">
+            <span class="campo__label">Próximo mantenimiento</span>
+            <div class="readonly">
+              <app-icon name="clock" [size]="13" />
+              <span>{{ proximoTexto() }}</span>
+            </div>
+          </div>
+        </div>
+
+        <label class="campo campo--grow">
+          <span class="campo__label">Observaciones</span>
+          <textarea
+            class="textarea"
+            [value]="observaciones()"
+            (input)="onObservaciones($event)"
+            placeholder="Ubicación, uso o notas del activo"
+          ></textarea>
+        </label>
+
+        <div class="form__grow"></div>
+
+        <span class="hairline"></span>
+
+        <footer class="form__foot">
+          <span>El activo se crea en estado Operativo</span>
+          <span>Campos obligatorios: nombre, categoría, costo y vida útil</span>
+        </footer>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="resumen">
+      <div class="resumen__inner">
+        <header class="resumen__head">
+          <h2 class="resumen__title">Resumen</h2>
+          <span class="resumen__badge">Lineal</span>
+        </header>
+
+        <span class="eyebrow">DEPRECIACIÓN MENSUAL</span>
+        <div class="resumen__amount">
+          <span class="cur">S/</span>
+          <span class="big">{{ depreciacion().toFixed(2) }}</span>
+        </div>
+        <span class="resumen__meta">
+          {{ moneda(costoNumero()) }} ÷ {{ vidaNumero() }} meses
+        </span>
+
+        <span class="dark-sep"></span>
+
+        <div class="resumen__rows">
+          <div>
+            <span>Categoría</span>
+            <strong>{{ categoriaLabel() }}</strong>
+          </div>
+          <div>
+            <span>Costo</span>
+            <strong>{{ moneda(costoNumero()) }}</strong>
+          </div>
+          <div>
+            <span>Vida útil</span>
+            <strong>{{ vidaNumero() }} meses</strong>
+          </div>
+          <div>
+            <span>Valor residual</span>
+            <strong>S/ 0.00</strong>
+          </div>
+          <div>
+            <span>Garantía hasta</span>
+            <strong class="is-ok">{{ garantiaTexto() }}</strong>
+          </div>
+        </div>
+
+        <div class="resumen__info">
+          <app-icon name="warning-circle" [size]="13" />
+          <span>El costo de compra se registra como egreso del turno de apertura.</span>
+        </div>
+
+        <div class="resumen__grow"></div>
+
+        <button type="button" class="btn-brand" (click)="guardar()">
+          <app-icon name="check" [size]="15" />
+          Guardar activo
+        </button>
+        <span class="resumen__foot">Se asigna código M-0xx y queda operativo</span>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__item">
+      <app-icon name="wrench" [size]="12" />
+      El próximo mantenimiento se calcula desde la fecha de compra
+    </span>
+    <span class="pie__item">
+      <app-icon name="warning-circle" [size]="12" />
+      La garantía vencida genera alerta en la ficha del activo
+    </span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

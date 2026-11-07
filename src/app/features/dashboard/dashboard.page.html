@@ -1,0 +1,206 @@
+<app-shell title="Pulso del turno" [subtitle]="fecha">
+  <div actions class="header-actions">
+    <span class="live">
+      <span class="live__dot"></span>
+      En vivo · {{ pedidosActivos() }} pedidos abiertos
+    </span>
+    <app-button variant="dark" icon="cash-register" routerLink="/cerrar-cuenta">
+      Cerrar caja
+    </app-button>
+  </div>
+
+  <app-panel class="hero">
+    <div class="hero__inner">
+      <div class="donut">
+        <svg viewBox="0 0 164 164" class="donut__svg" aria-hidden="true">
+          <circle cx="82" cy="82" r="75" fill="none" stroke="#ededf1" stroke-width="14" />
+          <circle
+            cx="82"
+            cy="82"
+            r="75"
+            fill="none"
+            stroke="var(--c-brand)"
+            stroke-width="14"
+            stroke-linecap="round"
+            [attr.stroke-dasharray]="circunferencia"
+            [attr.stroke-dashoffset]="donutOffset()"
+            transform="rotate(-90 82 82)"
+          />
+        </svg>
+        <div class="donut__center">
+          <strong>{{ porcentajeMeta() }}%</strong>
+          <span>de la meta</span>
+        </div>
+      </div>
+
+      <span class="hero__sep"></span>
+
+      <div class="sales">
+        <span class="sales__label">Ventas hoy</span>
+        <div class="sales__amount">
+          <span class="sales__cur">S/</span>
+          <span class="sales__big">{{ ventas() }}</span>
+        </div>
+        <div class="sales__delta">
+          <app-chip variant="success">+{{ kpis().deltaPct }}%</app-chip>
+          <span class="sales__note">vs ayer</span>
+        </div>
+        <p class="sales__meta">
+          Meta S/ {{ meta() }} · Faltan <strong>S/ {{ faltante() }}</strong>
+        </p>
+      </div>
+
+      <div class="hero__grow"></div>
+
+      <div class="hero__stats">
+        <app-stat
+          icon="clipboard-text"
+          label="Pedidos activos"
+          [value]="pedidosActivos().toString()"
+          [hint]="
+            desglose().local + ' local · ' + desglose().delivery + ' delivery · ' + desglose().apps + ' apps'
+          "
+        />
+        <span class="hero__stat-sep"></span>
+        <app-stat
+          icon="package"
+          tone="warning"
+          label="Stock bajo"
+          [value]="stockBajo().toString()"
+          [hint]="nombresStockBajo()"
+        />
+        <span class="hero__stat-sep"></span>
+        <app-stat
+          icon="trash"
+          tone="brand"
+          label="Mermas hoy"
+          [value]="'S/ ' + mermasMonto()"
+          [hint]="registrosMerma() + ' registros · turno tarde'"
+        />
+      </div>
+    </div>
+  </app-panel>
+
+  <section class="tops">
+    <app-section-header
+      title="Más vendidos hoy"
+      [meta]="'actualizado ' + kpis().actualizado + ' · 5 de ' + kpis().totalPlatosCarta + ' platos'"
+    />
+    <div class="tops__grid">
+      @for (plato of kpis().topPlatos; track plato.nombre; let i = $index) {
+        <div class="top" [class.top--first]="i === 0">
+          @if (i > 0) {
+            <span class="top__vline"></span>
+          }
+          <div class="top__inner">
+            <div class="top__name">
+              <span class="top__rank" [class.top__rank--first]="i === 0">{{ i + 1 }}</span>
+              <span class="top__dish">{{ plato.nombre }}</span>
+            </div>
+            <div class="top__nums">
+              <span class="top__monto">S/ {{ plato.monto }}</span>
+              <span class="top__ud">{{ plato.unidades }} ud.</span>
+            </div>
+            <div class="top__track">
+              <span class="top__fill" [style.width.%]="plato.porcentaje"></span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+    <div class="tops__foot">
+      <span>Ingresos S/ {{ ventas() }} · 5 de {{ kpis().pedidosTop }} pedidos</span>
+    </div>
+  </section>
+
+  <section class="bottom">
+    <div class="chart-block">
+      <app-section-header
+        title="Últimos 7 días"
+        [meta]="'mejor día ' + kpis().mejorDia + ' · S/ ' + kpis().mejorDiaMonto"
+      />
+      <div class="chart-canvas">
+        <svg
+          class="chart"
+          viewBox="0 0 1000 190"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          @for (y of guias; track y) {
+            <line
+              x1="0"
+              [attr.y1]="y"
+              x2="1000"
+              [attr.y2]="y"
+              stroke="#e3e3e8"
+              stroke-width="1"
+              vector-effect="non-scaling-stroke"
+            />
+          }
+          <path [attr.d]="trazos().area" fill="#fdebea" stroke="none" />
+          <path
+            [attr.d]="trazos().linea"
+            fill="none"
+            stroke="#e8262c"
+            stroke-width="2.5"
+            stroke-linejoin="round"
+            vector-effect="non-scaling-stroke"
+          />
+          @for (punto of trazos().puntos; track $index) {
+            <circle
+              [attr.cx]="punto.x"
+              [attr.cy]="punto.y"
+              [attr.r]="$index === 5 ? 6 : 4"
+              [attr.fill]="$index === 5 ? '#e8262c' : '#ffffff'"
+              stroke="#e8262c"
+              stroke-width="1.5"
+              vector-effect="non-scaling-stroke"
+            />
+          }
+        </svg>
+      </div>
+      <div class="chart-labels">
+        @for (punto of kpis().serieSemana; track $index) {
+          <span [class.is-today]="$index === 5">{{ punto.dia }}</span>
+        }
+      </div>
+    </div>
+
+    <app-dark-panel class="comandas">
+      <div class="comandas__inner">
+        <header class="comandas__head">
+          <div class="comandas__title">
+            <span class="comandas__bar"></span>
+            <h2>Comandas</h2>
+          </div>
+          <span class="comandas__meta">4 de 8 abiertas</span>
+        </header>
+
+        <div class="comandas__list">
+          @for (comanda of comandas(); track comanda.id) {
+            <div class="comanda">
+              <div class="comanda__left">
+                <div class="comanda__top">
+                  <span class="comanda__num">{{ comanda.numero }}</span>
+                  <span [class]="'dchip dchip--' + comanda.estadoTono">{{ comanda.estado }}</span>
+                </div>
+                <span class="comanda__sub">{{ comanda.detalle }}</span>
+              </div>
+              <div class="comanda__right">
+                <span class="comanda__monto">S/ {{ comanda.monto.toFixed(2) }}</span>
+                <span class="comanda__hora">{{ comanda.hora }}</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="comandas__spacer"></div>
+
+        <a class="comandas__link" routerLink="/comandas">
+          Ver todas las comandas
+          <app-icon name="arrow-right" [size]="13" />
+        </a>
+      </div>
+    </app-dark-panel>
+  </section>
+</app-shell>

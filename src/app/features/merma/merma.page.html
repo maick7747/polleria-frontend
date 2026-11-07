@@ -1,0 +1,259 @@
+<app-shell title="Control de merma" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="badge-warning">
+      <span class="badge-warning__dot"></span>
+      {{ pendientes().length }} pendiente de aprobación
+    </span>
+    <a class="ghost-link" routerLink="/inventario/historial">
+      <app-icon name="clock" [size]="14" />
+      Ver historial
+    </a>
+  </div>
+
+  <div class="cuerpo">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Detalle de la merma</h2>
+          </div>
+          <div class="panel__pills">
+            <span class="pill">{{ siguienteCodigo() }}</span>
+            <span class="pill pill--danger">Nuevo registro</span>
+          </div>
+        </header>
+
+        <div class="form">
+          <span class="campo__label">Tipo de merma</span>
+          <div class="chips" role="group" aria-label="Tipo de merma">
+            @for (t of tipos; track t) {
+              <button
+                type="button"
+                class="chip"
+                [class.is-active]="tipo() === t"
+                (click)="elegirTipo(t)"
+              >
+                {{ t }}
+              </button>
+            }
+          </div>
+
+          <div class="fila">
+            <label class="campo">
+              <span class="campo__label">Insumo afectado</span>
+              <select class="input" [value]="insumoId()" (change)="onInsumo($event)">
+                @for (insumo of insumos(); track insumo.id) {
+                  <option [value]="insumo.id">{{ insumo.nombre }}</option>
+                }
+              </select>
+            </label>
+            <label class="campo campo--sm">
+              <span class="campo__label">Cantidad ({{ unidad() }})</span>
+              <input
+                class="input"
+                type="number"
+                min="0"
+                step="0.1"
+                inputmode="decimal"
+                [value]="cantidad()"
+                (input)="onCantidad($event)"
+              />
+            </label>
+            <div class="campo campo--sm">
+              <span class="campo__label">Stock actual</span>
+              <strong class="dato">{{ stockActual() }} {{ unidad() }}</strong>
+            </div>
+          </div>
+
+          <div class="costo">
+            <div class="costo__main">
+              <span class="campo__label">Costo automático</span>
+              <div class="costo__valor">
+                <span>S/</span>
+                <strong>{{ costo().toFixed(2) }}</strong>
+              </div>
+            </div>
+            <div class="costo__meta">
+              <span class="campo__label">Costo / {{ unidad() }}</span>
+              <strong class="dato">{{ moneda(costoUnitario()) }}</strong>
+            </div>
+            <div class="costo__meta">
+              <span class="campo__label">Clasificación</span>
+              <div class="toggle">
+                <button
+                  type="button"
+                  class="toggle__btn"
+                  [class.is-active]="clasificacion() === 'evitable'"
+                  (click)="elegirClasificacion('evitable')"
+                >
+                  Evitable
+                </button>
+                <button
+                  type="button"
+                  class="toggle__btn"
+                  [class.is-active]="clasificacion() === 'inevitable'"
+                  (click)="elegirClasificacion('inevitable')"
+                >
+                  Inevitable
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <label class="campo">
+            <span class="campo__label">Causa raíz</span>
+            <input
+              class="input"
+              type="text"
+              [value]="causaRaiz()"
+              (input)="onCausa($event)"
+              placeholder="Ej. producción por encima de la demanda"
+            />
+          </label>
+
+          <label class="campo">
+            <span class="campo__label">Observación</span>
+            <input
+              class="input"
+              type="text"
+              [value]="observacion()"
+              (input)="onObservacion($event)"
+              placeholder="Detalle del registro"
+            />
+          </label>
+        </div>
+
+        <div class="nota">
+          <app-icon name="warning-circle" [size]="13" />
+          El costo se toma del costo promedio del insumo · el stock se descuenta al aprobar
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="impacto">
+      <div class="impacto__inner">
+        <header class="impacto__head">
+          <span class="impacto__bar"></span>
+          <h2>Impacto</h2>
+          <span class="impacto__pill">Pendiente</span>
+        </header>
+
+        <div class="impacto__block">
+          <span class="impacto__label">Costo de la merma</span>
+          <div class="impacto__amount">
+            <span>S/</span>
+            <strong>{{ costo().toFixed(2) }}</strong>
+          </div>
+        </div>
+
+        <span class="impacto__sep"></span>
+
+        <div class="impacto__row">
+          <span>Food cost del turno</span>
+          <span class="impacto__delta">
+            {{ foodCostBase }}%
+            <app-icon name="arrow-right" [size]="11" />
+            <strong>{{ foodCost() }}%</strong>
+          </span>
+        </div>
+        <div class="impacto__row">
+          <span>Stock {{ insumo()?.nombre ?? '—' }}</span>
+          <strong>{{ stockResultante() }} {{ unidad() }}</strong>
+        </div>
+        <div class="impacto__row">
+          <span>Movimiento de inventario</span>
+          <strong>{{ siguienteCodigo() }}</strong>
+        </div>
+
+        <span class="impacto__grow"></span>
+
+        <button
+          type="button"
+          class="btn-brand"
+          [disabled]="!puedeAprobar()"
+          (click)="aprobar()"
+        >
+          <app-icon name="check" [size]="15" />
+          Aprobar y descontar
+        </button>
+        <button type="button" class="btn-ghost-dark" (click)="rechazar()">
+          <app-icon name="x" [size]="15" />
+          Rechazar registro
+        </button>
+
+        <p class="impacto__note">Solo Dueño/Admin aprueba la baja de stock</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <section class="recientes">
+    <app-section-header title="Mermas recientes" [meta]="recientesMeta()" />
+
+    <div class="tabla">
+      <div class="tabla__head">
+        <span>FECHA</span>
+        <span>TIPO</span>
+        <span class="col-insumo">INSUMO</span>
+        <span>REGISTRADO POR</span>
+        <span>ESTADO</span>
+        <span class="right">COSTO</span>
+        <span></span>
+      </div>
+
+      @for (m of mermas(); track m.id) {
+        <div class="tabla__row">
+          <span class="meta">{{ fechaCorta(m.fecha) }}</span>
+          <span class="fuerte">{{ m.tipo }}</span>
+          <span class="col-insumo">
+            {{ m.insumoNombre ?? '—' }} · {{ m.cantidad }} {{ unidadDe(m) }}
+          </span>
+          <span class="meta">{{ registradoPor(m) }}</span>
+          <span>
+            <app-chip [variant]="tonoEstado(m.estado)">{{ textoEstado(m.estado) }}</app-chip>
+          </span>
+          <span class="right monto">{{ moneda(m.costoEstimado) }}</span>
+          <span class="acciones">
+            @if (m.estado === 'pendiente') {
+              <button
+                type="button"
+                class="accion"
+                title="Aprobar merma"
+                aria-label="Aprobar merma"
+                (click)="aprobarRegistro(m)"
+              >
+                <app-icon name="check" [size]="13" />
+              </button>
+              <button
+                type="button"
+                class="accion accion--danger"
+                title="Rechazar merma"
+                aria-label="Rechazar merma"
+                (click)="rechazarRegistro(m)"
+              >
+                <app-icon name="x" [size]="13" />
+              </button>
+            }
+          </span>
+        </div>
+      } @empty {
+        <div class="tabla__empty">
+          <app-empty-state
+            icon="trash"
+            title="Sin mermas"
+            description="Aún no hay registros de merma en el turno."
+          />
+        </div>
+      }
+    </div>
+  </section>
+
+  <div class="pie">
+    <span>Toda merma aprobada genera un movimiento de inventario y afecta el food cost</span>
+    <span>7 tipos de merma · umbral de cuadre S/ 0.00</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">{{ toast() }}</div>
+  }
+</app-shell>

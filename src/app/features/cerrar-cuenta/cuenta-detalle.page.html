@@ -1,0 +1,233 @@
+<app-shell [title]="titulo()" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <span class="caja">
+      <span class="caja__dot"></span>
+      Caja abierta · turno tarde
+    </span>
+    <a class="ghost-link" routerLink="/cerrar-cuenta">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a mesas
+    </a>
+  </div>
+
+  @if (cuenta(); as c) {
+    <div class="cuerpo">
+      <app-panel class="detalle">
+        <div class="detalle__inner">
+          <div class="detalle__main">
+            <header class="detalle__head">
+              <h2 class="detalle__title">Detalle de la cuenta</h2>
+              <span class="detalle__pill">Mesa {{ numeroMesa() }}</span>
+            </header>
+
+            <div class="rondas">
+              @for (ronda of c.rondas; track ronda.id; let i = $index) {
+                @if (i > 0) {
+                  <span class="rondas__sep"></span>
+                }
+                <section class="ronda">
+                  <header class="ronda__head">
+                    <span class="ronda__dot"></span>
+                    <h3 class="ronda__title">Ronda {{ ronda.numero }}</h3>
+                    <span class="ronda__hora">{{ hora(ronda.creadaEn) }}</span>
+                    <span class="ronda__spacer"></span>
+                    <span class="ronda__meta">{{ ronda.items.length }} ítems</span>
+                  </header>
+
+                  @for (item of ronda.items; track item.id) {
+                    <div class="item">
+                      <div class="item__info">
+                        <span class="item__name">{{ item.nombre }} x{{ item.cantidad }}</span>
+                        <span class="item__meta">
+                          {{ item.cantidad }} {{ unidades(item.cantidad) }} ·
+                          {{ moneda(item.precioUnitario) }} c/u
+                        </span>
+                      </div>
+                      <strong class="item__total">{{ moneda(item.subtotal) }}</strong>
+                    </div>
+                  }
+                </section>
+              } @empty {
+                <p class="rondas__vacio">Esta cuenta todavía no tiene rondas.</p>
+              }
+            </div>
+
+            <footer class="detalle__foot">
+              <div class="detalle__foot-text">
+                <strong>{{ rondas() }} rondas · {{ platos() }} platos</strong>
+                <span>El stock se descontó al enviar a cocina.</span>
+              </div>
+              <span class="detalle__foot-meta">{{ mozo() }}</span>
+            </footer>
+          </div>
+
+          <aside class="resumen-col">
+            <div class="resumen">
+              <span class="eyebrow">RESUMEN</span>
+              <div class="resumen__row">
+                <span>Subtotal</span>
+                <strong>{{ moneda(subtotal()) }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>IGV (18%)</span>
+                <strong>{{ moneda(igv()) }}</strong>
+              </div>
+              <span class="resumen__sep"></span>
+              <div class="resumen__total">
+                <span>Total</span>
+                <strong>{{ moneda(total()) }}</strong>
+              </div>
+            </div>
+
+            <div class="comprobante">
+              <div class="comprobante__head">
+                <span class="eyebrow">COMPROBANTE</span>
+                <span class="comprobante__tag">SUNAT simulado</span>
+              </div>
+              <span class="comprobante__sep"></span>
+              <div class="comprobante__row">
+                <span>Cliente</span>
+                <strong>{{ cliente() }}</strong>
+              </div>
+              <span class="comprobante__sep"></span>
+              <div class="comprobante__row">
+                <span>Documento</span>
+                <strong>{{ documento() }}</strong>
+              </div>
+              <span class="comprobante__sep"></span>
+              <div class="comprobante__row">
+                <span>Comprobante</span>
+                <strong>{{ comprobante() }}</strong>
+              </div>
+              <span class="comprobante__sep"></span>
+            </div>
+
+            <span class="resumen-col__grow"></span>
+
+            <div class="cuenta-nota">
+              <span class="eyebrow">CUENTA</span>
+              <strong>Cuenta única · sin split</strong>
+              <p>Se cobra una sola vez al cerrar</p>
+            </div>
+          </aside>
+        </div>
+      </app-panel>
+
+      <app-dark-panel class="cobro">
+        <div class="cobro__inner">
+          <header class="cobro__head">
+            <h2 class="cobro__title">Cobro</h2>
+            <span class="cobro__pill">{{ abierta() ? 'Cuenta única' : 'Cobrada' }}</span>
+          </header>
+
+          <div class="cobro__total">
+            <span class="cobro__eyebrow">TOTAL A PAGAR</span>
+            <div class="cobro__amount">
+              <span class="cobro__cur">S/</span>
+              <strong>{{ total().toFixed(2) }}</strong>
+            </div>
+            <span class="cobro__meta">
+              {{ platos() }} platos · {{ rondas() }} rondas · Mesa {{ numeroMesa() }}
+            </span>
+          </div>
+
+          <span class="cobro__grow"></span>
+
+          <span class="cobro__label">Método de pago</span>
+          <div class="metodos">
+            @for (m of metodos; track m.id) {
+              <button
+                type="button"
+                class="metodo"
+                [class.is-sel]="metodo() === m.id"
+                [attr.aria-pressed]="metodo() === m.id"
+                (click)="elegirMetodo(m.id)"
+              >
+                <app-icon [name]="m.icon" [size]="15" />
+                {{ m.label }}
+                @if (metodo() === m.id) {
+                  <app-icon name="check" [size]="13" />
+                }
+              </button>
+            }
+          </div>
+
+          <span class="cobro__grow"></span>
+
+          @if (metodo() === 'efectivo') {
+            <div class="caja-pago">
+              <div class="caja-pago__row">
+                <span>Efectivo recibido</span>
+                <span class="caja-pago__input">
+                  <span>S/</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputmode="decimal"
+                    aria-label="Efectivo recibido"
+                    [value]="recibido()"
+                    (input)="onRecibido($event)"
+                  />
+                </span>
+              </div>
+              <span class="caja-pago__sep"></span>
+              <div class="caja-pago__row">
+                <span>Vuelto</span>
+                <strong class="caja-pago__vuelto">{{ moneda(vuelto()) }}</strong>
+              </div>
+              @if (faltante() > 0) {
+                <span class="caja-pago__falta">Falta {{ moneda(faltante()) }}</span>
+              }
+            </div>
+          } @else {
+            <div class="caja-pago">
+              <div class="caja-pago__row">
+                <span>Monto a cobrar</span>
+                <strong>{{ moneda(total()) }}</strong>
+              </div>
+              <span class="caja-pago__sep"></span>
+              <span class="caja-pago__hint">Pago exacto con {{ metodo() }} · sin vuelto</span>
+            </div>
+          }
+
+          <span class="cobro__grow"></span>
+
+          <button
+            type="button"
+            class="pagar"
+            [disabled]="!puedeCobrar()"
+            (click)="registrarPago()"
+          >
+            <app-icon name="receipt" [size]="15" />
+            {{ abierta() ? 'Registrar pago y emitir comprobante' : 'Cuenta cobrada' }}
+          </button>
+          <p class="cobro__note">Sin split · un solo comprobante. SUNAT simulado.</p>
+        </div>
+      </app-dark-panel>
+    </div>
+
+    <div class="pie">
+      <span class="pie__item">
+        <app-icon name="check" [size]="12" />
+        El stock ya se descontó al enviar a cocina
+      </span>
+      <span class="pie__item pie__item--muted">
+        <app-icon name="cash-register" [size]="12" />
+        El cuadre de caja se actualiza al registrar el pago
+      </span>
+    </div>
+  } @else {
+    <app-empty-state
+      icon="receipt"
+      title="Cuenta no encontrada"
+      description="La cuenta solicitada no existe o ya fue cerrada."
+    >
+      <a class="ghost-link" routerLink="/cerrar-cuenta">Volver a mesas abiertas</a>
+    </app-empty-state>
+  }
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">{{ toast() }}</div>
+  }
+</app-shell>

@@ -1,0 +1,207 @@
+<app-shell title="Historial de movimientos" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/inventario">
+      <app-icon name="arrow-left" [size]="14" />
+      Inventario
+    </a>
+    <button type="button" class="dark-link" (click)="exportar()">
+      <app-icon name="download" [size]="15" />
+      Exportar
+    </button>
+  </div>
+
+  <div class="filtros">
+    <div class="filtros__left">
+      <div class="chips" role="group" aria-label="Filtrar por fecha">
+        @for (opcion of periodos; track opcion.valor) {
+          <button
+            type="button"
+            class="chip"
+            [class.is-active]="periodo() === opcion.valor"
+            (click)="cambiarPeriodo(opcion.valor)"
+          >
+            {{ opcion.label }}
+          </button>
+        }
+      </div>
+
+      <span class="divider"></span>
+
+      <div class="chips" role="group" aria-label="Filtrar por tipo">
+        @for (opcion of tipos; track opcion.valor) {
+          <button
+            type="button"
+            class="chip chip--small"
+            [class.is-active]="tipo() === opcion.valor"
+            (click)="cambiarTipo(opcion.valor)"
+          >
+            {{ opcion.label }}
+          </button>
+        }
+      </div>
+
+      <span class="divider"></span>
+
+      <label class="select">
+        <app-icon name="package" [size]="12" />
+        <select [value]="insumoId()" aria-label="Filtrar por insumo" (change)="onInsumo($event)">
+          <option value="0">Todos los insumos</option>
+          @for (insumo of listaInsumos(); track insumo.id) {
+            <option [value]="insumo.id">{{ insumo.nombre }} · {{ insumo.unidadMedida }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <span class="filtros__meta">
+      {{ visibles().length }} movimientos · saldo calculado al instante
+    </span>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <div class="grid grid--head">
+          <span>TIPO</span>
+          <span>DETALLE</span>
+          <span>INSUMO</span>
+          <span class="right">FECHA</span>
+          <span class="right">CANTIDAD</span>
+          <span class="right">SALDO</span>
+        </div>
+
+        <div class="rows">
+          @for (fila of visibles(); track fila.id) {
+            <button
+              type="button"
+              class="grid row"
+              [class.is-selected]="fila.id === seleccionId()"
+              (click)="seleccionar(fila.id)"
+            >
+              <span class="tipo-cell">
+                <span [class]="'tipo tipo--' + fila.tono">
+                  <app-icon [name]="fila.icono" [size]="11" />
+                  {{ fila.tipoLabel }}
+                </span>
+              </span>
+              <span class="detalle">
+                <span class="detalle__main">{{ fila.detalle }}</span>
+                <span class="detalle__meta">{{ fila.referencia }}</span>
+              </span>
+              <span class="insumo">{{ fila.insumo }}</span>
+              <span class="fecha">{{ fila.fechaTexto }}</span>
+              <span [class]="'cantidad ' + (fila.esEntrada ? 'cantidad--in' : 'cantidad--out')">
+                {{ fila.cantidadTexto }}
+              </span>
+              <span class="saldo">{{ fila.saldoTexto }}</span>
+            </button>
+          } @empty {
+            <div class="rows__empty">
+              <app-empty-state
+                icon="clock"
+                title="Sin movimientos"
+                description="No hay movimientos que coincidan con los filtros seleccionados."
+              />
+            </div>
+          }
+        </div>
+
+        <div class="panel__foot">
+          <span>Ventas, compras, mermas y ajustes en orden cronológico</span>
+          <span>{{ visibles().length }} de {{ movimientos().length }} movimientos</span>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aside">
+      <div class="resumen">
+        <header class="resumen__head">
+          <span class="resumen__bar"></span>
+          <h2>Resumen · {{ periodoLabel() }}</h2>
+        </header>
+
+        <div class="resumen__flows">
+          <div class="resumen__flow">
+            <span class="resumen__flow-label resumen__flow-label--in">
+              <app-icon name="arrow-left" [size]="12" />
+              Entradas
+            </span>
+            <strong class="resumen__flow-value resumen__flow-value--in">
+              +{{ cantidad(resumen().entradas) }} {{ resumen().unidad }}
+            </strong>
+          </div>
+          <div class="resumen__flow">
+            <span class="resumen__flow-label resumen__flow-label--out">
+              <app-icon name="arrow-right" [size]="12" />
+              Salidas
+            </span>
+            <strong class="resumen__flow-value resumen__flow-value--out">
+              −{{ cantidad(resumen().salidas) }} {{ resumen().unidad }}
+            </strong>
+          </div>
+        </div>
+
+        <span class="resumen__divider"></span>
+
+        <span class="resumen__label">{{ saldoLabel() }}</span>
+        <div class="resumen__big">
+          <strong>{{ cantidad(resumen().saldo) }}</strong>
+          <span>{{ resumen().unidad }}</span>
+        </div>
+        <span class="resumen__hint">
+          {{ resumen().insumoNombre }} · {{ visibles().length }} movimientos filtrados
+        </span>
+
+        <span class="resumen__divider"></span>
+
+        <div class="resumen__rows">
+          <div class="resumen__row">
+            <span>Mínimo vigente</span>
+            <strong>
+              @if (resumen().minimo !== null) {
+                {{ cantidad(resumen().minimo ?? 0) }} {{ resumen().unidad }}
+              } @else {
+                —
+              }
+            </strong>
+          </div>
+          <div class="resumen__row">
+            <span>Estado</span>
+            <span [class]="'estado-pill estado-pill--' + tonoResumen()">
+              {{ resumen().estado }}
+            </span>
+          </div>
+          <div class="resumen__row">
+            <span>Movimientos hoy</span>
+            <strong>{{ resumen().movimientosHoy }}</strong>
+          </div>
+        </div>
+
+        <div class="resumen__note">
+          <app-icon name="warning-circle" [size]="12" />
+          <p>Los ajustes manuales requieren motivo; ventas y mermas se registran solas.</p>
+        </div>
+
+        <span class="grow"></span>
+
+        <button type="button" class="btn-primary" (click)="exportar()">
+          <app-icon name="download" [size]="15" />
+          Exportar historial
+        </button>
+        <p class="resumen__foot">CSV · {{ visibles().length }} movimientos · {{ periodoLabel() }}</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>Todo movimiento de stock queda trazado con usuario, fecha y motivo</span>
+    <span>El saldo se recalcula con cada entrada y salida</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check-circle" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

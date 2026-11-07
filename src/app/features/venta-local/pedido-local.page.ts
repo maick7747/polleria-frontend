@@ -1,0 +1,285 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
+import { mensajeError } from '../../core/api/api.helpers';
+import { CuentasService } from '../../core/data/cuentas.service';
+import { FichasService } from '../../core/data/fichas.service';
+import { InventarioService } from '../../core/data/inventario.service';
+import { MesasService } from '../../core/data/mesas.service';
+import { MOCK_USUARIOS } from '../../core/data/mock-data';
+import type { PedidoDetalle, Plato } from '../../core/models';
+import {
+  abreviarNombre,
+  formatearMoneda,
+  minutosEntre,
+  round2,
+} from '../../core/utils/format';
+import { ChipComponent } from '../../shared/components/chip/chip';
+import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
+import { IconComponent } from '../../shared/components/icon/icon';
+import { PanelComponent } from '../../shared/components/panel/panel';
+import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
+
+interface StockPlato {
+  etiqueta: string;
+  tono: 'success' | 'warning';
+}
+
+@Component({
+  selector: 'app-pedido-local-page',
+  standalone: true,
+  imports: [
+    RouterLink,
+    AppShellComponent,
+    ChipComponent,
+    DarkPanelComponent,
+    IconComponent,
+    PanelComponent,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './pedido-local.page.html',
+  styleUrl: './pedido-local.page.css',
+})
+export class PedidoLocalPage {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly mesas = inject(MesasService);
+  private readonly cuentas = inject(CuentasService);
+  private readonly fichas = inject(FichasService);
+  private readonly inventario = inject(InventarioService);
+  private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly mesaId = Number(this.route.snapshot.paramMap.get('mesaId'));
+  private readonly usuarioId = this.auth.usuario()?.id ?? 3;
+  private readonly ahora = Date.now();
+
+  private secuenciaItem = 1000;
+  private temporizador: number | null = null;
+
+  readonly categoriaActiva = signal<string>('');
+  readonly busqueda = signal<string>('');
+  readonly items = signal<PedidoDetalle[]>([]);
+  readonly observacion = signal<string>('');
+  readonly toast = signal<string>('');
+  readonly moneda = formatearMoneda;
+
+  readonly mesa = computed(() => this.mesas.porId(this.mesaId) ?? null);
+  readonly cuenta = computed(() => this.cuentas.cuentaDeMesa(this.mesaId) ?? null);
+
+  readonly categorias = computed<string[]>(() => {
+    const lista: string[] = [];
+    for (const plato of this.fichas.activos()) {
+      if (!lista.includes(plato.categoria)) {
+        lista.push(plato.categoria);
+      }
+    }
+    return lista;
+  });
+
+  readonly numeroMesa = computed(() =>
+    String(this.mesa()?.numero ?? 0).padStart(2, '0'),
+  );
+  readonly rondasPrevias = computed(() => this.cuenta()?.rondas.length ?? 0);
+  readonly rondaActual = computed(() => this.rondasPrevias() + 1);
+  readonly titulo = computed(
+    () => `Mesa ${this.numeroMesa()} · Ronda ${this.rondaActual()}`,
+  );
+
+  readonly subtitulo = computed(() => {
+    const cuenta = this.cuenta();
+    const rondas = cuenta?.rondas.length ?? 0;
+    const total = formatearMoneda(cuenta?.total ?? 0);
+    const minutos = cuenta ? minutosEntre(cuenta.fechaApertura, this.ahora) : 0;
+    const usuario = MOCK_USUARIOS.find(
+      (candidato) => candidato.id === cuenta?.usuarioAperturaId,
+    );
+    const mozo = usuario ? abreviarNombre(usuario.nombre) : '—';
+    return `${rondas} rondas · ${total} · abierta ${minutos} min · Mozo ${mozo}`;
+  });
+
+  readonly platosVisibles = computed<Plato[]>(() => {
+    const categoria = this.categoriaActiva();
+    const termino = this.busqueda().trim().toLowerCase();
+    return this.fichas.activos().filter((plato) => {
+      const coincideCategoria = !categoria || plato.categoria === categoria;
+      const coincideTexto =
+        !termino || plato.nombre.toLowerCase().includes(termino);
+      return coincideCategoria && coincideTexto;
+    });
+  });
+
+  readonly totalRonda = computed(() =>
+    round2(this.items().reduce((suma, item) => suma + item.subtotal, 0)),
+  );
+  readonly subtotalRonda = computed(() => round2(this.totalRonda() / 1.18));
+  readonly igvRonda = computed(() => round2(this.totalRonda() - this.subtotalRonda()));
+  readonly totalCuenta = computed(() =>
+    round2((this.cuenta()?.total ?? 0) + this.totalRonda()),
+  );
+
+  readonly clienteNombre = computed(() => this.cuenta()?.cliente?.nombre ?? 'Sin datos');
+  readonly clienteAccion = computed(() => (this.cuenta()?.cliente ? 'Editar' : 'Agregar'));
+  readonly puedeEnviar = computed(() => this.items().length > 0);
+
+  readonly stockBajoTexto = computed(() => {
+    const bajos = this.inventario.stockBajo();
+    if (bajos.length === 0) {
+      return '';
+    }
+    const primero = bajos[0];
+    const plural = bajos.length === 1 ? '' : 's';
+    return `${bajos.length} insumo${plural} bajo${plural}: ${primero.nombre.toLowerCase()} (${primero.stockActual} ${primero.unidadMedida})`;
+  });
+
+  constructor() {
+    void this.inicializar();
+    this.destroyRef.onDestroy(() => {
+      if (this.temporizador !== null) {
+        window.clearTimeout(this.temporizador);
+      }
+    });
+  }
+
+  private async inicializar(): Promise<void> {
+    await Promise.all([
+      this.mesas.cargar(),
+      this.cuentas.cargar(),
+      this.inventario.cargar(),
+    ]);
+    if (!this.mesa()) {
+      void this.router.navigate(['/venta-local']);
+      return;
+    }
+    if (!this.cuentas.cuentaDeMesa(this.mesaId)) {
+      try {
+        await this.cuentas.abrirCuenta(this.mesaId, this.usuarioId);
+      } catch (error) {
+        this.avisar(mensajeError(error));
+      }
+    }
+    const primeraCategoria = this.categorias()[0];
+    if (primeraCategoria) {
+      this.categoriaActiva.set(primeraCategoria);
+    }
+  }
+
+  stockDe(plato: Plato): StockPlato {
+    const insuficiente = plato.ingredientes.some((ingrediente) => {
+      const insumo = this.inventario.porId(ingrediente.insumoId);
+      return insumo ? insumo.stockActual <= insumo.stockMinimo : false;
+    });
+    return insuficiente
+      ? { etiqueta: 'Stock bajo', tono: 'warning' }
+      : { etiqueta: 'Stock ok', tono: 'success' };
+  }
+
+  cantidadEnRonda(platoId: number): number {
+    return this.items()
+      .filter((item) => item.platilloId === platoId)
+      .reduce((suma, item) => suma + item.cantidad, 0);
+  }
+
+  agregar(plato: Plato): void {
+    const existente = this.items().find((item) => item.platilloId === plato.id);
+    if (existente) {
+      this.items.update((lista) =>
+        lista.map((item) => {
+          if (item.platilloId !== plato.id) {
+            return item;
+          }
+          const cantidad = item.cantidad + 1;
+          return {
+            ...item,
+            cantidad,
+            subtotal: round2(cantidad * item.precioUnitario),
+          };
+        }),
+      );
+      return;
+    }
+    const nuevo: PedidoDetalle = {
+      id: ++this.secuenciaItem,
+      platilloId: plato.id,
+      nombre: plato.nombre,
+      cantidad: 1,
+      precioUnitario: plato.precioVenta,
+      subtotal: plato.precioVenta,
+      estadoPreparacion: 'pendiente',
+    };
+    this.items.update((lista) => [...lista, nuevo]);
+  }
+
+  quitar(itemId: number): void {
+    this.items.update((lista) => {
+      const encontrado = lista.find((item) => item.id === itemId);
+      if (!encontrado) {
+        return lista;
+      }
+      if (encontrado.cantidad > 1) {
+        return lista.map((item) => {
+          if (item.id !== itemId) {
+            return item;
+          }
+          const cantidad = item.cantidad - 1;
+          return {
+            ...item,
+            cantidad,
+            subtotal: round2(cantidad * item.precioUnitario),
+          };
+        });
+      }
+      return lista.filter((item) => item.id !== itemId);
+    });
+  }
+
+  onBusqueda(event: Event): void {
+    this.busqueda.set((event.target as HTMLInputElement).value);
+  }
+
+  onObservacion(event: Event): void {
+    this.observacion.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  async enviar(): Promise<void> {
+    const cuenta = this.cuenta();
+    const items = this.items();
+    if (!cuenta || items.length === 0 || this.toast()) {
+      return;
+    }
+    const notas = this.observacion().trim();
+    const conNotas = items.map((item) => ({
+      ...item,
+      notas: notas ? notas : undefined,
+    }));
+    try {
+      const ronda = await this.cuentas.agregarRonda(cuenta.id, conNotas);
+      if (!ronda) {
+        this.avisar('No se pudo enviar la ronda.');
+        return;
+      }
+      this.toast.set(`Ronda ${ronda.numero} enviada a cocina`);
+      this.items.set([]);
+      this.temporizador = window.setTimeout(() => {
+        void this.router.navigate(['/venta-local']);
+      }, 950);
+    } catch (error) {
+      this.avisar(mensajeError(error));
+    }
+  }
+
+  private avisar(mensaje: string): void {
+    this.toast.set(mensaje);
+    if (this.temporizador !== null) {
+      window.clearTimeout(this.temporizador);
+    }
+    this.temporizador = window.setTimeout(() => this.toast.set(''), 2600);
+  }
+}

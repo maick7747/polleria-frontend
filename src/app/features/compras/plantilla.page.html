@@ -1,0 +1,175 @@
+<app-shell title="Plantilla de pedido" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <app-chip variant="warning" [dot]="true">Borrador</app-chip>
+    <a class="ghost-link" routerLink="/compras">
+      <app-icon name="clipboard-text" [size]="14" />
+      Ver {{ codigo() }}
+    </a>
+  </div>
+
+  <div class="canal">
+    <div class="canal__chips">
+      <span class="canal__chip canal__chip--active">
+        <app-icon name="phone" [size]="14" />
+        WhatsApp
+      </span>
+      <span class="canal__chip">
+        <app-icon name="user" [size]="13" />
+        {{ proveedor() }}
+      </span>
+      <span class="canal__chip">
+        <app-icon name="package" [size]="13" />
+        {{ items() }} insumos
+      </span>
+    </div>
+    <span class="canal__meta">Plantilla v3 · guardada hoy 17:40</span>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Vista previa del mensaje</h2>
+          </div>
+          <span class="panel__meta">así lo recibe el proveedor</span>
+        </header>
+
+        <div class="chat">
+          <span class="chat__day">Hoy · 17:42</span>
+
+          <div class="bubble bubble--out">
+            <textarea
+              class="chat__editor"
+              rows="13"
+              aria-label="Mensaje editable para el proveedor"
+              [value]="mensaje()"
+              (input)="onMensaje($event)"
+            ></textarea>
+          </div>
+
+          <div class="bubble bubble--total">
+            <span class="bubble__total-label">Total</span>
+            <strong>{{ moneda(total()) }}</strong>
+            <span class="bubble__total-hint">IGV incluido</span>
+          </div>
+
+          <div class="bubble bubble--in">
+            <p>Confirmado. Llega mañana temprano.</p>
+            <span class="bubble__time">17:44</span>
+          </div>
+
+          <span class="chat__grow"></span>
+
+          <span class="chat__note">
+            <app-icon name="note-pencil" [size]="12" />
+            Borrador editable · los cambios no alteran la orden de compra
+          </span>
+        </div>
+
+        <div class="vars">
+          <div class="vars__head">
+            <span class="vars__title">Variables de la plantilla</span>
+            <span class="vars__hint">
+              <app-icon name="check" [size]="11" />
+              se completan con la OC
+            </span>
+          </div>
+          <div class="vars__grid">
+            <div class="var">
+              <code>{{ '{{proveedor}}' }}</code>
+              <span>{{ proveedor() }}</span>
+            </div>
+            <div class="var">
+              <code>{{ '{{insumos}}' }}</code>
+              <span>{{ items() }} ítems · cantidades sugeridas</span>
+            </div>
+            <div class="var">
+              <code>{{ '{{total}}' }}</code>
+              <span>{{ moneda(total()) }} · IGV incluido</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel__foot">
+          <span>El mensaje no reemplaza la orden de compra.</span>
+          <span>Se abre WhatsApp Web con el texto listo</span>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aside">
+      <div class="envio">
+        <header class="envio__head">
+          <h2>Enviar pedido</h2>
+          <span class="envio__code">{{ codigo() }}</span>
+        </header>
+
+        <div class="envio__rows">
+          <div class="envio__row">
+            <span>Proveedor</span>
+            <strong>{{ proveedor() }}</strong>
+          </div>
+          <div class="envio__row">
+            <span>Teléfono</span>
+            <strong>+51 964 118 220</strong>
+          </div>
+          <div class="envio__row">
+            <span>Insumos</span>
+            <strong>{{ items() }} ítems</strong>
+          </div>
+          <div class="envio__row">
+            <span>Entrega</span>
+            <strong>{{ entrega }}</strong>
+          </div>
+        </div>
+
+        <span class="envio__divider"></span>
+
+        <div class="envio__amount">
+          <span class="envio__label">Total del pedido</span>
+          <div class="envio__big">
+            <span class="envio__cur">S/</span>
+            <strong>{{ numero(total()) }}</strong>
+          </div>
+          <span class="envio__hint">Incluye IGV 18% · precios del proveedor</span>
+        </div>
+
+        <span class="envio__divider"></span>
+
+        <div class="envio__warn">
+          <span class="envio__warn-icon">
+            <app-icon name="phone" [size]="15" />
+          </span>
+          <p>El mensaje llega al mismo chat donde el proveedor confirma el pedido.</p>
+        </div>
+
+        <span class="envio__grow"></span>
+
+        <button type="button" class="btn-primary" (click)="abrirWhatsapp()">
+          <app-icon name="phone" [size]="16" />
+          Abrir WhatsApp
+        </button>
+        <button type="button" class="btn-secondary" (click)="copiar()">
+          <app-icon name="note-pencil" [size]="15" />
+          Copiar mensaje
+        </button>
+
+        @if (feedback()) {
+          <p class="envio__feedback" role="status">
+            <app-icon name="check-circle" [size]="13" />
+            {{ feedback() }}
+          </p>
+        }
+
+        <p class="envio__note">El pedido queda como borrador hasta generar la OC.</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>Las variables se completan con la orden de compra.</span>
+    <span>Sin descuentos ni cortesías · precios de lista</span>
+  </div>
+</app-shell>

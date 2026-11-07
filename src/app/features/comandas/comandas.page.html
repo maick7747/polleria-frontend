@@ -1,0 +1,233 @@
+<app-shell title="Comandas" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/cuadre-caja">
+      <app-icon name="chart-bar" [size]="14" />
+      Cuadre de caja
+    </a>
+    <a class="dark-link" routerLink="/cuadre-caja">
+      <app-icon name="cash-register" [size]="15" />
+      Cerrar caja
+    </a>
+  </div>
+
+  <div class="toolbar">
+    <div class="filtros" role="group" aria-label="Filtrar comandas">
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'todas'"
+        (click)="cambiarFiltro('todas')"
+      >
+        Todas <span class="filtro__count">{{ conteos().todas }}</span>
+      </button>
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'local'"
+        (click)="cambiarFiltro('local')"
+      >
+        Local <span class="filtro__count">{{ conteos().local }}</span>
+      </button>
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'delivery'"
+        (click)="cambiarFiltro('delivery')"
+      >
+        Delivery <span class="filtro__count">{{ conteos().delivery }}</span>
+      </button>
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'rappi'"
+        (click)="cambiarFiltro('rappi')"
+      >
+        Rappi <span class="filtro__count">{{ conteos().rappi }}</span>
+      </button>
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'listas'"
+        (click)="cambiarFiltro('listas')"
+      >
+        Listas <span class="filtro__count filtro__count--ok">{{ conteos().listas }}</span>
+      </button>
+    </div>
+
+    <label class="buscador">
+      <app-icon name="magnifying-glass" [size]="14" />
+      <input
+        type="search"
+        placeholder="Buscar comanda o mesa"
+        aria-label="Buscar comanda o mesa"
+        [value]="busqueda()"
+        (input)="onBuscar($event)"
+      />
+    </label>
+  </div>
+
+  <div class="main">
+    <app-panel class="tabla">
+      <div class="tabla__head">
+        <span>COMANDO</span>
+        <span>CANAL</span>
+        <span>DESTINO</span>
+        <span class="center">RONDAS</span>
+        <span>TIEMPO</span>
+        <span>ESTADO</span>
+        <span class="right">TOTAL</span>
+      </div>
+
+      <div class="tabla__body">
+        @for (fila of visibles(); track fila.pedidoId) {
+          <button
+            type="button"
+            class="fila"
+            [class.is-sel]="esSeleccionada(fila.pedidoId)"
+            [attr.aria-pressed]="esSeleccionada(fila.pedidoId)"
+            (click)="seleccionar(fila.pedidoId)"
+          >
+            <span class="fila__num">{{ fila.numero }}</span>
+            <span class="fila__canal">
+              <app-icon [name]="iconoCanal(fila.canalTipo)" [size]="13" />
+              {{ fila.canal }}
+            </span>
+            <span class="fila__destino">{{ fila.destino }}</span>
+            <span class="fila__rondas">{{ fila.rondas }}</span>
+            <span class="fila__tiempo" [class.fila__tiempo--alert]="fila.minutos > 30">
+              {{ fila.minutos }} min
+            </span>
+            <span class="fila__estado">
+              <app-chip [variant]="fila.tono">{{ fila.estado }}</app-chip>
+            </span>
+            <span class="fila__total">{{ moneda(fila.total) }}</span>
+          </button>
+        } @empty {
+          <div class="tabla__vacio">
+            <app-empty-state
+              icon="clipboard-text"
+              title="Sin comandas"
+              description="No hay comandas que coincidan con el filtro o la búsqueda."
+            />
+          </div>
+        }
+      </div>
+
+      <div class="tabla__foot">
+        <span>Selecciona una comanda para ver sus rondas</span>
+        <span>{{ visibles().length }} de {{ conteos().todas }}</span>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="panel">
+      @if (seleccionada(); as sel) {
+        <div class="panel__inner">
+          <header class="panel__head">
+            <span class="panel__bar"></span>
+            <h2 class="panel__title">Comanda {{ sel.numero }}</h2>
+          </header>
+
+          <div class="detalle">
+            <app-chip [variant]="sel.tono">{{ sel.estado }}</app-chip>
+            <span class="detalle__meta">{{ sel.canal }} · {{ sel.destino }}</span>
+            <div class="detalle__stats">
+              <div class="detalle__stat">
+                <span>Tiempo</span>
+                <strong>{{ sel.minutos }} min</strong>
+              </div>
+              <div class="detalle__stat">
+                <span>Rondas</span>
+                <strong>{{ sel.rondas }}</strong>
+              </div>
+              <div class="detalle__stat">
+                <span>Total</span>
+                <strong>{{ moneda(sel.total) }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <span class="panel__divider"></span>
+
+          <span class="panel__eyebrow">RONDAS</span>
+          <div class="rondas">
+            @for (ronda of rondasDetalle(); track ronda.numero) {
+              <div class="ronda">
+                <span class="ronda__dot"></span>
+                <div class="ronda__info">
+                  <strong>Ronda {{ ronda.numero }}</strong>
+                  <span>{{ ronda.hora }} · {{ ronda.items }} ítems</span>
+                </div>
+                <span class="ronda__total">{{ moneda(ronda.total) }}</span>
+              </div>
+            }
+          </div>
+
+          <span class="panel__grow"></span>
+
+          <button type="button" class="volver" (click)="cerrarResumen()">
+            <app-icon name="arrow-left" [size]="14" />
+            Volver al resumen
+          </button>
+        </div>
+      } @else {
+        <div class="panel__inner">
+          <header class="panel__head">
+            <span class="panel__bar"></span>
+            <h2 class="panel__title">Resumen del turno</h2>
+          </header>
+
+          <div class="metricas">
+            <div class="metrica">
+              <span>Abiertas</span>
+              <strong>{{ resumen().abiertas }}</strong>
+            </div>
+            <div class="metrica">
+              <span>En cocina</span>
+              <strong>{{ resumen().enCocina }}</strong>
+            </div>
+            <div class="metrica">
+              <span>En camino</span>
+              <strong>{{ resumen().enCamino }}</strong>
+            </div>
+            <div class="metrica">
+              <span>Listas</span>
+              <strong>{{ resumen().listas }}</strong>
+            </div>
+          </div>
+
+          <span class="panel__divider"></span>
+
+          <span class="panel__label">Ventas del turno</span>
+          <div class="ventas">
+            <span class="ventas__cur">S/</span>
+            <strong>{{ ventasTexto() }}</strong>
+          </div>
+
+          <div class="panel__rows">
+            <div class="panel__row">
+              <span>Ticket promedio</span>
+              <strong>{{ moneda(resumen().ticket) }}</strong>
+            </div>
+            <div class="panel__row">
+              <span>{{ resumen().cuentasPorCobrar }} cuentas por cobrar</span>
+              <strong class="panel__row--pending">{{ moneda(resumen().porCobrar) }}</strong>
+            </div>
+          </div>
+
+          <span class="panel__grow"></span>
+
+          <a class="cerrar" routerLink="/cuadre-caja">
+            <app-icon name="cash-register" [size]="15" />
+            Cerrar caja
+          </a>
+          <p class="panel__note">{{ conteos().todas }} comandas · 4 canales</p>
+        </div>
+      }
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>Las comandas entregadas se archivan al cerrar el turno</span>
+    <span class="pie__muted">El cobro se registra al cerrar cada cuenta</span>
+  </div>
+</app-shell>

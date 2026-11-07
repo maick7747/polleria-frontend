@@ -1,0 +1,283 @@
+<app-shell title="Fichas técnicas" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a
+      class="ghost-link"
+      [routerLink]="['/fichas-tecnicas/ingredientes']"
+      [state]="{ platoId: seleccionado()?.id ?? 0 }"
+    >
+      <app-icon name="plus" [size]="14" />
+      Agregar ingredientes
+    </a>
+    <button type="button" class="dark-link" (click)="verTodas()">
+      <app-icon name="book-open" [size]="15" />
+      Ver todas
+    </button>
+  </div>
+
+  <div class="categorias">
+    <div class="chips" role="group" aria-label="Filtrar por categoría">
+      @for (item of categorias(); track item.nombre) {
+        <button
+          type="button"
+          class="chip"
+          [class.is-active]="categoria() === item.nombre"
+          (click)="cambiarCategoria(item.nombre)"
+        >
+          {{ item.nombre }}
+          <span class="chip__count">{{ item.total }}</span>
+        </button>
+      }
+    </div>
+
+    <label class="buscador">
+      <app-icon name="magnifying-glass" [size]="13" />
+      <input
+        type="search"
+        placeholder="Buscar plato"
+        aria-label="Buscar plato"
+        [value]="busqueda()"
+        (input)="onBuscar($event)"
+      />
+    </label>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <div class="lista">
+          <div class="grid grid--head">
+            <span>PLATO</span>
+            <span class="right">COSTO</span>
+            <span class="right">PRECIO</span>
+            <span class="right">MARGEN</span>
+            <span class="right">FOOD</span>
+          </div>
+
+          <div class="rows">
+            @for (fila of visibles(); track fila.id) {
+              <button
+                type="button"
+                class="grid row"
+                [class.is-selected]="fila.id === platoId()"
+                (click)="seleccionar(fila.id)"
+              >
+                <span class="plato">
+                  <span class="plato__name">{{ fila.nombre }}</span>
+                  <span class="plato__meta">
+                    {{ fila.categoria }} · {{ fila.ingredientes }} ingredientes
+                  </span>
+                </span>
+                <span class="monto">{{ moneda(fila.costo) }}</span>
+                <span class="monto">{{ moneda(fila.precio) }}</span>
+                <span class="margen">{{ moneda(fila.margen) }}</span>
+                <span [class]="'food ' + (fila.foodCost > 30 ? 'food--high' : '')">
+                  {{ porcentaje(fila.foodCost) }}
+                </span>
+              </button>
+            } @empty {
+              <div class="rows__empty">
+                <app-empty-state
+                  icon="book-open"
+                  title="Sin fichas"
+                  description="No hay platos que coincidan con la categoría o la búsqueda."
+                />
+              </div>
+            }
+          </div>
+
+          <div class="lista__foot">
+            <span>Costo promedio {{ moneda(promedioCosto()) }} · margen promedio {{ moneda(resumen().margenPromedio) }}</span>
+            <span>{{ visibles().length }} de {{ filas().length }}</span>
+          </div>
+        </div>
+
+        <span class="col-divider"></span>
+
+        <div class="detalle">
+          @if (seleccionado(); as fila) {
+            <span class="detalle__label">Ficha seleccionada</span>
+
+            @if (editando()) {
+              <div class="edit">
+                <label class="edit__field">
+                  <span>Nombre del plato</span>
+                  <input
+                    type="text"
+                    [value]="formNombre()"
+                    (input)="onFormNombre($event)"
+                  />
+                </label>
+                <label class="edit__field">
+                  <span>Precio de venta</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    [value]="formPrecio()"
+                    (input)="onFormPrecio($event)"
+                  />
+                </label>
+              </div>
+            } @else {
+              <h2 class="detalle__title">{{ fila.nombre }}</h2>
+            }
+
+            <span class="detalle__meta">
+              {{ fila.categoria }} · {{ fila.ingredientes }} ingredientes · act. 12 oct
+            </span>
+
+            <span class="hr"></span>
+
+            <div class="detalle__metrics">
+              <div class="detalle__metric">
+                <span>Costo</span>
+                <strong>{{ moneda(costoTotal()) }}</strong>
+              </div>
+              <div class="detalle__metric">
+                <span>Precio</span>
+                <strong>{{ moneda(precioVista()) }}</strong>
+              </div>
+              <div class="detalle__metric">
+                <span>Food cost</span>
+                <strong [class.detalle__metric--high]="foodCostVista() > 30">
+                  {{ porcentaje(foodCostVista()) }}
+                </strong>
+              </div>
+            </div>
+
+            <span class="hr"></span>
+
+            <div class="detalle__ing-head">
+              <span>Ingredientes</span>
+              <span class="detalle__ing-meta">{{ ingredientes().length }} ítems</span>
+            </div>
+
+            <div class="detalle__ings">
+              @for (item of ingredientes(); track $index) {
+                <div class="ing">
+                  <span class="ing__name">{{ item.nombre }}</span>
+                  <span class="ing__qty">{{ cantidad(item.cantidad) }} {{ item.unidad }}</span>
+                  <span class="ing__cost">{{ moneda(item.subtotal) }}</span>
+                </div>
+              } @empty {
+                <span class="detalle__none">Sin ingredientes registrados.</span>
+              }
+            </div>
+
+            <div class="detalle__total">
+              <span>Costo total</span>
+              <strong>{{ moneda(costoTotal()) }}</strong>
+            </div>
+
+            <span class="grow"></span>
+
+            <a
+              class="detalle__add"
+              [routerLink]="['/fichas-tecnicas/ingredientes']"
+              [state]="{ platoId: fila.id }"
+            >
+              <app-icon name="plus" [size]="12" />
+              Agregar ingredientes a esta ficha
+            </a>
+
+            <div class="detalle__note">
+              <app-icon name="warning-circle" [size]="12" />
+              <p>Al vender el plato, la ficha descuenta stock de cada ingrediente.</p>
+            </div>
+          }
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aside">
+      <div class="rent">
+        <header class="rent__head">
+          <span class="rent__bar"></span>
+          <h2>Rentabilidad</h2>
+        </header>
+
+        <span class="rent__label">Margen promedio por plato</span>
+        <div class="rent__big">
+          <span class="rent__cur">S/</span>
+          <strong>{{ monto(resumen().margenPromedio) }}</strong>
+        </div>
+        <div class="rent__chips">
+          <span class="rent__pill">Food cost {{ porcentaje(resumen().foodCostPromedio) }}</span>
+          <span class="rent__hint">objetivo ≤ 30%</span>
+        </div>
+
+        <span class="rent__divider"></span>
+
+        <div class="rent__rows">
+          <div class="rent__row">
+            <span>Mejor margen</span>
+            <strong>{{ resumen().mejor?.nombre ?? '—' }}</strong>
+          </div>
+          <div class="rent__row">
+            <span>Margen del mejor</span>
+            <strong class="rent__good">{{ moneda(resumen().mejor?.margen ?? 0) }}</strong>
+          </div>
+          <div class="rent__row">
+            <span>Menor margen</span>
+            <strong class="rent__warn">
+              {{ resumen().menor?.nombre ?? '—' }} · {{ moneda(resumen().menor?.margen ?? 0) }}
+            </strong>
+          </div>
+          <div class="rent__row">
+            <span>Platos sobre 30%</span>
+            <strong class="rent__bad">{{ resumen().sobre30 }} de {{ resumen().total }}</strong>
+          </div>
+        </div>
+
+        <span class="rent__divider"></span>
+
+        <div class="rent__focus">
+          <div class="rent__row">
+            <span>Ficha en edición</span>
+            <strong>{{ seleccionado()?.nombre ?? '—' }}</strong>
+          </div>
+          <div class="rent__row">
+            <span>Margen actual</span>
+            <strong>{{ moneda(margenVista()) }} · {{ porcentaje(100 - foodCostVista()) }}%</strong>
+          </div>
+        </div>
+
+        <span class="grow"></span>
+
+        <div class="rent__note">
+          <app-icon name="warning-circle" [size]="12" />
+          <p>El costo se recalcula al cambiar ingredientes o precios de compra.</p>
+        </div>
+
+        @if (editando()) {
+          <button type="button" class="btn-primary" (click)="guardarEdicion()">
+            <app-icon name="check-circle" [size]="15" />
+            Guardar cambios
+          </button>
+          <button type="button" class="btn-secondary" (click)="cancelarEdicion()">
+            <app-icon name="x" [size]="14" />
+            Cancelar
+          </button>
+        } @else {
+          <button type="button" class="btn-primary" [disabled]="!seleccionado()" (click)="editar()">
+            <app-icon name="note-pencil" [size]="15" />
+            Editar ficha
+          </button>
+        }
+        <p class="rent__foot">Cambios con registro de usuario y fecha</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>La ficha técnica define el descuento de stock por plato vendido</span>
+    <span>Food cost = costo del plato / precio de venta</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <app-icon name="check-circle" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

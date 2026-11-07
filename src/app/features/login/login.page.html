@@ -1,0 +1,74 @@
+<div class="login">
+  <aside class="brand-side">
+    <div class="brand">
+      <span class="brand__logo">F</span>
+      <span class="brand__name">Fratelli's</span>
+    </div>
+
+    <div class="brand-copy">
+      <h1>El pulso del turno,<br />en una sola pantalla.</h1>
+      <p>
+        Ventas, cocina, delivery, inventario y caja en un mismo lugar. Sin pago
+        inmediato: la cuenta se cierra al final, una sola vez.
+      </p>
+      <ul class="brand-list">
+        <li>Cuenta por mesa con 1..N rondas</li>
+        <li>KDS con SLA de 30 minutos</li>
+        <li>Caja, merma y reportes en tiempo real</li>
+      </ul>
+    </div>
+
+    <p class="brand-foot">Av. Ferrocarril N° 973 · El Tambo, Huancayo</p>
+  </aside>
+
+  <main class="form-side">
+    <form class="card" [formGroup]="form" (ngSubmit)="ingresar()">
+      <div class="card-head">
+        <span class="card-logo">F</span>
+        <div>
+          <h2>Ingresa al sistema</h2>
+          <p>Gestión integral · Fratelli's Restaurante</p>
+        </div>
+      </div>
+
+      <label class="field">
+        Correo electrónico
+        <input
+          type="email"
+          formControlName="email"
+          autocomplete="username"
+          placeholder="tu@fratellis.pe"
+        />
+      </label>
+
+      <label class="field">
+        Contraseña
+        <input
+          type="password"
+          formControlName="password"
+          autocomplete="current-password"
+          placeholder="••••••••"
+        />
+      </label>
+
+      @if (error()) {
+        <p class="error" role="alert">{{ error() }}</p>
+      }
+
+      <button class="login-btn" type="submit" [disabled]="cargando()">
+        {{ cargando() ? 'Ingresando…' : 'Ingresar' }}
+      </button>
+
+      <div class="demo">
+        <span>Accesos de prueba</span>
+        <div class="demo__list">
+          @for (acceso of accesos; track acceso.rol) {
+            <button type="button" (click)="usarAcceso(acceso)">{{ acceso.rol }}</button>
+          }
+        </div>
+      </div>
+    </form>
+
+    <p class="foot">Solo personal autorizado · RBAC multi-rol</p>
+  </main>
+</div>

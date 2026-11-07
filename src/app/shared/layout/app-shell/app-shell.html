@@ -1,0 +1,51 @@
+<div class="shell">
+  <aside class="rail">
+    <a class="logo" routerLink="/dashboard" aria-label="Fratelli's · Inicio">F</a>
+    <span class="rail-gap"></span>
+
+    <nav class="rail-nav" aria-label="Módulos del sistema">
+      @for (item of nav(); track item.route) {
+        <a
+          class="rail-item"
+          [routerLink]="item.route"
+          [routerLinkActive]="'is-active'"
+          [routerLinkActiveOptions]="{ exact: item.exact }"
+          [title]="item.label"
+          [attr.aria-label]="item.label"
+        >
+          <app-icon [name]="item.icon" [size]="19" />
+        </a>
+      }
+    </nav>
+
+    <div class="rail-spacer"></div>
+
+    <button
+      class="avatar"
+      type="button"
+      [title]="'Cerrar sesión · ' + (usuario()?.nombre ?? '')"
+      aria-label="Cerrar sesión"
+      (click)="logout()"
+    >
+      {{ iniciales() }}
+    </button>
+  </aside>
+
+  <div class="rail-divider"></div>
+
+  <main class="content">
+    <header class="page-header">
+      <div class="page-titles">
+        <h1 class="page-title">{{ title() }}</h1>
+        @if (subtitle()) {
+          <p class="page-subtitle">{{ subtitle() }}</p>
+        }
+      </div>
+      <div class="page-actions">
+        <ng-content select="[actions]"></ng-content>
+      </div>
+    </header>
+
+    <ng-content></ng-content>
+  </main>
+</div>

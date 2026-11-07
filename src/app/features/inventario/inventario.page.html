@@ -1,0 +1,190 @@
+<app-shell title="Control de inventario" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/inventario/ajustar">
+      <app-icon name="filter" [size]="14" />
+      Ajustar mínimo
+    </a>
+    <a class="dark-link" routerLink="/inventario/historial">
+      <app-icon name="clock" [size]="15" />
+      Historial
+    </a>
+  </div>
+
+  <div class="toolbar">
+    <div class="chips" role="group" aria-label="Filtrar inventario">
+      <button
+        type="button"
+        class="chip"
+        [class.is-active]="filtro() === 'todos'"
+        (click)="cambiarFiltro('todos')"
+      >
+        Todos <span class="chip__count">{{ conteos().todos }}</span>
+      </button>
+      <button
+        type="button"
+        class="chip"
+        [class.is-active]="filtro() === 'bajo'"
+        (click)="cambiarFiltro('bajo')"
+      >
+        Bajo <span class="chip__count chip__count--warning">{{ conteos().bajo }}</span>
+      </button>
+      <button
+        type="button"
+        class="chip"
+        [class.is-active]="filtro() === 'critico'"
+        (click)="cambiarFiltro('critico')"
+      >
+        Crítico <span class="chip__count chip__count--danger">{{ conteos().critico }}</span>
+      </button>
+      <span class="chip chip--static">
+        OK <span class="chip__count">{{ conteos().ok }}</span>
+      </span>
+    </div>
+
+    <label class="buscador">
+      <app-icon name="magnifying-glass" [size]="14" />
+      <input
+        type="search"
+        placeholder="Buscar insumo"
+        aria-label="Buscar insumo"
+        [value]="busqueda()"
+        (input)="onBuscar($event)"
+      />
+    </label>
+  </div>
+
+  <div class="board">
+    <app-panel class="panel">
+      <div class="panel__inner">
+        <header class="panel__head">
+          <div class="panel__title">
+            <span class="panel__bar"></span>
+            <h2>Stock por insumo</h2>
+          </div>
+          <span class="panel__meta">
+            valorizado {{ moneda(valorInventario()) }} · {{ visibles().length }} de
+            {{ conteos().todos }}
+          </span>
+        </header>
+
+        <div class="grid grid--head">
+          <span>INSUMO</span>
+          <span>STOCK</span>
+          <span>MÍNIMO</span>
+          <span>NIVEL</span>
+          <span>ESTADO</span>
+        </div>
+
+        <div class="rows">
+          @for (fila of visibles(); track fila.insumoId) {
+            <div class="grid row" [class.row--alert]="fila.estado === 'critico'">
+              <div class="insumo">
+                <span class="insumo__name">{{ fila.nombre }}</span>
+                <span class="insumo__meta">{{ fila.categoria }} · unidad {{ fila.unidad }}</span>
+              </div>
+              <span class="stock">{{ cantidad(fila.stock, fila.unidad) }}</span>
+              <span class="minimo">{{ cantidad(fila.minimo, fila.unidad) }}</span>
+              <div class="nivel">
+                <span class="nivel__track">
+                  <span
+                    class="nivel__fill"
+                    [class]="'nivel__fill nivel__fill--' + fila.estado"
+                    [style.width.%]="fila.barra"
+                  ></span>
+                </span>
+                <span [class]="'nivel__pct nivel__pct--' + fila.estado">{{ fila.porcentaje }}%</span>
+              </div>
+              <span class="estado">
+              <span [class]="'alerta__chip alerta__chip--' + fila.estado">{{ textoEstado(fila.estado) }}</span>
+              </span>
+            </div>
+          } @empty {
+            <div class="rows__empty">
+              <app-empty-state
+                icon="monitor"
+                title="Sin insumos"
+                description="No hay insumos que coincidan con el filtro o la búsqueda."
+              />
+            </div>
+          }
+        </div>
+
+        <div class="panel__foot">
+          <span>El stock baja automáticamente al confirmar cada pedido</span>
+          <span>{{ visibles().length }} de {{ conteos().todos }} insumos</span>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="aside">
+      <div class="alertas">
+        <header class="alertas__head">
+          <h2>Alertas de stock</h2>
+          <span class="alertas__badge">{{ alertas().length }} bajo mínimo</span>
+        </header>
+
+        <span class="alertas__divider"></span>
+
+        <div class="alertas__list">
+          @for (fila of alertas(); track fila.insumoId) {
+            <div class="alerta">
+              <span
+                class="alerta__icon"
+                [class.alerta__icon--critical]="fila.estado === 'critico'"
+              >
+                <app-icon
+                  [name]="fila.estado === 'critico' ? 'warning-circle' : 'package'"
+                  [size]="15"
+                />
+              </span>
+              <div class="alerta__info">
+                <strong>{{ fila.nombre }}</strong>
+                <span>{{ cantidad(fila.stock, fila.unidad) }} de {{ cantidad(fila.minimo, fila.unidad) }} mínimo</span>
+              </div>
+              <app-chip [variant]="tonoEstado(fila.estado)">{{ textoEstado(fila.estado) }}</app-chip>
+            </div>
+          }
+        </div>
+
+        <span class="alertas__divider"></span>
+
+        <div class="alertas__rows">
+          <div class="alertas__row">
+            <span>Valorizado en riesgo</span>
+            <strong>{{ moneda(valorRiesgo()) }}</strong>
+          </div>
+          <div class="alertas__row">
+            <span>Cobertura estimada</span>
+            <strong class="alertas__row--warning">2 días</strong>
+          </div>
+        </div>
+
+        <div class="alertas__amount">
+          <span class="alertas__label">Insumos bajo mínimo</span>
+          <div class="alertas__big">
+            <strong>{{ alertas().length }}</strong>
+            <span>de {{ conteos().todos }} insumos</span>
+          </div>
+        </div>
+
+        <span class="alertas__grow"></span>
+
+        <a class="btn-primary" routerLink="/inventario/verificar">
+          <app-icon name="check" [size]="16" />
+          Verificar stock
+        </a>
+        <a class="btn-secondary" routerLink="/compras">
+          <app-icon name="shopping-cart" [size]="15" />
+          Generar sugerencia de compra
+        </a>
+
+        <p class="alertas__note">El conteo físico ajusta el stock del sistema.</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>{{ conteos().todos }} insumos · {{ alertas().length }} bajo mínimo · {{ moneda(valorInventario()) }} valorizado</span>
+    <span>Merma y devoluciones también mueven el stock</span>
+  </div>
+</app-shell>
