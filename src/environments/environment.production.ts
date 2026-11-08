@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://polleria-backend-6kym.onrender.com/api',
+  apiUrl: 'https://polleria-backend-useast.onrender.com/api',
   useApi: true,
   supabaseUrl: '',
   supabaseKey: '',
