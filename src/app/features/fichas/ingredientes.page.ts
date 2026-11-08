@@ -162,15 +162,14 @@ export class FichasIngredientesPage {
     return `Ficha ${plato.nombre} · costo actual ${this.moneda(this.fichaCosto())} · ${plato.ingredientes.length} ingredientes`;
   });
 
+  private readonly solicitado: number;
+
   constructor() {
     const estado = this.router.getCurrentNavigation()?.extras.state as
       | { platoId?: number }
       | undefined;
-    const solicitado = typeof estado?.platoId === 'number' ? estado.platoId : 0;
-    const inicial = this.fichas.porId(solicitado) ?? this.fichas.platos()[0];
-    if (inicial) {
-      this.platoId.set(inicial.id);
-    }
+    this.solicitado = typeof estado?.platoId === 'number' ? estado.platoId : 0;
+    void this.inicializar();
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
@@ -179,6 +178,14 @@ export class FichasIngredientesPage {
         window.clearTimeout(this.navTimer);
       }
     });
+  }
+
+  private async inicializar(): Promise<void> {
+    await this.fichas.cargar();
+    const inicial = this.fichas.porId(this.solicitado) ?? this.fichas.platos()[0];
+    if (inicial) {
+      this.platoId.set(inicial.id);
+    }
   }
 
   cantidad(valor: number): string {

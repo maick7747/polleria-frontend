@@ -10,7 +10,6 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { mensajeError } from '../../core/api/api.helpers';
 import { CuentasService } from '../../core/data/cuentas.service';
-import { MOCK_USUARIOS } from '../../core/data/mock-data';
 import type { MetodoPago } from '../../core/models';
 import {
   abreviarNombre,
@@ -70,6 +69,9 @@ export class CuentaDetallePage {
   readonly metodo = signal<MetodoPago>('efectivo');
   readonly recibido = signal('100');
   readonly procesando = signal(false);
+  readonly cargando = signal(true);
+  readonly avisoLento = signal(false);
+  readonly error = signal<string | null>(null);
   readonly toast = signal('');
   readonly toastError = signal(false);
 
@@ -77,7 +79,7 @@ export class CuentaDetallePage {
   private navTimer: number | null = null;
 
   constructor() {
-    void this.cuentas.cargarDetalle(this.cuentaId);
+    void this.cargar();
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
@@ -86,6 +88,32 @@ export class CuentaDetallePage {
         window.clearTimeout(this.navTimer);
       }
     });
+  }
+
+  private async cargar(): Promise<void> {
+    this.cargando.set(true);
+    this.error.set(null);
+    this.avisoLento.set(false);
+    const temporizador = window.setTimeout(() => this.avisoLento.set(true), 5000);
+    try {
+      const ok = await this.cuentas.cargarDetalle(this.cuentaId);
+      if (!ok) {
+        const detalle = this.cuentas.errorDetalle();
+        this.error.set(
+          detalle?.status === 404
+            ? 'La cuenta no existe o ya fue cerrada.'
+            : detalle?.message ?? 'No se pudo cargar la cuenta.',
+        );
+      }
+    } finally {
+      window.clearTimeout(temporizador);
+      this.avisoLento.set(false);
+      this.cargando.set(false);
+    }
+  }
+
+  reintentar(): void {
+    void this.cargar();
   }
 
   readonly numeroMesa = computed<string>(() =>
@@ -98,10 +126,7 @@ export class CuentaDetallePage {
       return 'Cuenta no encontrada';
     }
     const minutos = minutosEntre(cuenta.fechaApertura, AHORA);
-    const usuario = MOCK_USUARIOS.find(
-      (candidato) => candidato.id === cuenta.usuarioAperturaId,
-    );
-    const mozo = usuario ? abreviarNombre(usuario.nombre) : '—';
+    const mozo = abreviarNombre(cuenta.usuarioAperturaNombre ?? '');
     return `Abierta ${minutos} min · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
   });
 
@@ -114,12 +139,9 @@ export class CuentaDetallePage {
     (this.cuenta()?.rondas ?? []).reduce((suma, ronda) => suma + ronda.items.length, 0),
   );
 
-  readonly mozo = computed<string>(() => {
-    const usuario = MOCK_USUARIOS.find(
-      (candidato) => candidato.id === this.cuenta()?.usuarioAperturaId,
-    );
-    return usuario ? abreviarNombre(usuario.nombre) : '—';
-  });
+  readonly mozo = computed<string>(() =>
+    abreviarNombre(this.cuenta()?.usuarioAperturaNombre ?? ''),
+  );
 
   readonly cliente = computed<string>(() => this.cuenta()?.cliente?.nombre ?? 'Consumidor final');
   readonly documento = computed<string>(() => {

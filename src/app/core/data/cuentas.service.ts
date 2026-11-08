@@ -10,13 +10,14 @@ import type {
 } from '../models';
 import { round2 } from '../utils/format';
 import { ApiClient } from '../api/api.client';
+import type { ApiError } from '../api/api.client';
 import { USE_API } from '../api/api.config';
-import { esApiError, esFalloRed } from '../api/api.helpers';
+import { esApiError, esFalloRed, mensajeError } from '../api/api.helpers';
 import type {
-  ApiList,
   CobroResponseDto,
   CuentaDto,
   PedidoDto,
+  TableroDto,
 } from '../api/api.types';
 import { toCuenta, toPago, toRonda } from '../api/api.mappers';
 import { MesasService } from './mesas.service';
@@ -36,15 +37,21 @@ export class CuentasService {
   private readonly clientesPendientes = new Map<number, DatosCliente>();
 
   readonly cargando = signal<boolean>(false);
+  readonly error = signal<string | null>(null);
+  readonly errorDetalle = signal<ApiError | null>(null);
+  readonly aviso = signal<string | null>(null);
 
+  // En modo API arranca vacío: los mocks solo se usan en modo demo.
   readonly cuentas = signal<Cuenta[]>(
-    MOCK_CUENTAS.map((cuenta) => ({
-      ...cuenta,
-      rondas: cuenta.rondas.map((ronda) => ({
-        ...ronda,
-        items: ronda.items.map((item) => ({ ...item })),
-      })),
-    })),
+    USE_API
+      ? []
+      : MOCK_CUENTAS.map((cuenta) => ({
+          ...cuenta,
+          rondas: cuenta.rondas.map((ronda) => ({
+            ...ronda,
+            items: ronda.items.map((item) => ({ ...item })),
+          })),
+        })),
   );
 
   readonly abiertas = computed<Cuenta[]>(() =>
@@ -63,30 +70,33 @@ export class CuentasService {
     return this.abiertas().find((cuenta) => cuenta.mesaId === mesaId);
   }
 
-  async cargar(): Promise<boolean> {
+  async cargar(silencioso = false): Promise<boolean> {
     if (!USE_API) {
       return false;
     }
-    this.cargando.set(true);
+    if (!silencioso) {
+      this.cargando.set(true);
+      this.error.set(null);
+      this.aviso.set(null);
+    }
     try {
-      const lista = await firstValueFrom(
-        this.api.get<ApiList<CuentaDto>>('/cuentas', { estado: 'abierta', limit: 100 }),
+      const tablero = await firstValueFrom(
+        this.api.get<TableroDto>('/venta-local/tablero'),
       );
-      const detalles = await Promise.all(
-        lista.data.map((cuenta) =>
-          firstValueFrom(this.api.get<CuentaDto>(`/cuentas/${cuenta.id}`)),
-        ),
-      );
-      const normalizadas = detalles.map(toCuenta);
-      this.cuentas.set(normalizadas);
-      for (const cuenta of normalizadas) {
-        this.mesas.cambiarEstado(cuenta.mesaId, 'ocupada');
-      }
+      this.cuentas.set(tablero.cuentas.map(toCuenta));
+      this.mesas.reemplazar(tablero.mesas);
+      this.error.set(null);
+      this.aviso.set(null);
       return true;
-    } catch {
+    } catch (error) {
+      if (!silencioso || this.cuentas().length === 0) {
+        this.error.set(mensajeError(error));
+      }
       return false;
     } finally {
-      this.cargando.set(false);
+      if (!silencioso) {
+        this.cargando.set(false);
+      }
     }
   }
 
@@ -94,20 +104,49 @@ export class CuentasService {
     if (!USE_API) {
       return false;
     }
+    this.errorDetalle.set(null);
     try {
       const dto = await firstValueFrom(this.api.get<CuentaDto>(`/cuentas/${id}`));
       this.upsert(toCuenta(dto));
       return true;
-    } catch {
+    } catch (error) {
+      this.errorDetalle.set(esApiError(error) ? error : null);
       return false;
     }
   }
 
-  guardarCliente(cuentaId: number, cliente: DatosCliente): Cuenta | null {
+  async guardarCliente(
+    cuentaId: number,
+    cliente: DatosCliente,
+  ): Promise<Cuenta | null> {
     const cuenta = this.porId(cuentaId);
     if (!cuenta) {
       return null;
     }
+
+    if (USE_API) {
+      try {
+        const dto = await firstValueFrom(
+          this.api.patch<CuentaDto>(`/cuentas/${cuentaId}/cliente`, {
+            cliente: this.aClientePayload(cliente),
+          }),
+        );
+        // El PATCH devuelve un resumen: `pedidos` viene como lista de ids, no
+        // como rondas completas. Conservamos las rondas locales y solo
+        // actualizamos el cliente para no romper el detalle en pantalla.
+        const actualizada: Cuenta = {
+          ...cuenta,
+          cliente: toCuenta(dto).cliente ?? cliente,
+        };
+        this.upsert(actualizada);
+        return actualizada;
+      } catch (error) {
+        if (!esFalloRed(error)) {
+          throw error;
+        }
+      }
+    }
+
     const actualizada: Cuenta = { ...cuenta, cliente };
     this.cuentas.update((lista) =>
       lista.map((actual) => (actual.id === cuentaId ? actualizada : actual)),
@@ -131,15 +170,15 @@ export class CuentasService {
 
     if (USE_API) {
       try {
+        const pendiente = this.clientesPendientes.get(mesaId);
         const dto = await firstValueFrom(
-          this.api.post<CuentaDto>('/cuentas', { mesa_id: mesaId }),
+          this.api.post<CuentaDto>('/cuentas', {
+            mesa_id: mesaId,
+            cliente: pendiente ? this.aClientePayload(pendiente) : undefined,
+          }),
         );
         const cuenta = toCuenta(dto);
-        const pendiente = this.clientesPendientes.get(mesaId);
-        if (pendiente) {
-          cuenta.cliente = pendiente;
-          this.clientesPendientes.delete(mesaId);
-        }
+        this.clientesPendientes.delete(mesaId);
         this.upsert(cuenta);
         this.mesas.cambiarEstado(mesaId, 'ocupada');
         return cuenta;
@@ -160,6 +199,7 @@ export class CuentasService {
   async agregarRonda(
     cuentaId: number,
     items: PedidoDetalle[],
+    clave?: string,
   ): Promise<Ronda | null> {
     const cuenta = this.porId(cuentaId);
     if (!cuenta || cuenta.estado !== 'abierta') {
@@ -174,10 +214,16 @@ export class CuentasService {
             cantidad: item.cantidad,
             notas: item.notas ?? null,
           })),
+          idempotency_key: clave ?? null,
         };
         const dto = await firstValueFrom(
           this.api.post<PedidoDto>(`/cuentas/${cuentaId}/pedidos`, payload),
         );
+        if (dto.idempotente === true) {
+          const actual = this.porId(cuentaId) ?? cuenta;
+          const existente = actual.rondas.find((ronda) => ronda.id === dto.id);
+          return existente ?? toRonda(dto, actual.rondas.length + 1);
+        }
         let enviado = dto;
         try {
           enviado = await firstValueFrom(
@@ -225,6 +271,7 @@ export class CuentasService {
     if (!cuenta || cuenta.estado !== 'abierta') {
       return null;
     }
+    this.clientesPendientes.delete(cuenta.mesaId);
 
     if (USE_API) {
       try {
@@ -261,6 +308,7 @@ export class CuentasService {
     if (!cuenta || cuenta.estado !== 'abierta' || cuenta.rondas.length > 0) {
       return false;
     }
+    this.clientesPendientes.delete(cuenta.mesaId);
 
     if (USE_API) {
       try {
@@ -282,6 +330,21 @@ export class CuentasService {
     this.cuentas.update((lista) => lista.filter((actual) => actual.id !== cuentaId));
     this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
     return true;
+  }
+
+  private aClientePayload(cliente: DatosCliente): {
+    nombre: string;
+    tipo_documento: string;
+    numero_documento: string;
+    telefono?: string;
+  } {
+    const telefono = cliente.telefono?.trim();
+    return {
+      nombre: cliente.nombre,
+      tipo_documento: cliente.tipoDocumento,
+      numero_documento: cliente.numeroDocumento,
+      ...(telefono ? { telefono } : {}),
+    };
   }
 
   private upsert(cuenta: Cuenta): void {

@@ -10,7 +10,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { mensajeError } from '../../core/api/api.helpers';
 import { CuentasService } from '../../core/data/cuentas.service';
-import { MOCK_USUARIOS } from '../../core/data/mock-data';
+import { NotificacionesService } from '../../core/data/notificaciones.service';
 import type { Cuenta } from '../../core/models';
 import {
   abreviarNombre,
@@ -36,6 +36,7 @@ interface CuentaVista {
   minutos: number;
   rondas: number;
   mozo: string;
+  listos: number;
   prioritaria: boolean;
   subtotal: number;
   igv: number;
@@ -59,8 +60,11 @@ interface CuentaVista {
 })
 export class CerrarCuentaPage {
   private readonly cuentas = inject(CuentasService);
+  private readonly notificaciones = inject(NotificacionesService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  private toastTimer: number | null = null;
 
   private readonly ahora = signal(Date.now());
 
@@ -71,6 +75,12 @@ export class CerrarCuentaPage {
   readonly seleccionadaId = signal<number | null>(null);
   readonly liberando = signal(false);
   readonly aviso = signal('');
+  readonly avisoLento = signal(false);
+  readonly toast = signal('');
+
+  readonly cargando = this.cuentas.cargando;
+  readonly error = this.cuentas.error;
+  readonly avisoCarga = this.cuentas.aviso;
 
   readonly vistas = computed<CuentaVista[]>(() => {
     const lista = this.cuentas
@@ -110,9 +120,57 @@ export class CerrarCuentaPage {
   readonly dineroAbierto = computed<string>(() => formatearMoneda(this.totalAbierto()));
 
   constructor() {
-    const intervalo = setInterval(() => this.ahora.set(Date.now()), 30000);
-    this.destroyRef.onDestroy(() => clearInterval(intervalo));
-    void this.cuentas.cargar();
+    const reloj = setInterval(() => this.ahora.set(Date.now()), 30000);
+    const refresco = setInterval(() => void this.refrescar(), 15000);
+    this.destroyRef.onDestroy(() => {
+      clearInterval(reloj);
+      clearInterval(refresco);
+      if (this.toastTimer !== null) {
+        window.clearTimeout(this.toastTimer);
+      }
+    });
+    void this.cargar();
+  }
+
+  private async cargar(): Promise<void> {
+    this.avisoLento.set(false);
+    const temporizador = window.setTimeout(() => this.avisoLento.set(true), 5000);
+    try {
+      await this.cuentas.cargar();
+    } finally {
+      window.clearTimeout(temporizador);
+      this.avisoLento.set(false);
+    }
+    this.notificaciones.sincronizar(this.cuentas.abiertas(), false);
+  }
+
+  // Refresco silencioso: detecta platos listos y avisa al mozo.
+  private async refrescar(): Promise<void> {
+    if (document.visibilityState !== 'visible' || this.cargando()) {
+      return;
+    }
+    await this.cuentas.cargar(true);
+    const nuevos = this.notificaciones.sincronizar(this.cuentas.abiertas());
+    if (nuevos.length > 0) {
+      const ultimo = nuevos[nuevos.length - 1];
+      this.mostrarToast(
+        nuevos.length === 1
+          ? `Mesa ${String(ultimo.mesaNumero).padStart(2, '0')} · ${ultimo.plato} listo`
+          : `${nuevos.length} platos listos en cocina`,
+      );
+    }
+  }
+
+  private mostrarToast(mensaje: string): void {
+    this.toast.set(mensaje);
+    if (this.toastTimer !== null) {
+      window.clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = window.setTimeout(() => this.toast.set(''), 4000);
+  }
+
+  reintentar(): void {
+    void this.cargar();
   }
 
   @HostListener('document:keydown.escape')
@@ -169,13 +227,18 @@ export class CerrarCuentaPage {
   private vista(cuenta: Cuenta): CuentaVista {
     const minutos = this.minutos(cuenta);
     const subtotal = round2(cuenta.total / 1.18);
-    const usuario = MOCK_USUARIOS.find((candidato) => candidato.id === cuenta.usuarioAperturaId);
+    const listos = cuenta.rondas.reduce(
+      (total, ronda) =>
+        total + ronda.items.filter((item) => item.estadoPreparacion === 'listo').length,
+      0,
+    );
     return {
       cuenta,
       numero: String(cuenta.mesaId).padStart(2, '0'),
       minutos,
       rondas: cuenta.rondas.length,
-      mozo: usuario ? abreviarNombre(usuario.nombre) : '—',
+      mozo: abreviarNombre(cuenta.usuarioAperturaNombre ?? ''),
+      listos,
       prioritaria: minutos > UMBRAL_DEMORA,
       subtotal,
       igv: round2(cuenta.total - subtotal),

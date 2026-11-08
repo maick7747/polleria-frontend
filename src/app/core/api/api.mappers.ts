@@ -1,6 +1,7 @@
 import type {
   CanalPedido,
   CategoriaInsumo,
+  CategoriaPlatillo,
   ComprobanteTipo,
   Cuenta,
   EstadoCuenta,
@@ -15,6 +16,7 @@ import type {
   Pago,
   Pedido,
   PedidoDetalle,
+  Plato,
   Ronda,
   TipoConsumo,
   UnidadMedida,
@@ -27,6 +29,7 @@ import type {
   MovimientoDto,
   PagoDto,
   PedidoDto,
+  PlatoDto,
 } from './api.types';
 
 const METODOS: readonly MetodoPago[] = ['efectivo', 'tarjeta', 'yape', 'plin', 'transferencia'];
@@ -194,10 +197,21 @@ export function toCuenta(dto: CuentaDto): Cuenta {
     total: dto.total,
     fechaApertura: dto.fecha_apertura,
     usuarioAperturaId: dto.usuario_apertura_id,
+    usuarioAperturaNombre: dto.usuario_apertura_nombre ?? undefined,
     fechaCierre: dto.fecha_cierre ?? undefined,
     usuarioCierreId: dto.usuario_cierre_id ?? undefined,
     comprobanteTipo: toComprobanteTipo(dto.comprobante_tipo),
     comprobanteNumero: dto.comprobante_numero ?? undefined,
+    ...(dto.cliente
+      ? {
+          cliente: {
+            tipoDocumento: dto.cliente.tipo_documento === 'RUC' ? 'RUC' : 'DNI',
+            numeroDocumento: dto.cliente.numero_documento ?? '',
+            nombre: dto.cliente.nombre,
+            telefono: dto.cliente.telefono ?? undefined,
+          },
+        }
+      : {}),
     rondas,
   };
 }
@@ -257,5 +271,23 @@ export function toMovimiento(dto: MovimientoDto): MovimientoStock {
     usuarioId: dto.usuario_id,
     observacion: dto.observacion ?? '',
     fecha: dto.fecha,
+  };
+}
+
+export function toPlato(dto: PlatoDto): Plato {
+  return {
+    id: dto.id,
+    nombre: dto.nombre,
+    descripcion: dto.descripcion ?? '',
+    categoria: (dto.categoria ?? 'Pollos') as CategoriaPlatillo,
+    precioVenta: Number(dto.precio_venta),
+    activo: Boolean(dto.activo),
+    ingredientes: (dto.ingredientes ?? []).map((ingrediente) => ({
+      insumoId: ingrediente.insumo_id,
+      nombre: ingrediente.insumo ?? '',
+      cantidad: Number(ingrediente.cantidad),
+      unidadMedida: (ingrediente.unidad_medida ?? 'und') as UnidadMedida,
+      costoUnitario: Number(ingrediente.costo_promedio ?? 0),
+    })),
   };
 }

@@ -179,10 +179,13 @@
           type="button"
           class="enviar"
           [disabled]="!puedeEnviar()"
+          [attr.aria-busy]="enviando()"
           (click)="enviar()"
         >
-          <app-icon name="flame" [size]="16" />
-          Enviar a cocina
+          @if (!enviando()) {
+            <app-icon name="flame" [size]="16" />
+          }
+          {{ enviando() ? 'Enviando…' : 'Enviar a cocina' }}
         </button>
         <p class="cuenta__nota">No se cobra ahora. Se cobra al cerrar la cuenta.</p>
       </div>

@@ -8,9 +8,9 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MesasService } from '../../core/data/mesas.service';
+import { NotificacionesService } from '../../core/data/notificaciones.service';
 import type { Cuenta, Mesa, Ronda } from '../../core/models';
 import {
   abreviarNombre,
@@ -34,6 +34,7 @@ interface MesaVista {
   mesa: Mesa;
   cuenta: Cuenta | null;
   minutos: number;
+  listos: number;
 }
 
 interface MesaDetalle extends MesaVista {
@@ -66,15 +67,25 @@ const TAMANO_FILA = 5;
 export class VentaLocalPage {
   private readonly mesas = inject(MesasService);
   private readonly cuentas = inject(CuentasService);
-  private readonly auth = inject(AuthService);
+  private readonly notificaciones = inject(NotificacionesService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+
+  private toastTimer: number | null = null;
 
   private readonly ahora = signal(Date.now());
 
   readonly fecha = computed(() => `Fratelli's · ${fechaLarga()} · ${turnoActual()}`);
   readonly filtro = signal<FiltroMesas>('todas');
   readonly seleccionadaId = signal<number | null>(null);
+  readonly avisoLento = signal(false);
+  readonly toast = signal('');
+  readonly esqueletos = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+
+  readonly cargando = computed(() => this.mesas.cargando() || this.cuentas.cargando());
+  readonly error = computed(() => this.mesas.error() ?? this.cuentas.error());
+  readonly aviso = this.cuentas.aviso;
+  readonly errorDetalle = this.mesas.errorDetalle;
 
   readonly totalMesas = computed(() => this.mesas.mesas().length);
   readonly libres = this.mesas.libres;
@@ -89,10 +100,18 @@ export class VentaLocalPage {
     return this.mesas.mesas().map((mesa) => {
       // Preferimos la cuenta del servicio (trae rondas y detalles completos).
       const cuenta = this.cuentas.cuentaDeMesa(mesa.id) ?? mesa.cuentaAbierta ?? null;
+      const listos = cuenta
+        ? cuenta.rondas.reduce(
+            (total, ronda) =>
+              total + ronda.items.filter((item) => item.estadoPreparacion === 'listo').length,
+            0,
+          )
+        : 0;
       return {
         mesa,
         cuenta,
         minutos: cuenta ? minutosEntre(cuenta.fechaApertura, ahora) : 0,
+        listos,
       };
     });
   });
@@ -127,13 +146,11 @@ export class VentaLocalPage {
     const cuenta = tarjeta.cuenta;
     const total = cuenta?.total ?? 0;
     const subtotal = round2(total / 1.18);
-    const usuario = this.auth.usuario();
-    const esPropia = Boolean(cuenta && usuario && cuenta.usuarioAperturaId === usuario.id);
     return {
       ...tarjeta,
       rondas: cuenta?.rondas ?? [],
       totalRondas: cuenta?.rondas.length ?? 0,
-      mozo: esPropia && usuario ? abreviarNombre(usuario.nombre) : '—',
+      mozo: abreviarNombre(cuenta?.usuarioAperturaNombre ?? ''),
       horaIngreso: formatearHora(cuenta?.fechaApertura),
       subtotal,
       igv: round2(total - subtotal),
@@ -156,8 +173,15 @@ export class VentaLocalPage {
   readonly igvSeleccionado = computed(() => formatearMoneda(this.seleccionada()?.igv ?? 0));
 
   constructor() {
-    const intervalo = setInterval(() => this.ahora.set(Date.now()), 30000);
-    this.destroyRef.onDestroy(() => clearInterval(intervalo));
+    const reloj = setInterval(() => this.ahora.set(Date.now()), 30000);
+    const refresco = setInterval(() => void this.refrescar(), 15000);
+    this.destroyRef.onDestroy(() => {
+      clearInterval(reloj);
+      clearInterval(refresco);
+      if (this.toastTimer !== null) {
+        window.clearTimeout(this.toastTimer);
+      }
+    });
     void this.cargar();
   }
 
@@ -167,11 +191,61 @@ export class VentaLocalPage {
   }
 
   private async cargar(): Promise<void> {
-    await Promise.all([this.mesas.cargar(), this.cuentas.cargar()]);
+    this.avisoLento.set(false);
+    const temporizador = window.setTimeout(() => this.avisoLento.set(true), 5000);
+    try {
+      // El tablero agregado trae mesas + cuentas en una sola petición.
+      await this.cuentas.cargar();
+    } finally {
+      window.clearTimeout(temporizador);
+      this.avisoLento.set(false);
+    }
+    // Primera carga: siembra los avisos existentes sin alertar.
+    this.notificaciones.sincronizar(this.cuentas.abiertas(), false);
     const actual = this.seleccionadaId();
     if (actual !== null && !this.mesas.porId(actual)) {
       this.seleccionadaId.set(null);
     }
+  }
+
+  // Refresco silencioso: no muestra esqueletos y avisa si cocina marcó algo listo.
+  private async refrescar(): Promise<void> {
+    if (document.visibilityState !== 'visible' || this.cargando()) {
+      return;
+    }
+    await this.cuentas.cargar(true);
+    const nuevos = this.notificaciones.sincronizar(this.cuentas.abiertas());
+    if (nuevos.length > 0) {
+      const ultimo = nuevos[nuevos.length - 1];
+      this.avisar(
+        nuevos.length === 1
+          ? `Mesa ${String(ultimo.mesaNumero).padStart(2, '0')} · ${ultimo.plato} listo`
+          : `${nuevos.length} platos listos en cocina`,
+      );
+    }
+  }
+
+  reintentar(): void {
+    void this.cargar();
+  }
+
+  avisar(mensaje: string): void {
+    this.toast.set(mensaje);
+    if (this.toastTimer !== null) {
+      window.clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = window.setTimeout(() => this.toast.set(''), 4000);
+  }
+
+  rondaLista(ronda: Ronda): boolean {
+    return ronda.items.length > 0 && ronda.items.every((item) => item.estadoPreparacion === 'listo');
+  }
+
+  estadoPlato(estado: string): string {
+    if (estado === 'listo') {
+      return 'Listo';
+    }
+    return estado === 'en_preparacion' ? 'Preparando' : 'Pendiente';
   }
 
   // Click simple: selecciona o deselecciona (toggle). No navega.

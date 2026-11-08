@@ -1,6 +1,10 @@
 import { computed, inject, Injectable } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import type { Pedido, PedidoDetalle } from '../models';
 import { minutosEntre } from '../utils/format';
+import { ApiClient } from '../api/api.client';
+import { USE_API } from '../api/api.config';
+import type { ApiList, PedidoListoDto } from '../api/api.types';
 import { PedidosService } from './pedidos.service';
 
 export const UMBRAL_KDS_MIN = 30;
@@ -19,6 +23,7 @@ export interface ComandaKds {
 @Injectable({ providedIn: 'root' })
 export class CocinaService {
   private readonly pedidos = inject(PedidosService);
+  private readonly api = inject(ApiClient);
 
   readonly comandas = computed<ComandaKds[]>(() =>
     this.pedidos.enCocina().map((pedido) => {
@@ -56,6 +61,17 @@ export class CocinaService {
 
   marcarListo(pedidoId: number, itemId: number): Promise<boolean> {
     return this.pedidos.marcarItemListo(pedidoId, itemId);
+  }
+
+  // Avisos reales del backend: pedidos servidos que todavía no se cobran.
+  async pedidosListos(): Promise<PedidoListoDto[]> {
+    if (!USE_API) {
+      return [];
+    }
+    const respuesta = await firstValueFrom(
+      this.api.get<ApiList<PedidoListoDto>>('/pedidos-listos'),
+    );
+    return respuesta.data;
   }
 
   private origen(pedido: Pedido): ComandaKds['origen'] {

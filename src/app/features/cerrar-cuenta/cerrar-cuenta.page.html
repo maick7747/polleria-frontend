@@ -42,6 +42,33 @@
     </div>
   </app-section-header>
 
+  @if (error() && totalCuentas() > 0) {
+    <div class="estado estado--error" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <div class="estado__texto">
+        <strong>No se pudieron actualizar las cuentas</strong>
+        <span>{{ error() }}</span>
+      </div>
+      <button type="button" class="estado__btn" (click)="reintentar()">
+        <app-icon name="arrow-clockwise" [size]="14" />
+        Reintentar
+      </button>
+    </div>
+  }
+  @if (cargando()) {
+    <div class="estado estado--carga" role="status">
+      <span class="estado__spinner" aria-hidden="true"></span>
+      <span>
+        {{ avisoLento()
+          ? 'El servidor está despertando… puede tardar hasta un minuto.'
+          : 'Cargando cuentas abiertas…' }}
+      </span>
+    </div>
+  }
+  @if (avisoCarga(); as mensaje) {
+    <div class="estado estado--aviso" role="status">{{ mensaje }}</div>
+  }
+
   <div class="board">
     <div class="grid">
       @for (item of vistas(); track item.cuenta.id) {
@@ -63,6 +90,9 @@
                 <app-chip variant="warning" [dot]="true">
                   +{{ item.minutos - umbral }} min
                 </app-chip>
+              }
+              @if (item.listos > 0) {
+                <app-chip variant="success" [dot]="true">Listo</app-chip>
               }
               <app-chip variant="danger">Ocupada</app-chip>
             </div>
@@ -104,11 +134,34 @@
         </button>
       } @empty {
         <div class="vacio">
-          <app-empty-state
-            icon="cash-register"
-            title="Sin cuentas en este filtro"
-            description="No hay mesas ocupadas que coincidan con el filtro seleccionado."
-          />
+          @if (cargando()) {
+            <div class="estado estado--carga estado--bloque" role="status">
+              <span class="estado__spinner" aria-hidden="true"></span>
+              <span>
+                {{ avisoLento()
+                  ? 'El servidor está despertando… puede tardar hasta un minuto.'
+                  : 'Cargando cuentas abiertas…' }}
+              </span>
+            </div>
+          } @else if (error()) {
+            <div class="estado estado--error estado--bloque" role="alert">
+              <app-icon name="warning-circle" [size]="20" />
+              <div class="estado__texto">
+                <strong>No se pudieron cargar las cuentas</strong>
+                <span>{{ error() }}</span>
+              </div>
+              <button type="button" class="estado__btn" (click)="reintentar()">
+                <app-icon name="arrow-clockwise" [size]="14" />
+                Reintentar
+              </button>
+            </div>
+          } @else {
+            <app-empty-state
+              icon="cash-register"
+              title="Sin cuentas en este filtro"
+              description="No hay mesas ocupadas que coincidan con el filtro seleccionado."
+            />
+          }
         </div>
       }
 
@@ -255,4 +308,11 @@
     </span>
     <span class="pie__note">El cobro se realiza una sola vez al cerrar la cuenta.</span>
   </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <span class="toast__dot"></span>
+      {{ toast() }}
+    </div>
+  }
 </app-shell>

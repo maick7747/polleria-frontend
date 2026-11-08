@@ -194,12 +194,8 @@
               <app-icon name="check" [size]="15" />
               {{ f.item.estadoPreparacion === 'listo' ? 'Plato listo' : 'Marcar listo' }}
             </button>
-            <button type="button" class="dark-btn dark-btn--ghost" (click)="avisarMozo()">
-              <app-icon name="receipt" [size]="15" />
-              Avisar al mozo
-            </button>
           </div>
-          <p class="foco__foot">El aviso se envía al mozo al marcar el plato como listo.</p>
+          <p class="foco__foot">Al marcar el plato como listo se avisa al mozo en su bandeja.</p>
         </div>
       } @else {
         <app-empty-state

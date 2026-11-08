@@ -90,20 +90,20 @@
 }
 
 .board {
-  height: 684px;
-  flex: 0 0 684px;
+  /* Altura por contenido: las filas del grid crecen con la tarjeta y no se
+     solapan entre sí (antes: altura fija + filas 1fr recortaban el contenido). */
+  min-height: 684px;
+  flex: 0 0 auto;
   display: flex;
   gap: 18px;
-  min-height: 0;
 }
 
 .grid {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(320px, auto);
   gap: 18px;
 }
 
@@ -656,7 +656,7 @@
     flex-direction: column;
   }
   .grid {
-    grid-template-rows: repeat(2, 300px);
+    grid-auto-rows: minmax(300px, auto);
   }
   .resumen {
     width: auto;
@@ -687,5 +687,133 @@
   }
   .resumen__amount strong {
     font-size: 44px;
+  }
+}
+
+/* --- Estado de carga / error / aviso ------------------------------------ */
+.estado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--c-border);
+  background: var(--c-white);
+  color: var(--c-text-2);
+  font-size: 12.5px;
+  margin-bottom: 12px;
+}
+
+.estado__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.estado__texto strong {
+  color: var(--c-text);
+  font-size: 13px;
+}
+
+.estado--error {
+  border-color: #f0c9c9;
+  background: #fff5f5;
+  color: #8a2b2b;
+}
+
+.estado--error .estado__texto strong {
+  color: #8a2b2b;
+}
+
+.estado--carga {
+  border-color: #d9e2f3;
+  background: #f5f8ff;
+}
+
+.estado--aviso {
+  border-color: #f2e2b8;
+  background: #fffaf0;
+  color: #7a5a12;
+}
+
+.estado--bloque {
+  align-items: flex-start;
+  padding: 22px;
+  margin-bottom: 0;
+}
+
+.estado__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.estado__btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.estado__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: var(--c-brand);
+  animation: girar 0.8s linear infinite;
+  flex: none;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Aviso de cocina ---------------------------------------------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-radius: var(--r-pill);
+  background: var(--c-ink);
+  color: var(--c-white);
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+  z-index: 40;
+}
+
+.toast__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-success);
+  animation: latido 1.4s ease-in-out infinite;
+}
+
+@keyframes latido {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
   }
 }

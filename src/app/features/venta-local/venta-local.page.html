@@ -39,6 +39,60 @@
     </div>
   </app-section-header>
 
+  @if (error() && totalMesas() > 0) {
+    <div class="estado estado--error" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <div class="estado__texto">
+        <strong>No se pudieron actualizar las mesas</strong>
+        <span>{{ error() }}</span>
+      </div>
+      <button type="button" class="estado__btn" (click)="reintentar()">
+        <app-icon name="arrow-clockwise" [size]="14" />
+        Reintentar
+      </button>
+    </div>
+  }
+  @if (cargando()) {
+    <div class="estado estado--carga" role="status">
+      <span class="estado__spinner" aria-hidden="true"></span>
+      <span>
+        {{ avisoLento()
+          ? 'El servidor está despertando… puede tardar hasta un minuto.'
+          : 'Cargando mesas y cuentas…' }}
+      </span>
+    </div>
+  }
+  @if (aviso(); as mensaje) {
+    <div class="estado estado--aviso" role="status">{{ mensaje }}</div>
+  }
+  @if (errorDetalle(); as mensaje) {
+    <div class="estado estado--aviso" role="status">
+      No se pudo cargar el detalle de la mesa: {{ mensaje }}
+    </div>
+  }
+
+  @if (cargando() && totalMesas() === 0) {
+    <div class="esqueletos" aria-hidden="true">
+      @for (item of esqueletos; track item) {
+        <div class="esqueleto">
+          <span class="esqueleto__num"></span>
+          <span class="esqueleto__linea"></span>
+        </div>
+      }
+    </div>
+  } @else if (error() && totalMesas() === 0) {
+    <div class="estado estado--error estado--bloque" role="alert">
+      <app-icon name="warning-circle" [size]="20" />
+      <div class="estado__texto">
+        <strong>No se pudieron cargar las mesas</strong>
+        <span>{{ error() }}</span>
+      </div>
+      <button type="button" class="estado__btn" (click)="reintentar()">
+        <app-icon name="arrow-clockwise" [size]="14" />
+        Reintentar
+      </button>
+    </div>
+  } @else {
   <div class="board">
     <app-panel class="plano">
       <div class="zona">
@@ -67,6 +121,9 @@
                     <span class="mesa__sub">
                       {{ item.mesa.estado === 'libre' ? 'Libre' : item.minutos + ' min' }}
                     </span>
+                    @if (item.listos > 0) {
+                      <span class="mesa__listo" aria-hidden="true">{{ item.listos }}</span>
+                    }
                   </button>
                   @if (item.cuenta) {
                     <span
@@ -142,6 +199,9 @@
                       <strong class="ronda__title">Ronda {{ ronda.numero }}</strong>
                       <span class="ronda__hora">{{ hora(ronda.creadaEn) }}</span>
                       <span class="ronda__spacer"></span>
+                      @if (rondaLista(ronda)) {
+                        <span class="ronda__listo">Lista</span>
+                      }
                       <span class="ronda__meta">
                         {{ ronda.items.length }} {{ ronda.items.length === 1 ? 'ítem' : 'ítems' }}
                       </span>
@@ -149,6 +209,13 @@
                     @for (item of ronda.items; track item.id) {
                       <div class="item">
                         <span class="item__name">{{ item.nombre }} x{{ item.cantidad }}</span>
+                        <span
+                          class="item__estado"
+                          [class.item__estado--listo]="item.estadoPreparacion === 'listo'"
+                          [class.item__estado--prep]="item.estadoPreparacion === 'en_preparacion'"
+                        >
+                          {{ estadoPlato(item.estadoPreparacion) }}
+                        </span>
                         <strong class="item__total">{{ moneda(item.subtotal) }}</strong>
                       </div>
                     }
@@ -207,6 +274,7 @@
       </div>
     </aside>
   </div>
+  }
 
   <div class="pie">
     <span>
@@ -215,4 +283,11 @@
     </span>
     <span class="pie__note">El cobro se realiza al cerrar la cuenta.</span>
   </div>
+
+  @if (toast()) {
+    <div class="toast" role="status">
+      <span class="toast__dot"></span>
+      {{ toast() }}
+    </div>
+  }
 </app-shell>

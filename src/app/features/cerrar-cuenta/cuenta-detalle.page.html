@@ -10,6 +10,20 @@
     </a>
   </div>
 
+  @if (error() && cuenta()) {
+    <div class="estado estado--error" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <div class="estado__texto">
+        <strong>No se pudo actualizar la cuenta</strong>
+        <span>{{ error() }}</span>
+      </div>
+      <button type="button" class="estado__btn" (click)="reintentar()">
+        <app-icon name="arrow-clockwise" [size]="14" />
+        Reintentar
+      </button>
+    </div>
+  }
+
   @if (cuenta(); as c) {
     <div class="cuerpo">
       <app-panel class="detalle">
@@ -216,6 +230,27 @@
         <app-icon name="cash-register" [size]="12" />
         El cuadre de caja se actualiza al registrar el pago
       </span>
+    </div>
+  } @else if (cargando()) {
+    <div class="estado estado--carga estado--bloque" role="status">
+      <span class="estado__spinner" aria-hidden="true"></span>
+      <span>
+        {{ avisoLento()
+          ? 'El servidor está despertando… puede tardar hasta un minuto.'
+          : 'Cargando la cuenta…' }}
+      </span>
+    </div>
+  } @else if (error()) {
+    <div class="estado estado--error estado--bloque" role="alert">
+      <app-icon name="warning-circle" [size]="20" />
+      <div class="estado__texto">
+        <strong>No se pudo cargar la cuenta</strong>
+        <span>{{ error() }}</span>
+      </div>
+      <button type="button" class="estado__btn" (click)="reintentar()">
+        <app-icon name="arrow-clockwise" [size]="14" />
+        Reintentar
+      </button>
     </div>
   } @else {
     <app-empty-state

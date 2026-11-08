@@ -12,8 +12,14 @@
           [routerLinkActiveOptions]="{ exact: item.exact }"
           [title]="item.label"
           [attr.aria-label]="item.label"
+          (click)="marcarLeidos(item)"
         >
           <app-icon [name]="item.icon" [size]="19" />
+          @if (item.route === '/pedidos-listos' && noLeidos() > 0) {
+            <span class="rail-badge" aria-hidden="true">
+              {{ noLeidos() > 9 ? '9+' : noLeidos() }}
+            </span>
+          }
         </a>
       }
     </nav>

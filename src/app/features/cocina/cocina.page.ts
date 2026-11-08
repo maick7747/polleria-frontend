@@ -18,7 +18,6 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { IconComponent } from '../../shared/components/icon/icon';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-const AHORA = Date.now();
 const TARJETAS_KDS = 6;
 
 type CanalTono = 'local' | 'delivery' | 'rappi' | 'llamafood';
@@ -92,19 +91,37 @@ export class CocinaPage {
   readonly reloj = reloj;
   private temporizador: number | null = null;
 
+  readonly ahora = signal(Date.now());
   readonly seleccionadaId = signal<number>(this.cocina.comandas()[0]?.pedidoId ?? 0);
   readonly toast = signal<string>('');
 
   constructor() {
+    const relojIntervalo = setInterval(() => this.ahora.set(Date.now()), 10000);
+    const refresco = setInterval(() => void this.refrescar(), 10000);
+    this.destroyRef.onDestroy(() => {
+      clearInterval(relojIntervalo);
+      clearInterval(refresco);
+      if (this.temporizador !== null) {
+        window.clearTimeout(this.temporizador);
+      }
+    });
     void this.inicializar();
   }
 
   private async inicializar(): Promise<void> {
-    await Promise.all([this.pedidos.cargar(), this.cuentas.cargar()]);
+    await Promise.all([this.pedidos.cargar(), this.cuentas.cargar(), this.fichas.cargar()]);
     const primera = this.cocina.comandas()[0];
     if (primera) {
       this.seleccionadaId.set(primera.pedidoId);
     }
+  }
+
+  // Refresco periódico del KDS (solo con la pestaña visible).
+  private async refrescar(): Promise<void> {
+    if (document.visibilityState !== 'visible') {
+      return;
+    }
+    await Promise.all([this.pedidos.cargar(), this.cuentas.cargar(true)]);
   }
 
   readonly comandas = computed<ComandaVista[]>(() =>
@@ -239,14 +256,6 @@ export class CocinaPage {
     }
   }
 
-  avisarMozo(): void {
-    const comanda = this.seleccionada();
-    if (!comanda) {
-      return;
-    }
-    this.avisar(`Aviso enviado al mozo · ${comanda.etiqueta}`);
-  }
-
   estadoItem(item: PedidoDetalle): string {
     if (item.estadoPreparacion === 'listo') {
       return 'listo';
@@ -260,11 +269,6 @@ export class CocinaPage {
       window.clearTimeout(this.temporizador);
     }
     this.temporizador = window.setTimeout(() => this.toast.set(''), 2600);
-    this.destroyRef.onDestroy(() => {
-      if (this.temporizador !== null) {
-        window.clearTimeout(this.temporizador);
-      }
-    });
   }
 
   private vista(comanda: ComandaKds): ComandaVista {
@@ -272,7 +276,7 @@ export class CocinaPage {
     const cuenta = pedido?.cuentaId != null ? this.cuentas.porId(pedido.cuentaId) : null;
     const ronda = cuenta?.rondas.length ?? 1;
     const listos = comanda.items.filter((item) => item.estadoPreparacion === 'listo').length;
-    const segundos = Math.max(0, Math.floor((AHORA - Date.parse(comanda.creadoEn)) / 1000));
+    const segundos = Math.max(0, Math.floor((this.ahora() - Date.parse(comanda.creadoEn)) / 1000));
     const referenciaMesa = comanda.referencia.startsWith('Mesa ');
     return {
       pedidoId: comanda.pedidoId,

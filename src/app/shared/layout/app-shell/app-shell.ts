@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
+import { NotificacionesService } from '../../../core/data/notificaciones.service';
 import type { RolNombre } from '../../../core/models';
 import { IconComponent, type IconName } from '../../components/icon/icon';
 
@@ -22,6 +23,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Dashboard', route: '/dashboard', icon: 'house', roles: [], exact: true },
   { label: 'Venta en Local', route: '/venta-local', icon: 'receipt', roles: ['Mozo', 'Cajero', 'Dueño/Admin'], exact: false },
   { label: 'Comandas', route: '/comandas', icon: 'clipboard-text', roles: ['Mozo', 'Cajero', 'Cocinero', 'Dueño/Admin'], exact: false },
+  { label: 'Pedidos listos', route: '/pedidos-listos', icon: 'bell-ringing', roles: ['Mozo', 'Cajero', 'Dueño/Admin'], exact: false },
   { label: 'Cocina KDS', route: '/cocina', icon: 'flame', roles: ['Cocinero', 'Dueño/Admin'], exact: false },
   { label: 'Cerrar cuenta', route: '/cerrar-cuenta', icon: 'cash-register', roles: ['Cajero', 'Dueño/Admin'], exact: false },
   { label: 'Delivery propio', route: '/delivery-propio', icon: 'storefront', roles: ['Repartidor', 'Cajero', 'Dueño/Admin'], exact: false },
@@ -48,10 +50,12 @@ const NAV_ITEMS: readonly NavItem[] = [
 })
 export class AppShellComponent {
   private readonly auth = inject(AuthService);
+  private readonly notificaciones = inject(NotificacionesService);
 
   readonly title = input<string>('');
   readonly subtitle = input<string>('');
   readonly usuario = this.auth.usuario;
+  readonly noLeidos = this.notificaciones.noLeidos;
 
   readonly nav = computed<readonly NavItem[]>(() =>
     NAV_ITEMS.filter((item) => this.auth.hasAnyRole(item.roles)),
@@ -66,6 +70,12 @@ export class AppShellComponent {
       .map((parte) => parte.charAt(0).toUpperCase())
       .join('');
   });
+
+  marcarLeidos(item: NavItem): void {
+    if (item.route === '/pedidos-listos') {
+      this.notificaciones.marcarLeidos();
+    }
+  }
 
   logout(): void {
     this.auth.logout();

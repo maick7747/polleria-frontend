@@ -9,11 +9,15 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { mensajeError } from '../../core/api/api.helpers';
+import { USE_API } from '../../core/api/api.config';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { FichasService } from '../../core/data/fichas.service';
 import { InventarioService } from '../../core/data/inventario.service';
 import { MesasService } from '../../core/data/mesas.service';
-import { MOCK_USUARIOS } from '../../core/data/mock-data';
+import {
+  nuevaClave,
+  PedidoBorradorService,
+} from '../../core/data/pedido-borrador.service';
 import type { PedidoDetalle, Plato } from '../../core/models';
 import {
   abreviarNombre,
@@ -55,6 +59,7 @@ export class PedidoLocalPage {
   private readonly fichas = inject(FichasService);
   private readonly inventario = inject(InventarioService);
   private readonly auth = inject(AuthService);
+  private readonly borrador = inject(PedidoBorradorService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly mesaId = Number(this.route.snapshot.paramMap.get('mesaId'));
@@ -63,12 +68,14 @@ export class PedidoLocalPage {
 
   private secuenciaItem = 1000;
   private temporizador: number | null = null;
+  private claveRonda = nuevaClave();
 
   readonly categoriaActiva = signal<string>('');
   readonly busqueda = signal<string>('');
   readonly items = signal<PedidoDetalle[]>([]);
   readonly observacion = signal<string>('');
   readonly toast = signal<string>('');
+  readonly enviando = signal(false);
   readonly moneda = formatearMoneda;
 
   readonly mesa = computed(() => this.mesas.porId(this.mesaId) ?? null);
@@ -98,10 +105,7 @@ export class PedidoLocalPage {
     const rondas = cuenta?.rondas.length ?? 0;
     const total = formatearMoneda(cuenta?.total ?? 0);
     const minutos = cuenta ? minutosEntre(cuenta.fechaApertura, this.ahora) : 0;
-    const usuario = MOCK_USUARIOS.find(
-      (candidato) => candidato.id === cuenta?.usuarioAperturaId,
-    );
-    const mozo = usuario ? abreviarNombre(usuario.nombre) : '—';
+    const mozo = abreviarNombre(cuenta?.usuarioAperturaNombre ?? '');
     return `${rondas} rondas · ${total} · abierta ${minutos} min · Mozo ${mozo}`;
   });
 
@@ -134,7 +138,7 @@ export class PedidoLocalPage {
   readonly clienteAccion = computed(
     () => ((this.cuenta()?.cliente ?? this.clientePendiente()) ? 'Editar' : 'Agregar'),
   );
-  readonly puedeEnviar = computed(() => this.items().length > 0);
+  readonly puedeEnviar = computed(() => this.items().length > 0 && !this.enviando());
 
   readonly stockBajoTexto = computed(() => {
     const bajos = this.inventario.stockBajo();
@@ -147,6 +151,7 @@ export class PedidoLocalPage {
   });
 
   constructor() {
+    this.restaurarBorrador();
     void this.inicializar();
     this.destroyRef.onDestroy(() => {
       if (this.temporizador !== null) {
@@ -155,12 +160,49 @@ export class PedidoLocalPage {
     });
   }
 
+  private restaurarBorrador(): void {
+    const borrador = this.borrador.obtener(this.mesaId);
+    if (!borrador) {
+      return;
+    }
+    this.items.set(borrador.items);
+    this.observacion.set(borrador.observacion);
+    this.claveRonda = borrador.clave;
+    const mayor = borrador.items.reduce(
+      (maximo, item) => Math.max(maximo, item.id),
+      0,
+    );
+    this.secuenciaItem = Math.max(1000, mayor);
+  }
+
+  private persistirBorrador(): void {
+    this.borrador.guardar(this.mesaId, {
+      clave: this.claveRonda,
+      items: this.items(),
+      observacion: this.observacion(),
+      actualizadoEn: new Date().toISOString(),
+    });
+  }
+
   private async inicializar(): Promise<void> {
-    await Promise.all([
-      this.mesas.cargar(),
-      this.cuentas.cargar(),
-      this.inventario.cargar(),
-    ]);
+    // El tablero agregado trae mesas + cuentas en una sola petición.
+    await this.cuentas.cargar();
+
+    // Catálogos: solo se piden si aún no están en memoria.
+    // InventarioService arranca con mocks incluso en modo API, así que su
+    // signal nunca está vacía; en modo API se mantiene la carga (1 request)
+    // para no mostrar stock simulado.
+    const tareas: Promise<boolean>[] = [];
+    if (this.inventario.insumos().length === 0 || USE_API) {
+      tareas.push(this.inventario.cargar());
+    }
+    if (this.fichas.platos().length === 0) {
+      tareas.push(this.fichas.cargar());
+    }
+    if (tareas.length > 0) {
+      await Promise.all(tareas);
+    }
+
     if (!this.mesa()) {
       void this.router.navigate(['/venta-local']);
       return;
@@ -205,21 +247,26 @@ export class PedidoLocalPage {
           };
         }),
       );
-      return;
+    } else {
+      const nuevo: PedidoDetalle = {
+        id: ++this.secuenciaItem,
+        platilloId: plato.id,
+        nombre: plato.nombre,
+        cantidad: 1,
+        precioUnitario: plato.precioVenta,
+        subtotal: plato.precioVenta,
+        estadoPreparacion: 'pendiente',
+      };
+      this.items.update((lista) => [...lista, nuevo]);
     }
-    const nuevo: PedidoDetalle = {
-      id: ++this.secuenciaItem,
-      platilloId: plato.id,
-      nombre: plato.nombre,
-      cantidad: 1,
-      precioUnitario: plato.precioVenta,
-      subtotal: plato.precioVenta,
-      estadoPreparacion: 'pendiente',
-    };
-    this.items.update((lista) => [...lista, nuevo]);
+    this.claveRonda = nuevaClave();
+    this.persistirBorrador();
   }
 
   quitar(itemId: number): void {
+    if (!this.items().some((item) => item.id === itemId)) {
+      return;
+    }
     this.items.update((lista) => {
       const encontrado = lista.find((item) => item.id === itemId);
       if (!encontrado) {
@@ -240,6 +287,8 @@ export class PedidoLocalPage {
       }
       return lista.filter((item) => item.id !== itemId);
     });
+    this.claveRonda = nuevaClave();
+    this.persistirBorrador();
   }
 
   onBusqueda(event: Event): void {
@@ -248,20 +297,22 @@ export class PedidoLocalPage {
 
   onObservacion(event: Event): void {
     this.observacion.set((event.target as HTMLTextAreaElement).value);
+    this.persistirBorrador();
   }
 
   async enviar(): Promise<void> {
-    let cuenta = this.cuenta();
-    const items = this.items();
-    if (items.length === 0 || this.toast()) {
+    if (this.enviando() || this.items().length === 0) {
       return;
     }
-    const notas = this.observacion().trim();
-    const conNotas = items.map((item) => ({
-      ...item,
-      notas: notas ? notas : undefined,
-    }));
+    this.enviando.set(true);
     try {
+      let cuenta = this.cuenta();
+      const items = this.items();
+      const notas = this.observacion().trim();
+      const conNotas = items.map((item) => ({
+        ...item,
+        notas: notas ? notas : undefined,
+      }));
       // La cuenta se crea recién aquí (al enviar la primera ronda).
       if (!cuenta) {
         cuenta = await this.cuentas.abrirCuenta(this.mesaId, this.usuarioId);
@@ -270,18 +321,26 @@ export class PedidoLocalPage {
           return;
         }
       }
-      const ronda = await this.cuentas.agregarRonda(cuenta.id, conNotas);
+      const ronda = await this.cuentas.agregarRonda(
+        cuenta.id,
+        conNotas,
+        this.claveRonda,
+      );
       if (!ronda) {
         this.avisar('No se pudo enviar la ronda.');
         return;
       }
       this.toast.set(`Ronda ${ronda.numero} enviada a cocina`);
       this.items.set([]);
+      this.observacion.set('');
+      this.borrador.limpiar(this.mesaId);
       this.temporizador = window.setTimeout(() => {
         void this.router.navigate(['/venta-local']);
       }, 950);
     } catch (error) {
       this.avisar(mensajeError(error));
+    } finally {
+      this.enviando.set(false);
     }
   }
 

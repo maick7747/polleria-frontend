@@ -63,6 +63,7 @@ export interface Cuenta {
   total: number;
   fechaApertura: string;
   usuarioAperturaId: number;
+  usuarioAperturaNombre?: string;
   fechaCierre?: string;
   usuarioCierreId?: number;
   comprobanteTipo: ComprobanteTipo;

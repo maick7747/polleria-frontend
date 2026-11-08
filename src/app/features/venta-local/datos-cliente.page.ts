@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { mensajeError } from '../../core/api/api.helpers';
 import { AuthService } from '../../core/auth/auth.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MesasService } from '../../core/data/mesas.service';
@@ -56,6 +57,8 @@ export class DatosClientePage {
   readonly consultado = signal<string>('');
   readonly coincidencia = signal<number>(0);
   readonly error = signal<string>('');
+  readonly guardando = signal(false);
+  readonly cargando = signal(true);
 
   readonly mesa = computed(() => this.mesas.porId(this.mesaId) ?? null);
   readonly cuenta = computed(() => this.cuentas.cuentaDeMesa(this.mesaId) ?? null);
@@ -91,6 +94,17 @@ export class DatosClientePage {
       }
     });
 
+    void this.inicializar();
+  }
+
+  private async inicializar(): Promise<void> {
+    this.cargando.set(true);
+    try {
+      // El tablero agregado trae mesas + cuentas en una sola petición.
+      await this.cuentas.cargar();
+    } finally {
+      this.cargando.set(false);
+    }
     if (!this.mesa()) {
       void this.router.navigate(['/venta-local']);
       return;
@@ -161,7 +175,10 @@ export class DatosClientePage {
     }, 650);
   }
 
-  guardar(): void {
+  async guardar(): Promise<void> {
+    if (this.guardando()) {
+      return;
+    }
     const largo = this.tipo() === 'DNI' ? 8 : 11;
     if (this.numero().length !== largo) {
       this.estado.set('error');
@@ -182,12 +199,25 @@ export class DatosClientePage {
       correo: this.correo().trim() || undefined,
     };
     const cuenta = this.cuenta();
-    if (cuenta) {
-      this.cuentas.guardarCliente(cuenta.id, cliente);
-    } else {
-      this.cuentas.guardarClientePendiente(this.mesaId, cliente);
+    this.guardando.set(true);
+    try {
+      if (cuenta) {
+        const actualizada = await this.cuentas.guardarCliente(cuenta.id, cliente);
+        if (!actualizada) {
+          this.estado.set('error');
+          this.error.set('No se pudo guardar el cliente. Intenta de nuevo.');
+          return;
+        }
+      } else {
+        this.cuentas.guardarClientePendiente(this.mesaId, cliente);
+      }
+      await this.router.navigate(['/venta-local/pedido', this.mesaId]);
+    } catch (error) {
+      this.estado.set('error');
+      this.error.set(mensajeError(error));
+    } finally {
+      this.guardando.set(false);
     }
-    void this.router.navigate(['/venta-local/pedido', this.mesaId]);
   }
 
   omitir(): void {

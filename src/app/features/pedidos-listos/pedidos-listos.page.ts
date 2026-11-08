@@ -7,6 +7,11 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { mensajeError } from '../../core/api/api.helpers';
+import type { PedidoListoDto } from '../../core/api/api.types';
+import { CocinaService } from '../../core/data/cocina.service';
+import { NotificacionesService } from '../../core/data/notificaciones.service';
+import { hora as formatearHora } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
@@ -33,50 +38,9 @@ interface PedidoListo {
   items: readonly PlatoListo[];
 }
 
-const PEDIDOS_INICIALES: readonly PedidoListo[] = [
-  {
-    id: 'M04',
-    etiqueta: 'M04',
-    tipo: 'mesa',
-    ronda: 'Ronda 2',
-    hora: '17:42',
-    minutos: 2,
-    meta: 'Ronda 2 · 3 platos · mozo asignado Yair',
-    items: [
-      { nombre: '1/2 Pollo a la brasa', cantidad: 1 },
-      { nombre: 'Papas fritas', cantidad: 1 },
-      { nombre: 'Chicha morada', cantidad: 2 },
-    ],
-  },
-  {
-    id: 'M02',
-    etiqueta: 'M02',
-    tipo: 'mesa',
-    ronda: 'Ronda 1',
-    hora: '17:38',
-    minutos: 4,
-    meta: 'Ronda 1 · 3 platos · hace 4 min en barra',
-    items: [
-      { nombre: 'Pollo entero a la brasa', cantidad: 1 },
-      { nombre: 'Ensalada fresca', cantidad: 1 },
-      { nombre: 'Chicha morada 1 L', cantidad: 1 },
-    ],
-  },
-  {
-    id: '#0121',
-    etiqueta: '#0121',
-    tipo: 'llevar',
-    ronda: 'Ronda 1',
-    hora: '17:35',
-    minutos: 6,
-    meta: 'Ronda 1 · 2 platos · esperando en mostrador',
-    items: [
-      { nombre: '1/4 Pollo a la brasa', cantidad: 2 },
-      { nombre: 'Papas fritas', cantidad: 1 },
-      { nombre: 'Sin ají · empaque sellado', cantidad: 0, nota: 'obs.' },
-    ],
-  },
-];
+const CLAVE_ENTREGADOS = 'fratelli.avisos.entregados';
+const REFRESCO_MS = 15000;
+const FORMATO_DIA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' });
 
 @Component({
   selector: 'app-pedidos-listos-page',
@@ -95,24 +59,31 @@ const PEDIDOS_INICIALES: readonly PedidoListo[] = [
   styleUrl: './pedidos-listos.page.css',
 })
 export class PedidosListosPage {
+  private readonly cocina = inject(CocinaService);
+  private readonly notificaciones = inject(NotificacionesService);
   private readonly destroyRef = inject(DestroyRef);
 
   private temporizador: number | null = null;
+  private entregados = this.leerEntregados();
 
-  readonly pedidos = signal<PedidoListo[]>(
-    PEDIDOS_INICIALES.map((pedido) => ({
-      ...pedido,
-      items: pedido.items.map((item) => ({ ...item })),
-    })),
-  );
-
-  readonly horaActualizacion = signal<string>('17:46');
+  readonly pedidos = signal<PedidoListo[]>([]);
+  readonly cargando = signal(true);
+  readonly error = signal<string | null>(null);
+  readonly horaActualizacion = signal<string>('—');
   readonly toast = signal<string>('');
+  readonly noLeidos = this.notificaciones.noLeidos;
 
   readonly total = computed<number>(() => this.pedidos().length);
 
   readonly mayorEspera = computed<number>(() =>
     this.pedidos().reduce((mayor, pedido) => Math.max(mayor, pedido.minutos), 0),
+  );
+
+  readonly avisoHace = computed<number>(() =>
+    this.pedidos().reduce(
+      (menor, pedido) => Math.min(menor, pedido.minutos),
+      Number.POSITIVE_INFINITY,
+    ),
   );
 
   readonly subtitulo = computed<string>(() => {
@@ -125,15 +96,54 @@ export class PedidosListosPage {
   readonly metaTablero = computed<string>(() => `actualizado ${this.horaActualizacion()}`);
 
   readonly metaPie = computed<string>(
-    () => `${this.total()} de ${PEDIDOS_INICIALES.length} avisos pendientes`,
+    () => `${this.total()} ${this.total() === 1 ? 'aviso pendiente' : 'avisos pendientes'}`,
   );
 
   constructor() {
+    const refresco = setInterval(() => void this.refrescar(), REFRESCO_MS);
     this.destroyRef.onDestroy(() => {
+      clearInterval(refresco);
       if (this.temporizador !== null) {
         window.clearTimeout(this.temporizador);
       }
     });
+    void this.cargar();
+  }
+
+  async cargar(): Promise<void> {
+    this.cargando.set(true);
+    this.error.set(null);
+    try {
+      const datos = await this.cocina.pedidosListos();
+      this.pedidos.set(
+        datos
+          .filter((dto) => this.esDeHoy(dto.fecha_listo) && !this.entregados.has(String(dto.id)))
+          .map((dto) => this.aVista(dto)),
+      );
+      this.marcarHora();
+      this.notificaciones.marcarLeidos();
+    } catch (error) {
+      this.error.set(mensajeError(error));
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  private async refrescar(): Promise<void> {
+    if (document.visibilityState !== 'visible' || this.cargando()) {
+      return;
+    }
+    try {
+      const datos = await this.cocina.pedidosListos();
+      this.pedidos.set(
+        datos
+          .filter((dto) => this.esDeHoy(dto.fecha_listo) && !this.entregados.has(String(dto.id)))
+          .map((dto) => this.aVista(dto)),
+      );
+      this.marcarHora();
+    } catch {
+      // refresco silencioso: se conserva la última lista
+    }
   }
 
   entregar(id: string): void {
@@ -141,6 +151,8 @@ export class PedidosListosPage {
     if (!pedido) {
       return;
     }
+    this.entregados.add(id);
+    this.guardarEntregados();
     this.pedidos.update((lista) => lista.filter((actual) => actual.id !== id));
     this.avisar(`${pedido.etiqueta} entregado · aviso archivado`);
   }
@@ -155,11 +167,7 @@ export class PedidosListosPage {
   }
 
   actualizar(): void {
-    const ahora = new Date();
-    const hh = String(ahora.getHours()).padStart(2, '0');
-    const mm = String(ahora.getMinutes()).padStart(2, '0');
-    this.horaActualizacion.set(`${hh}:${mm}`);
-    this.avisar('Tablero actualizado');
+    void this.cargar();
   }
 
   iconoPlato(nombre: string): IconName {
@@ -177,6 +185,76 @@ export class PedidosListosPage {
       return 'fork-knife';
     }
     return 'flame';
+  }
+
+  private aVista(dto: PedidoListoDto): PedidoListo {
+    const esMesa = dto.tipo_consumo === 'sala' || dto.mesa_numero !== null;
+    const etiqueta = dto.mesa_numero
+      ? `M${String(dto.mesa_numero).padStart(2, '0')}`
+      : `#${dto.numero}`;
+    const platos = dto.detalles.length;
+    return {
+      id: String(dto.id),
+      etiqueta,
+      tipo: esMesa ? 'mesa' : 'llevar',
+      ronda: `Pedido ${dto.numero}`,
+      hora: dto.fecha_listo ? formatearHora(dto.fecha_listo) : '—',
+      minutos: dto.minutos_esperando ?? 0,
+      meta: `${platos} ${platos === 1 ? 'plato' : 'platos'} · ${this.canal(dto.canal)}`,
+      items: dto.detalles.map((detalle) => ({
+        nombre: detalle.platillo_nombre ?? `Platillo ${detalle.platillo_id}`,
+        cantidad: detalle.cantidad,
+        nota: detalle.notas ?? undefined,
+      })),
+    };
+  }
+
+  private canal(canal: string): string {
+    switch (canal) {
+      case 'local':
+        return 'Salón';
+      case 'delivery_propio':
+        return 'Delivery propio';
+      case 'rappi':
+        return 'Rappi';
+      case 'llamafood':
+        return 'LlamaFood';
+      default:
+        return canal;
+    }
+  }
+
+  private marcarHora(): void {
+    const ahora = new Date();
+    const hh = String(ahora.getHours()).padStart(2, '0');
+    const mm = String(ahora.getMinutes()).padStart(2, '0');
+    this.horaActualizacion.set(`${hh}:${mm}`);
+  }
+
+  // La bandeja es del turno: solo avisos de hoy (zona Lima).
+  private esDeHoy(fechaIso: string | null): boolean {
+    if (!fechaIso) {
+      return false;
+    }
+    return FORMATO_DIA.format(new Date(fechaIso)) === FORMATO_DIA.format(new Date());
+  }
+
+  private leerEntregados(): Set<string> {
+    try {
+      const bruto = sessionStorage.getItem(CLAVE_ENTREGADOS);
+      const lista = bruto ? (JSON.parse(bruto) as unknown) : [];
+      return new Set(Array.isArray(lista) ? lista.map((id) => String(id)) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  private guardarEntregados(): void {
+    try {
+      sessionStorage.setItem(CLAVE_ENTREGADOS, JSON.stringify([...this.entregados]));
+    } catch {
+      // sin sessionStorage: el aviso reaparece al recargar
+    }
   }
 
   private avisar(mensaje: string): void {

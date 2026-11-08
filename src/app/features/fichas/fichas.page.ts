@@ -202,15 +202,23 @@ export class FichasPage {
   });
 
   constructor() {
-    const inicial = this.fichas.platos()[0];
-    if (inicial) {
-      this.platoId.set(inicial.id);
-    }
+    void this.inicializar();
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
       }
     });
+  }
+
+  private async inicializar(): Promise<void> {
+    await this.fichas.cargar();
+    const actual = this.platoId();
+    if (actual === 0 || !this.fichas.porId(actual)) {
+      const inicial = this.fichas.platos()[0];
+      if (inicial) {
+        this.platoId.set(inicial.id);
+      }
+    }
   }
 
   cantidad(valor: number): string {

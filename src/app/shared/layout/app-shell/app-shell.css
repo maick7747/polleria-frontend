@@ -68,6 +68,7 @@
 }
 
 .rail-item {
+  position: relative;
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
@@ -89,6 +90,37 @@
 .rail-item.is-active {
   background: var(--c-brand-soft);
   color: var(--c-brand);
+}
+
+.rail-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--c-brand);
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--c-white);
+  animation: latido 1.6s ease-in-out infinite;
+}
+
+@keyframes latido {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
 }
 
 .rail-spacer {

@@ -2,13 +2,28 @@
   <div actions class="header-actions">
     <span class="live-chip">
       <app-icon name="bell-ringing" [size]="12" />
-      Cocina avisó hace 2 min
+      @if (total() > 0) {
+        Cocina avisó hace {{ avisoHace() }} min
+      } @else {
+        Sin avisos pendientes
+      }
     </span>
     <button type="button" class="ghost-btn" (click)="actualizar()">
       <app-icon name="arrow-clockwise" [size]="14" />
       Actualizar
     </button>
   </div>
+
+  @if (error()) {
+    <div class="aviso-error" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <span>{{ error() }}</span>
+      <button type="button" (click)="actualizar()">Reintentar</button>
+    </div>
+  }
+  @if (cargando() && total() === 0) {
+    <div class="aviso-carga" role="status">Cargando avisos de cocina…</div>
+  }
 
   <div class="resumen">
     <div class="resumen__bloque">
@@ -53,10 +68,10 @@
     <div class="resumen__bloque">
       <app-icon name="users" [size]="19" class="resumen__icon" />
       <div class="resumen__data">
-        <span class="resumen__label">Mozo en turno</span>
+        <span class="resumen__label">Sin leer</span>
         <div class="resumen__valor">
-          <strong>2</strong>
-          <span>Mozo + Cajero</span>
+          <strong>{{ noLeidos() }}</strong>
+          <span>desde que abriste la app</span>
         </div>
       </div>
     </div>
@@ -142,7 +157,11 @@
 
         <span class="aviso__chip">
           <span class="aviso__dot"></span>
-          Cocina avisó hace 2 min
+          @if (total() > 0) {
+            Cocina avisó hace {{ avisoHace() }} min
+          } @else {
+            Sin avisos pendientes
+          }
         </span>
 
         <span class="aviso__sep"></span>

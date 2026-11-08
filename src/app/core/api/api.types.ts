@@ -51,6 +51,16 @@ export interface DetallePedidoDto {
   platillo_nombre?: string | null;
 }
 
+export interface ClienteDto {
+  id?: number;
+  nombre: string;
+  tipo_documento?: string | null;
+  numero_documento?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  referencia?: string | null;
+}
+
 export interface PedidoDto {
   id: number;
   numero: string;
@@ -78,6 +88,19 @@ export interface PedidoDto {
   cliente_nombre?: string | null;
   fecha_entrega: string | null;
   detalles?: DetallePedidoDto[];
+  idempotente?: boolean;
+}
+
+export interface PedidoListoDto {
+  id: number;
+  numero: string;
+  canal: string;
+  tipo_consumo: string;
+  mesa_numero: number | null;
+  cuenta_id: number | null;
+  fecha_listo: string | null;
+  minutos_esperando: number;
+  detalles: DetallePedidoDto[];
 }
 
 export interface PagoDto {
@@ -98,11 +121,14 @@ export interface CuentaDto {
   total: number;
   fecha_apertura: string;
   usuario_apertura_id: number;
+  usuario_apertura_nombre?: string | null;
   fecha_cierre: string | null;
   usuario_cierre_id: number | null;
   comprobante_tipo: string;
   comprobante_numero: string | null;
   mesa_numero?: number | null;
+  cliente_id?: number | null;
+  cliente?: ClienteDto | null;
   subtotal?: number;
   igv?: number;
   total_consolidado?: number;
@@ -116,6 +142,12 @@ export interface ComprobanteDto {
   numero: string;
   total: number;
   fecha: string;
+}
+
+export interface TableroDto {
+  generado_en: string;
+  mesas: MesaDto[];
+  cuentas: CuentaDto[];
 }
 
 export interface CobroResponseDto {
@@ -236,4 +268,23 @@ export interface DashboardDto {
   fecha: string;
   kpis: DashboardKpisDto;
   top_platillos: DashboardTopPlatilloDto[];
+}
+
+export interface IngredientePlatoDto {
+  insumo_id: number;
+  insumo?: string | null;
+  cantidad: number;
+  unidad_medida?: string | null;
+  costo_promedio?: number | null;
+}
+
+export interface PlatoDto {
+  id: number;
+  categoria_id?: number | null;
+  nombre: string;
+  descripcion?: string | null;
+  precio_venta: number;
+  activo: boolean;
+  categoria?: string | null;
+  ingredientes?: IngredientePlatoDto[] | null;
 }

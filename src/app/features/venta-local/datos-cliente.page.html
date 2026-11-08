@@ -231,9 +231,14 @@
 
         <div class="comp__grow"></div>
 
-        <button type="button" class="comp__save" (click)="guardar()">
+        <button
+          type="button"
+          class="comp__save"
+          [disabled]="guardando() || cargando()"
+          (click)="guardar()"
+        >
           <app-icon name="check" [size]="16" />
-          Guardar y volver al pedido
+          {{ cargando() ? 'Cargando…' : guardando() ? 'Guardando…' : 'Guardar y volver al pedido' }}
         </button>
         <span class="comp__nota">Opcional · se puede omitir</span>
       </div>

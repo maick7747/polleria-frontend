@@ -9,7 +9,13 @@ export type UnidadMedida = 'kg' | 'g' | 'l' | 'ml' | 'und' | 'docena';
 
 export type TipoMovimiento = 'entrada' | 'salida' | 'merma' | 'ajuste' | 'devolucion';
 
-export type CategoriaPlatillo = 'Pollos' | 'Guarniciones' | 'Bebidas' | 'Combos' | 'Entradas';
+export type CategoriaPlatillo =
+  | 'Pollos'
+  | 'Guarniciones'
+  | 'Bebidas'
+  | 'Combos'
+  | 'Entradas'
+  | 'Postres';
 
 export interface Insumo {
   id: number;
