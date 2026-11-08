@@ -9,6 +9,13 @@
     </app-button>
   </div>
 
+  @if (error()) {
+    <div class="dashboard-error" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
   <app-panel class="hero">
     <div class="hero__inner">
       <div class="donut">

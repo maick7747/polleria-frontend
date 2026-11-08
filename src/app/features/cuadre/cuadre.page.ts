@@ -125,7 +125,10 @@ export class CuadrePage {
   }
 
   private async inicializar(): Promise<void> {
-    await this.cuadre.cargar();
+    const ok = await this.cuadre.cargar();
+    if (!ok) {
+      this.avisar(this.cuadre.error() ?? 'No se pudo cargar el cuadre de caja.', true);
+    }
     this.inicializarCampos();
   }
 

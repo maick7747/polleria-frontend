@@ -10,6 +10,13 @@
     </a>
   </div>
 
+  @if (error()) {
+    <div class="comandas-error" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
   <div class="toolbar">
     <div class="filtros" role="group" aria-label="Filtrar comandas">
       <button

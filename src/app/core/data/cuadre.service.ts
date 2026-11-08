@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import { round2 } from '../utils/format';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
-import { esFalloRed } from '../api/api.helpers';
+import { esFalloRed, mensajeError } from '../api/api.helpers';
 import type { CuadreDto } from '../api/api.types';
 
 @Injectable({ providedIn: 'root' })
@@ -11,6 +11,7 @@ export class CuadreService {
   private readonly api = inject(ApiClient);
 
   readonly cargando = signal<boolean>(false);
+  readonly error = signal<string | null>(null);
   readonly cuadreId = signal<number | null>(null);
 
   readonly abierta = signal<boolean>(false);
@@ -38,6 +39,7 @@ export class CuadreService {
       return false;
     }
     this.cargando.set(true);
+    this.error.set(null);
     try {
       const dto = await firstValueFrom(this.api.get<CuadreDto | null>('/cuadre-caja'));
       if (dto) {
@@ -49,7 +51,8 @@ export class CuadreService {
         this.totalEgresos.set(0);
       }
       return true;
-    } catch {
+    } catch (error) {
+      this.error.set(mensajeError(error));
       return false;
     } finally {
       this.cargando.set(false);

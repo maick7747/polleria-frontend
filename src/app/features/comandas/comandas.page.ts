@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { PagosService } from '../../core/data/pagos.service';
@@ -11,8 +18,6 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
-
-const AHORA = Date.now();
 
 type FiltroComandas = 'todas' | 'local' | 'delivery' | 'rappi' | 'listas';
 type CanalTipo = 'local' | 'delivery' | 'rappi';
@@ -57,18 +62,27 @@ export class ComandasPage {
   private readonly pedidos = inject(PedidosService);
   private readonly cuentas = inject(CuentasService);
   private readonly pagos = inject(PagosService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly moneda = formatearMoneda;
   readonly filtro = signal<FiltroComandas>('todas');
   readonly busqueda = signal('');
   readonly seleccionadaId = signal<number | null>(null);
+  readonly ahora = signal(Date.now());
+  readonly error = this.pedidos.error;
 
   constructor() {
+    const reloj = setInterval(() => this.ahora.set(Date.now()), 30000);
+    this.destroyRef.onDestroy(() => clearInterval(reloj));
     void this.cargar();
   }
 
   private async cargar(): Promise<void> {
-    await Promise.all([this.pedidos.cargar(), this.cuentas.cargar()]);
+    await Promise.all([this.pedidos.cargarKds(), this.cuentas.cargar()]);
+  }
+
+  reintentar(): void {
+    void this.cargar();
   }
 
   readonly filas = computed<ComandaFila[]>(() =>
@@ -169,9 +183,14 @@ export class ComandasPage {
 
   readonly subtitulo = computed<string>(() => {
     const listas = this.conteos().listas;
+    const hora = new Date(this.ahora()).toLocaleTimeString('es-PE', {
+      timeZone: 'America/Lima',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     return `Turno tarde · ${this.conteos().todas} abiertas · ${listas} ${
       listas === 1 ? 'lista' : 'listas'
-    } · actualizado 17:42`;
+    } · actualizado ${hora}`;
   });
 
   cambiarFiltro(filtro: FiltroComandas): void {
@@ -209,7 +228,7 @@ export class ComandasPage {
       canalTipo: this.canalTipo(pedido),
       destino: this.destino(pedido),
       rondas: cuenta?.rondas.length ?? 1,
-      minutos: minutosEntre(pedido.fechaPedido, AHORA),
+      minutos: minutosEntre(pedido.fechaPedido, this.ahora()),
       estado: estado.estado,
       tono: estado.tono,
       total: cuenta?.total ?? pedido.total,

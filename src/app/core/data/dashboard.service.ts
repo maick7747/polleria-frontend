@@ -3,6 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import type { ComandaResumen, KpiResumen, Pedido, TopPlato } from '../models';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
+import { mensajeError } from '../api/api.helpers';
 import type { DashboardDto } from '../api/api.types';
 import { round2 } from '../utils/format';
 import { CocinaService } from './cocina.service';
@@ -22,6 +23,7 @@ export class DashboardService {
   private readonly cocina = inject(CocinaService);
 
   readonly cargando = signal<boolean>(false);
+  readonly error = signal<string | null>(null);
 
   readonly kpis = signal<KpiResumen>(MOCK_KPIS);
   readonly fecha = "Fratelli's · miércoles 14 de octubre · turno tarde";
@@ -89,12 +91,18 @@ export class DashboardService {
   );
 
   async cargarDatos(): Promise<void> {
-    await Promise.all([
+    this.error.set(null);
+    const [dashboardOk, pedidosOk, cuentasOk, inventarioOk] = await Promise.all([
       this.cargar(),
-      this.pedidos.cargar(),
+      this.pedidos.cargarKds(),
       this.cuentas.cargar(),
       this.inventario.cargar(),
     ]);
+    if (!dashboardOk || !pedidosOk || !cuentasOk || !inventarioOk) {
+      this.error.set(
+        this.error() ?? 'No se pudieron cargar todos los datos del turno. Reintenta.',
+      );
+    }
   }
 
   async cargar(): Promise<boolean> {
@@ -127,7 +135,8 @@ export class DashboardService {
         topPlatos,
       });
       return true;
-    } catch {
+    } catch (error) {
+      this.error.set(mensajeError(error));
       return false;
     } finally {
       this.cargando.set(false);

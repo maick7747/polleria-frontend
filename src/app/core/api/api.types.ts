@@ -180,8 +180,13 @@ export interface KdsPedidoDto {
   mesa_numero: number | null;
   cuenta_id?: number | null;
   estado: string;
+  estado_pago: string;
+  metodo_pago: string | null;
   estado_entrega: string | null;
   prioridad: string;
+  subtotal: number;
+  igv: number;
+  total: number;
   fecha_pedido: string;
   fecha_inicio_prep: string | null;
   fecha_listo: string | null;

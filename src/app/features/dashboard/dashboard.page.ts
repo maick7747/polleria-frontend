@@ -46,6 +46,7 @@ export class DashboardPage {
   readonly kpis = this.dashboard.kpis;
   readonly fecha = this.dashboard.fecha;
   readonly comandas = this.dashboard.comandas;
+  readonly error = this.dashboard.error;
 
   readonly pedidosActivos = this.dashboard.pedidosActivos;
   readonly desglose = this.dashboard.desglose;
@@ -64,6 +65,10 @@ export class DashboardPage {
   readonly porcentajeMeta = this.dashboard.porcentajeMeta;
 
   constructor() {
+    void this.dashboard.cargarDatos();
+  }
+
+  reintentar(): void {
     void this.dashboard.cargarDatos();
   }
 
