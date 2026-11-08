@@ -215,36 +215,30 @@ export class CuentasService {
             notas: item.notas ?? null,
           })),
           idempotency_key: clave ?? null,
+          enviar_cocina: true,
         };
-        const dto = await firstValueFrom(
+        let dto = await firstValueFrom(
           this.api.post<PedidoDto>(`/cuentas/${cuentaId}/pedidos`, payload),
         );
-        if (dto.idempotente === true) {
+        const idempotente = dto.idempotente === true;
+        if (dto.estado !== 'en_cocina' && dto.estado !== 'cancelado') {
+          dto = await firstValueFrom(
+            this.api.post<PedidoDto>(`/pedidos/${dto.id}/enviar-cocina`),
+          );
+        }
+        if (idempotente) {
           const actual = this.porId(cuentaId) ?? cuenta;
           const existente = actual.rondas.find((ronda) => ronda.id === dto.id);
           return existente ?? toRonda(dto, actual.rondas.length + 1);
         }
-        let enviado = dto;
-        try {
-          enviado = await firstValueFrom(
-            this.api.post<PedidoDto>(`/pedidos/${dto.id}/enviar-cocina`),
-          );
-        } catch (error) {
-          await firstValueFrom(
-            this.api.post<PedidoDto>(`/pedidos/${dto.id}/cancelar`, {
-              motivo: 'No se pudo enviar a cocina',
-            }),
-          ).catch(() => undefined);
-          throw error;
-        }
-        const ronda = toRonda(enviado, cuenta.rondas.length + 1);
+        const ronda = toRonda(dto, cuenta.rondas.length + 1);
         this.cuentas.update((lista) =>
           lista.map((actual) =>
             actual.id === cuentaId
               ? {
                   ...actual,
                   rondas: [...actual.rondas, ronda],
-                  total: round2(actual.total + enviado.total),
+                  total: round2(actual.total + dto.total),
                 }
               : actual,
           ),
