@@ -58,12 +58,18 @@ const CATEGORIAS_INSUMO: readonly CategoriaInsumo[] = [
 const UNIDADES: readonly UnidadMedida[] = ['kg', 'g', 'l', 'ml', 'und', 'docena'];
 
 export function toMesa(dto: MesaDto): Mesa {
+  // `GET /mesas` devuelve un `cuenta_abierta` parcial (sin pedidos); solo se
+  // mapea cuando el detalle (`GET /mesas/:id`) trae los pedidos completos.
+  const cuentaAbierta =
+    dto.cuenta_abierta && Array.isArray(dto.cuenta_abierta.pedidos)
+      ? toCuenta(dto.cuenta_abierta)
+      : null;
   return {
     id: dto.id,
     numero: dto.numero,
     estado: dto.estado === 'ocupada' ? 'ocupada' : 'libre',
     activa: dto.activa,
-    cuentaAbierta: dto.cuenta_abierta ? toCuenta(dto.cuenta_abierta) : null,
+    cuentaAbierta,
   };
 }
 

@@ -142,7 +142,9 @@
                       <strong class="ronda__title">Ronda {{ ronda.numero }}</strong>
                       <span class="ronda__hora">{{ hora(ronda.creadaEn) }}</span>
                       <span class="ronda__spacer"></span>
-                      <span class="ronda__meta">{{ ronda.items.length }} ítems</span>
+                      <span class="ronda__meta">
+                        {{ ronda.items.length }} {{ ronda.items.length === 1 ? 'ítem' : 'ítems' }}
+                      </span>
                     </header>
                     @for (item of ronda.items; track item.id) {
                       <div class="item">

@@ -87,7 +87,8 @@ export class VentaLocalPage {
   readonly tarjetas = computed<MesaVista[]>(() => {
     const ahora = this.ahora();
     return this.mesas.mesas().map((mesa) => {
-      const cuenta = mesa.cuentaAbierta ?? this.cuentas.cuentaDeMesa(mesa.id) ?? null;
+      // Preferimos la cuenta del servicio (trae rondas y detalles completos).
+      const cuenta = this.cuentas.cuentaDeMesa(mesa.id) ?? mesa.cuentaAbierta ?? null;
       return {
         mesa,
         cuenta,
