@@ -11,10 +11,31 @@ import type {
 import { round2 } from '../utils/format';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
-import { esFalloRed } from '../api/api.helpers';
-import type { ApiList, KdsEstadoLineaDto, KdsEstadoResponseDto, PedidoDto } from '../api/api.types';
-import { toPedido } from '../api/api.mappers';
+import { esFalloRed, mensajeError } from '../api/api.helpers';
+import type {
+  ApiList,
+  KdsEstadoLineaDto,
+  KdsEstadoResponseDto,
+  KdsPedidoDto,
+  PageMeta,
+  PedidoDto,
+} from '../api/api.types';
+import { toPedido, toPedidoKds } from '../api/api.mappers';
 import { MOCK_PEDIDOS } from './mock-data';
+
+export interface PedidosQuery {
+  page?: number;
+  limit?: number;
+  estado?: string;
+  canal?: string;
+  desde?: string;
+  hasta?: string;
+}
+
+export interface PedidosMeta extends PageMeta {
+  prioritarios?: number;
+  sla_min?: number;
+}
 
 export interface NuevoPedido {
   canal: CanalPedido;
@@ -40,12 +61,16 @@ export class PedidosService {
   private secuencia = 1000;
 
   readonly cargando = signal<boolean>(false);
+  readonly error = signal<string | null>(null);
+  readonly meta = signal<PedidosMeta | null>(null);
 
   readonly pedidos = signal<Pedido[]>(
-    MOCK_PEDIDOS.map((pedido) => ({
-      ...pedido,
-      items: pedido.items.map((item) => ({ ...item })),
-    })),
+    USE_API
+      ? []
+      : MOCK_PEDIDOS.map((pedido) => ({
+          ...pedido,
+          items: pedido.items.map((item) => ({ ...item })),
+        })),
   );
 
   readonly activos = computed<Pedido[]>(() =>
@@ -66,18 +91,62 @@ export class PedidosService {
     return this.pedidos().find((pedido) => pedido.id === id);
   }
 
-  async cargar(): Promise<boolean> {
+  async cargar(opciones: PedidosQuery = {}): Promise<boolean> {
+    if (!USE_API) {
+      return false;
+    }
+    const limit = opciones.limit ?? 100;
+    this.cargando.set(true);
+    this.error.set(null);
+    try {
+      const respuesta = await firstValueFrom(
+        this.api.get<ApiList<PedidoDto>>('/pedidos', {
+          page: opciones.page ?? 1,
+          limit,
+          estado: opciones.estado || undefined,
+          canal: opciones.canal || undefined,
+          desde: opciones.desde || undefined,
+          hasta: opciones.hasta || undefined,
+        }),
+      );
+      this.pedidos.set(respuesta.data.map(toPedido));
+      this.meta.set({
+        page: respuesta.meta.page ?? 1,
+        limit: respuesta.meta.limit ?? limit,
+        total: respuesta.meta.total ?? respuesta.data.length,
+        pages: respuesta.meta.pages ?? 0,
+      });
+      return true;
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return false;
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  async cargarKds(): Promise<boolean> {
     if (!USE_API) {
       return false;
     }
     this.cargando.set(true);
+    this.error.set(null);
     try {
       const respuesta = await firstValueFrom(
-        this.api.get<ApiList<PedidoDto>>('/pedidos', { limit: 100 }),
+        this.api.get<ApiList<KdsPedidoDto>>('/kds/pedidos'),
       );
-      this.pedidos.set(respuesta.data.map(toPedido));
+      this.pedidos.set(respuesta.data.map(toPedidoKds));
+      this.meta.set({
+        page: 1,
+        limit: respuesta.data.length,
+        total: respuesta.meta.total ?? respuesta.data.length,
+        pages: 1,
+        prioritarios: respuesta.meta.prioritarios,
+        sla_min: respuesta.meta.sla_min,
+      });
       return true;
-    } catch {
+    } catch (error) {
+      this.error.set(mensajeError(error));
       return false;
     } finally {
       this.cargando.set(false);

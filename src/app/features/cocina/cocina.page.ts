@@ -18,8 +18,6 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { IconComponent } from '../../shared/components/icon/icon';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-const TARJETAS_KDS = 6;
-
 type CanalTono = 'local' | 'delivery' | 'rappi' | 'llamafood';
 type RitmoTono = 'neutral' | 'brand' | 'warning' | 'success';
 
@@ -94,6 +92,7 @@ export class CocinaPage {
   readonly ahora = signal(Date.now());
   readonly seleccionadaId = signal<number>(this.cocina.comandas()[0]?.pedidoId ?? 0);
   readonly toast = signal<string>('');
+  readonly error = this.pedidos.error;
 
   constructor() {
     const relojIntervalo = setInterval(() => this.ahora.set(Date.now()), 10000);
@@ -109,7 +108,11 @@ export class CocinaPage {
   }
 
   private async inicializar(): Promise<void> {
-    await Promise.all([this.pedidos.cargar(), this.cuentas.cargar(), this.fichas.cargar()]);
+    await Promise.all([
+      this.pedidos.cargarKds(),
+      this.cuentas.cargar(),
+      this.fichas.cargar(),
+    ]);
     const primera = this.cocina.comandas()[0];
     if (primera) {
       this.seleccionadaId.set(primera.pedidoId);
@@ -121,14 +124,15 @@ export class CocinaPage {
     if (document.visibilityState !== 'visible') {
       return;
     }
-    await Promise.all([this.pedidos.cargar(), this.cuentas.cargar(true)]);
+    await Promise.all([this.pedidos.cargarKds(), this.cuentas.cargar(true)]);
+  }
+
+  reintentar(): void {
+    void this.inicializar();
   }
 
   readonly comandas = computed<ComandaVista[]>(() =>
-    this.cocina
-      .comandas()
-      .slice(0, TARJETAS_KDS)
-      .map((comanda) => this.vista(comanda)),
+    this.cocina.comandas().map((comanda) => this.vista(comanda)),
   );
 
   readonly seleccionada = computed<ComandaVista | null>(() => {

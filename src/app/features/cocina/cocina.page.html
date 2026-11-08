@@ -4,6 +4,13 @@
     <span class="live"><span class="live__dot"></span>En vivo</span>
   </div>
 
+  @if (error()) {
+    <div class="kds-error" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
   <section class="ritmo" aria-label="Ritmo de cocina">
     @for (item of ritmo(); track item.label; let i = $index) {
       <div class="ritmo__item" [class.ritmo__item--first]="i === 0">

@@ -25,6 +25,7 @@ import type {
   CuentaDto,
   DetallePedidoDto,
   InsumoDto,
+  KdsPedidoDto,
   MesaDto,
   MovimientoDto,
   PagoDto,
@@ -185,6 +186,30 @@ export function toPedido(dto: PedidoDto): Pedido {
     comprobanteTipo: toComprobanteTipo(dto.comprobante_tipo),
     items: (dto.detalles ?? []).map(toDetalle),
     fechaEntrega: dto.fecha_entrega ?? undefined,
+  };
+}
+
+export function toPedidoKds(dto: KdsPedidoDto): Pedido {
+  return {
+    id: dto.id,
+    numero: dto.numero,
+    fechaPedido: dto.fecha_pedido,
+    canal: toCanal(dto.canal),
+    tipoConsumo: toTipoConsumo(dto.tipo_consumo),
+    mesaId: dto.mesa_id ?? null,
+    cuentaId: dto.cuenta_id ?? null,
+    rondaId: null,
+    usuarioCajeroId: 0,
+    estado: toEstadoPedido(dto.estado),
+    estadoPago: 'pendiente',
+    subtotal: 0,
+    igv: 0,
+    total: 0,
+    comisionPlataforma: 0,
+    costoDelivery: 0,
+    observaciones: dto.observaciones ?? undefined,
+    comprobanteTipo: 'ticket',
+    items: dto.detalles.map(toDetalle),
   };
 }
 

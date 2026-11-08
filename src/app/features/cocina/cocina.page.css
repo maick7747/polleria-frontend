@@ -164,8 +164,11 @@
   height: 100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 260px;
+  align-content: start;
   gap: 14px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .card {
@@ -834,7 +837,7 @@
     flex-direction: column;
   }
   .grid-cards {
-    grid-template-rows: repeat(2, 260px);
+    grid-auto-rows: 260px;
   }
   .foco {
     width: auto;
@@ -860,7 +863,7 @@
   }
   .grid-cards {
     grid-template-columns: 1fr;
-    grid-template-rows: repeat(6, 260px);
+    grid-auto-rows: 260px;
   }
   .cola {
     height: auto;
@@ -874,4 +877,32 @@
     align-items: stretch;
     gap: 12px;
   }
+}
+
+.kds-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-danger-soft);
+  border-radius: 10px;
+  background: var(--c-danger-soft);
+  color: var(--c-brand-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kds-error button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
 }

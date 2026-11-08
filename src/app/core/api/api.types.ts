@@ -18,6 +18,8 @@ export interface ApiList<T> {
     total_bajo?: number;
     total_critico?: number;
     valor_inventario?: number;
+    prioritarios?: number;
+    sla_min?: number;
   };
 }
 
@@ -167,6 +169,34 @@ export interface CobroResponseDto {
   pago: PagoDto;
   comprobante: ComprobanteDto;
   vuelto: number;
+}
+
+export interface KdsPedidoDto {
+  id: number;
+  numero: string;
+  canal: string;
+  tipo_consumo: string;
+  mesa_id?: number | null;
+  mesa_numero: number | null;
+  cuenta_id?: number | null;
+  estado: string;
+  estado_entrega: string | null;
+  prioridad: string;
+  fecha_pedido: string;
+  fecha_inicio_prep: string | null;
+  fecha_listo: string | null;
+  tiempo_min: number;
+  sla_min: number;
+  prioritario: boolean;
+  observaciones: string | null;
+  detalles: DetallePedidoDto[];
+}
+
+export interface KdsMetaDto {
+  total: number;
+  prioritarios: number;
+  sla_min: number;
+  generado_en: string;
 }
 
 export interface KdsEstadoLineaDto {
