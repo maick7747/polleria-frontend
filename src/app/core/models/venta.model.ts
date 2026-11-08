@@ -31,6 +31,7 @@ export interface Mesa {
   numero: number;
   estado: EstadoMesa;
   activa: boolean;
+  cuentaAbierta?: Cuenta | null;
 }
 
 export interface PedidoDetalle {

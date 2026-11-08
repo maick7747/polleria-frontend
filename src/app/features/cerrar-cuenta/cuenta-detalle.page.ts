@@ -15,6 +15,7 @@ import type { MetodoPago } from '../../core/models';
 import {
   abreviarNombre,
   formatearMoneda,
+  hora as formatearHora,
   minutosEntre,
   round2,
 } from '../../core/utils/format';
@@ -209,7 +210,7 @@ export class CuentaDetallePage {
   }
 
   hora(iso: string): string {
-    return iso.slice(11, 16);
+    return formatearHora(iso);
   }
 
   unidades(cantidad: number): string {

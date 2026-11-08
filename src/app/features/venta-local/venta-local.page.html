@@ -1,4 +1,4 @@
-<app-shell title="Nuevo pedido · Local" [subtitle]="fecha">
+<app-shell title="Nuevo pedido · Local" [subtitle]="fecha()">
   <div actions class="header-actions">
     <span class="caja">
       <span class="caja__dot"></span>
@@ -59,7 +59,9 @@
                       numeroMesa(item.mesa.numero) +
                       (item.mesa.estado === 'ocupada' ? ', ocupada' : ', libre')
                     "
+                    title="Click para ver el detalle · doble click para tomar pedido"
                     (click)="seleccionar(item.mesa)"
+                    (dblclick)="abrirPedido(item.mesa)"
                   >
                     <span class="mesa__num">{{ numeroMesa(item.mesa.numero) }}</span>
                     <span class="mesa__sub">
@@ -93,16 +95,31 @@
                 <h2 class="detalle__title">Mesa {{ numeroMesa(sel.mesa.numero) }}</h2>
                 <p class="detalle__sub">Salón principal</p>
               </div>
-              <app-chip [variant]="sel.mesa.estado === 'ocupada' ? 'danger' : 'neutral'">
-                {{ sel.mesa.estado === 'ocupada' ? 'Ocupada' : 'Libre' }}
-              </app-chip>
+              <div class="detalle__head-actions">
+                <app-chip [variant]="sel.mesa.estado === 'ocupada' ? 'danger' : 'neutral'">
+                  {{ sel.mesa.estado === 'ocupada' ? 'Ocupada' : 'Libre' }}
+                </app-chip>
+                <button
+                  type="button"
+                  class="detalle__close"
+                  aria-label="Quitar selección"
+                  title="Quitar selección (Esc)"
+                  (click)="limpiarSeleccion()"
+                >
+                  <app-icon name="x" [size]="14" />
+                </button>
+              </div>
             </header>
 
             <span class="detalle__sep"></span>
 
             <div class="detalle__row">
               <span>Rondas</span>
-              <strong>{{ sel.rondas }}</strong>
+              <strong>{{ sel.totalRondas }}</strong>
+            </div>
+            <div class="detalle__row">
+              <span>Hora de ingreso</span>
+              <strong>{{ sel.horaIngreso }}</strong>
             </div>
             <div class="detalle__row">
               <span>Tiempo abierta</span>
@@ -113,6 +130,33 @@
             <div class="detalle__row">
               <span>Mozo</span>
               <strong>{{ sel.mozo }}</strong>
+            </div>
+
+            <div class="detalle__scroll">
+              @if (sel.cuenta) {
+                <span class="rondas__title">Rondas</span>
+                @for (ronda of sel.rondas; track ronda.id) {
+                  <section class="ronda">
+                    <header class="ronda__head">
+                      <span class="ronda__dot"></span>
+                      <strong class="ronda__title">Ronda {{ ronda.numero }}</strong>
+                      <span class="ronda__hora">{{ hora(ronda.creadaEn) }}</span>
+                      <span class="ronda__spacer"></span>
+                      <span class="ronda__meta">{{ ronda.items.length }} ítems</span>
+                    </header>
+                    @for (item of ronda.items; track item.id) {
+                      <div class="item">
+                        <span class="item__name">{{ item.nombre }} x{{ item.cantidad }}</span>
+                        <strong class="item__total">{{ moneda(item.subtotal) }}</strong>
+                      </div>
+                    }
+                  </section>
+                } @empty {
+                  <p class="rondas__vacio">Sin rondas todavía.</p>
+                }
+              } @else {
+                <p class="rondas__vacio">Mesa libre. Doble click para tomar un pedido.</p>
+              }
             </div>
 
             <div class="detalle__grow"></div>
@@ -156,7 +200,7 @@
         </div>
         <p class="leyenda__hint">
           <app-icon name="caret-right" [size]="13" />
-          Click en una mesa para ver el detalle.
+          Click para seleccionar · doble click para tomar pedido · Esc para quitar.
         </p>
       </div>
     </aside>

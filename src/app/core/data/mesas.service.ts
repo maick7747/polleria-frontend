@@ -49,4 +49,22 @@ export class MesasService {
       this.cargando.set(false);
     }
   }
+
+  // Detalle de una mesa: GET /mesas/:id devuelve la cuenta abierta con sus
+  // pedidos (rondas) y el detalle de platos. Se cachea en la signal `mesas`.
+  async cargarDetalle(id: number): Promise<Mesa | null> {
+    if (!USE_API) {
+      return this.porId(id) ?? null;
+    }
+    try {
+      const dto = await firstValueFrom(this.api.get<MesaDto>(`/mesas/${id}`));
+      const mesa = toMesa(dto);
+      this.mesas.update((lista) =>
+        lista.map((item) => (item.id === mesa.id ? { ...item, ...mesa } : item)),
+      );
+      return mesa;
+    } catch {
+      return this.porId(id) ?? null;
+    }
+  }
 }

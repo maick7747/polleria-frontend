@@ -82,6 +82,10 @@
               <strong [class.cuenta__alert]="item.prioritaria">{{ item.minutos }} min</strong>
             </div>
             <div class="cuenta__row">
+              <span>Ingreso</span>
+              <strong>{{ hora(item.cuenta.fechaApertura) }}</strong>
+            </div>
+            <div class="cuenta__row">
               <span>Rondas</span>
               <strong>{{ item.rondas }}</strong>
             </div>
@@ -126,7 +130,7 @@
         </div>
         <p class="leyenda__hint">
           <app-icon name="caret-right" [size]="13" />
-          Selecciona una mesa para revisar su cuenta y cobrar.
+          Click para seleccionar o quitar la selección (Esc).
         </p>
         <span class="leyenda__grow"></span>
         <div class="leyenda__foot">
@@ -141,7 +145,18 @@
         <div class="resumen__inner">
           <header class="resumen__head">
             <h2 class="resumen__title">Cobro</h2>
-            <span class="resumen__pill">Cuenta única</span>
+            <div class="resumen__head-actions">
+              <span class="resumen__pill">Cuenta única</span>
+              <button
+                type="button"
+                class="resumen__close"
+                aria-label="Quitar selección"
+                title="Quitar selección (Esc)"
+                (click)="limpiarSeleccion()"
+              >
+                <app-icon name="x" [size]="14" />
+              </button>
+            </div>
           </header>
 
           <div class="resumen__mesa">
@@ -160,6 +175,10 @@
             <div class="resumen__row">
               <span>Rondas</span>
               <strong>{{ sel.rondas }}</strong>
+            </div>
+            <div class="resumen__row">
+              <span>Hora de ingreso</span>
+              <strong>{{ hora(sel.cuenta.fechaApertura) }}</strong>
             </div>
             <div class="resumen__row">
               <span>Mozo</span>
@@ -204,8 +223,8 @@
       } @else {
         <app-empty-state
           icon="cash-register"
-          title="Sin cuentas abiertas"
-          description="Cuando una mesa tenga consumos aparecerá aquí para cobrar."
+          title="Sin cuenta seleccionada"
+          description="Selecciona una mesa ocupada para revisar su cuenta y cobrar. Vuelve a hacer click o pulsa Esc para quitar la selección."
         />
       }
     </app-dark-panel>

@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  HostListener,
+  inject,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MOCK_USUARIOS } from '../../core/data/mock-data';
@@ -6,6 +14,7 @@ import type { Cuenta } from '../../core/models';
 import {
   abreviarNombre,
   formatearMoneda,
+  hora as formatearHora,
   minutosEntre,
   round2,
 } from '../../core/utils/format';
@@ -16,7 +25,6 @@ import { IconComponent } from '../../shared/components/icon/icon';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-const AHORA = Date.now();
 const UMBRAL_DEMORA = 30;
 
 type FiltroCuentas = 'todas' | 'demora' | 'mayor';
@@ -51,11 +59,15 @@ interface CuentaVista {
 export class CerrarCuentaPage {
   private readonly cuentas = inject(CuentasService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+
+  private readonly ahora = signal(Date.now());
 
   readonly umbral = UMBRAL_DEMORA;
   readonly moneda = formatearMoneda;
+  readonly hora = formatearHora;
   readonly filtro = signal<FiltroCuentas>('todas');
-  readonly seleccionadaId = signal<number>(this.cuentas.abiertas()[0]?.id ?? 0);
+  readonly seleccionadaId = signal<number | null>(null);
 
   readonly vistas = computed<CuentaVista[]>(() => {
     const lista = this.cuentas
@@ -87,15 +99,22 @@ export class CerrarCuentaPage {
 
   readonly seleccionada = computed<CuentaVista | null>(() => {
     const lista = this.vistas();
-    return lista.find((item) => item.cuenta.id === this.seleccionadaId()) ?? lista[0] ?? null;
+    return lista.find((item) => item.cuenta.id === this.seleccionadaId()) ?? null;
   });
 
-  readonly idSeleccionada = computed<number>(() => this.seleccionada()?.cuenta.id ?? 0);
+  readonly idSeleccionada = computed<number | null>(() => this.seleccionada()?.cuenta.id ?? null);
   readonly totalAbierto = this.cuentas.totalAbierto;
   readonly dineroAbierto = computed<string>(() => formatearMoneda(this.totalAbierto()));
 
   constructor() {
+    const intervalo = setInterval(() => this.ahora.set(Date.now()), 30000);
+    this.destroyRef.onDestroy(() => clearInterval(intervalo));
     void this.cuentas.cargar();
+  }
+
+  @HostListener('document:keydown.escape')
+  limpiarConEscape(): void {
+    this.limpiarSeleccion();
   }
 
   cambiarFiltro(filtro: FiltroCuentas): void {
@@ -103,7 +122,11 @@ export class CerrarCuentaPage {
   }
 
   seleccionar(cuentaId: number): void {
-    this.seleccionadaId.set(cuentaId);
+    this.seleccionadaId.update((actual) => (actual === cuentaId ? null : cuentaId));
+  }
+
+  limpiarSeleccion(): void {
+    this.seleccionadaId.set(null);
   }
 
   esSeleccionada(cuentaId: number): boolean {
@@ -135,6 +158,6 @@ export class CerrarCuentaPage {
   }
 
   private minutos(cuenta: Cuenta): number {
-    return minutosEntre(cuenta.fechaApertura, AHORA);
+    return minutosEntre(cuenta.fechaApertura, this.ahora());
   }
 }

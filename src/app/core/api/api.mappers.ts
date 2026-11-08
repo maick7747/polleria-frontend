@@ -63,6 +63,7 @@ export function toMesa(dto: MesaDto): Mesa {
     numero: dto.numero,
     estado: dto.estado === 'ocupada' ? 'ocupada' : 'libre',
     activa: dto.activa,
+    cuentaAbierta: dto.cuenta_abierta ? toCuenta(dto.cuenta_abierta) : null,
   };
 }
 

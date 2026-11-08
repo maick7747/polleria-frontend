@@ -2,6 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
+  HostListener,
   inject,
   signal,
 } from '@angular/core';
@@ -9,13 +11,15 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MesasService } from '../../core/data/mesas.service';
-import { MOCK_USUARIOS } from '../../core/data/mock-data';
-import type { Cuenta, Mesa } from '../../core/models';
+import type { Cuenta, Mesa, Ronda } from '../../core/models';
 import {
   abreviarNombre,
+  fechaLarga,
   formatearMoneda,
+  hora as formatearHora,
   minutosEntre,
   round2,
+  turnoActual,
 } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -33,8 +37,10 @@ interface MesaVista {
 }
 
 interface MesaDetalle extends MesaVista {
-  rondas: number;
+  rondas: Ronda[];
+  totalRondas: number;
   mozo: string;
+  horaIngreso: string;
   subtotal: number;
   igv: number;
 }
@@ -62,16 +68,13 @@ export class VentaLocalPage {
   private readonly cuentas = inject(CuentasService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
-  private readonly ahora = Date.now();
+  private readonly ahora = signal(Date.now());
 
-  readonly fecha = "Fratelli's · miércoles 14 de octubre · turno tarde";
+  readonly fecha = computed(() => `Fratelli's · ${fechaLarga()} · ${turnoActual()}`);
   readonly filtro = signal<FiltroMesas>('todas');
-  readonly seleccionadaId = signal<number | null>(
-    this.mesas.mesas().find((mesa) => mesa.numero === 4)?.id ??
-      this.mesas.mesas().find((mesa) => mesa.estado === 'ocupada')?.id ??
-      null,
-  );
+  readonly seleccionadaId = signal<number | null>(null);
 
   readonly totalMesas = computed(() => this.mesas.mesas().length);
   readonly libres = this.mesas.libres;
@@ -79,11 +82,12 @@ export class VentaLocalPage {
   readonly cuentasAbiertas = this.cuentas.abiertas;
   readonly totalAbierto = this.cuentas.totalAbierto;
   readonly moneda = formatearMoneda;
+  readonly hora = formatearHora;
 
   readonly tarjetas = computed<MesaVista[]>(() => {
-    const ahora = this.ahora;
+    const ahora = this.ahora();
     return this.mesas.mesas().map((mesa) => {
-      const cuenta = this.cuentas.cuentaDeMesa(mesa.id) ?? null;
+      const cuenta = mesa.cuentaAbierta ?? this.cuentas.cuentaDeMesa(mesa.id) ?? null;
       return {
         mesa,
         cuenta,
@@ -119,15 +123,17 @@ export class VentaLocalPage {
     if (!tarjeta) {
       return null;
     }
-    const total = tarjeta.cuenta?.total ?? 0;
+    const cuenta = tarjeta.cuenta;
+    const total = cuenta?.total ?? 0;
     const subtotal = round2(total / 1.18);
-    const usuario = MOCK_USUARIOS.find(
-      (candidato) => candidato.id === tarjeta.cuenta?.usuarioAperturaId,
-    );
+    const usuario = this.auth.usuario();
+    const esPropia = Boolean(cuenta && usuario && cuenta.usuarioAperturaId === usuario.id);
     return {
       ...tarjeta,
-      rondas: tarjeta.cuenta?.rondas.length ?? 0,
-      mozo: usuario ? abreviarNombre(usuario.nombre) : '—',
+      rondas: cuenta?.rondas ?? [],
+      totalRondas: cuenta?.rondas.length ?? 0,
+      mozo: esPropia && usuario ? abreviarNombre(usuario.nombre) : '—',
+      horaIngreso: formatearHora(cuenta?.fechaApertura),
       subtotal,
       igv: round2(total - subtotal),
     };
@@ -149,20 +155,38 @@ export class VentaLocalPage {
   readonly igvSeleccionado = computed(() => formatearMoneda(this.seleccionada()?.igv ?? 0));
 
   constructor() {
+    const intervalo = setInterval(() => this.ahora.set(Date.now()), 30000);
+    this.destroyRef.onDestroy(() => clearInterval(intervalo));
     void this.cargar();
+  }
+
+  @HostListener('document:keydown.escape')
+  limpiarConEscape(): void {
+    this.limpiarSeleccion();
   }
 
   private async cargar(): Promise<void> {
     await Promise.all([this.mesas.cargar(), this.cuentas.cargar()]);
     const actual = this.seleccionadaId();
-    const existe = actual !== null && this.mesas.porId(actual) !== undefined;
-    if (!existe) {
-      const ocupada = this.mesas.mesas().find((mesa) => mesa.estado === 'ocupada');
-      this.seleccionadaId.set(ocupada?.id ?? this.mesas.mesas()[0]?.id ?? null);
+    if (actual !== null && !this.mesas.porId(actual)) {
+      this.seleccionadaId.set(null);
     }
   }
 
+  // Click simple: selecciona o deselecciona (toggle). No navega.
   async seleccionar(mesa: Mesa): Promise<void> {
+    if (this.seleccionadaId() === mesa.id) {
+      this.limpiarSeleccion();
+      return;
+    }
+    this.seleccionadaId.set(mesa.id);
+    if (mesa.estado === 'ocupada' || this.cuentas.cuentaDeMesa(mesa.id)) {
+      await this.mesas.cargarDetalle(mesa.id);
+    }
+  }
+
+  // Doble click (o botón "Tomar pedido"): abre cuenta si hace falta y navega.
+  async abrirPedido(mesa: Mesa): Promise<void> {
     this.seleccionadaId.set(mesa.id);
     try {
       if (!this.cuentas.cuentaDeMesa(mesa.id)) {
@@ -176,17 +200,14 @@ export class VentaLocalPage {
 
   async irAPedido(): Promise<void> {
     const id = this.seleccionadaId();
-    if (id === null) {
-      return;
+    const mesa = id === null ? null : this.mesas.porId(id);
+    if (mesa) {
+      await this.abrirPedido(mesa);
     }
-    try {
-      if (!this.cuentas.cuentaDeMesa(id)) {
-        await this.cuentas.abrirCuenta(id, this.auth.usuario()?.id ?? 3);
-      }
-      await this.router.navigate(['/venta-local/pedido', id]);
-    } catch {
-      this.seleccionadaId.set(id);
-    }
+  }
+
+  limpiarSeleccion(): void {
+    this.seleccionadaId.set(null);
   }
 
   cambiarFiltro(filtro: FiltroMesas): void {

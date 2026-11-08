@@ -34,6 +34,7 @@ export interface MesaDto {
   numero: number;
   estado: string;
   activa: boolean;
+  cuenta_abierta?: CuentaDto | null;
 }
 
 export interface DetallePedidoDto {

@@ -393,6 +393,29 @@
   gap: 12px;
 }
 
+.resumen__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resumen__close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-on-dark-2);
+}
+
+.resumen__close:hover {
+  color: var(--c-white);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
 .resumen__title {
   font-family: var(--font-display);
   font-size: 15px;
