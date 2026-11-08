@@ -53,6 +53,13 @@
     </label>
   </div>
 
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="recargar()">Reintentar</button>
+    </div>
+  }
+
   <div class="board">
     <app-panel class="panel">
       <div class="panel__inner">
@@ -108,6 +115,15 @@
             </div>
           }
         </div>
+
+        <app-paginador
+          [page]="pagina()"
+          [pages]="meta().pages"
+          [total]="meta().total"
+          [limit]="limite()"
+          (pageChange)="cambiarPagina($event)"
+          (limitChange)="cambiarLimite($event)"
+        />
 
         <div class="panel__foot">
           <span>El stock baja automáticamente al confirmar cada pedido</span>

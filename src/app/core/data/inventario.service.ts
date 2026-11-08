@@ -4,10 +4,39 @@ import type { Insumo, MovimientoStock, TipoMovimiento } from '../models';
 import { round3 } from '../utils/format';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
-import { esFalloRed } from '../api/api.helpers';
-import type { AjusteResponseDto, ApiList, InsumoDto } from '../api/api.types';
+import { esFalloRed, mensajeError } from '../api/api.helpers';
+import type { AjusteResponseDto, ApiList, InsumoDto, PageMeta } from '../api/api.types';
 import { toInsumo, toMovimiento } from '../api/api.mappers';
 import { MOCK_INSUMOS, MOCK_MOVIMIENTOS } from './mock-data';
+
+export interface InventarioMeta extends PageMeta {
+  totalInsumos: number;
+  totalOk: number;
+  totalBajo: number;
+  totalCritico: number;
+  totalAlertas: number;
+  valorInventario: number;
+}
+
+export interface InventarioQuery {
+  page?: number;
+  limit?: number;
+  q?: string;
+  estado?: string;
+}
+
+const META_INICIAL: InventarioMeta = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  pages: 0,
+  totalInsumos: 0,
+  totalOk: 0,
+  totalBajo: 0,
+  totalCritico: 0,
+  totalAlertas: 0,
+  valorInventario: 0,
+};
 
 @Injectable({ providedIn: 'root' })
 export class InventarioService {
@@ -16,42 +45,81 @@ export class InventarioService {
   private secuencia = 1000;
 
   readonly cargando = signal<boolean>(false);
+  readonly error = signal<string | null>(null);
 
-  readonly insumos = signal<Insumo[]>(MOCK_INSUMOS.map((insumo) => ({ ...insumo })));
+  readonly insumos = signal<Insumo[]>(
+    USE_API ? [] : MOCK_INSUMOS.map((insumo) => ({ ...insumo })),
+  );
 
   readonly movimientos = signal<MovimientoStock[]>(
-    MOCK_MOVIMIENTOS.map((movimiento) => ({ ...movimiento })),
+    USE_API ? [] : MOCK_MOVIMIENTOS.map((movimiento) => ({ ...movimiento })),
   );
 
-  readonly stockBajo = computed<Insumo[]>(() =>
-    this.insumos().filter((insumo) => insumo.stockActual <= insumo.stockMinimo),
+  readonly alertas = signal<Insumo[]>(
+    USE_API
+      ? []
+      : MOCK_INSUMOS.filter((insumo) => insumo.stockActual <= insumo.stockMinimo).map(
+          (insumo) => ({ ...insumo }),
+        ),
   );
 
-  readonly valorInventario = computed<number>(() =>
-    round3(
-      this.insumos().reduce(
-        (suma, insumo) => suma + insumo.stockActual * insumo.costoPromedio,
-        0,
-      ),
-    ),
-  );
+  readonly meta = signal<InventarioMeta>({ ...META_INICIAL });
+
+  readonly stockBajo = computed<Insumo[]>(() => this.alertas());
+
+  readonly valorInventario = computed<number>(() => this.meta().valorInventario);
+
+  readonly conteos = computed(() => {
+    const meta = this.meta();
+    return {
+      todos: meta.totalInsumos,
+      ok: meta.totalOk,
+      bajo: meta.totalBajo,
+      critico: meta.totalCritico,
+      alertas: meta.totalAlertas,
+    };
+  });
 
   porId(id: number): Insumo | undefined {
     return this.insumos().find((insumo) => insumo.id === id);
   }
 
-  async cargar(): Promise<boolean> {
+  async cargar(opciones: InventarioQuery = {}): Promise<boolean> {
     if (!USE_API) {
       return false;
     }
+    const page = opciones.page ?? 1;
+    const limit = opciones.limit ?? this.meta().limit;
+    const q = opciones.q?.trim() || undefined;
+    const estado = opciones.estado || undefined;
+
     this.cargando.set(true);
+    this.error.set(null);
     try {
-      const respuesta = await firstValueFrom(
-        this.api.get<ApiList<InsumoDto>>('/inventario', { limit: 100 }),
-      );
-      this.insumos.set(respuesta.data.map(toInsumo));
+      const [lista, alertas] = await Promise.all([
+        firstValueFrom(
+          this.api.get<ApiList<InsumoDto>>('/inventario', { page, limit, q, estado }),
+        ),
+        firstValueFrom(this.api.get<ApiList<InsumoDto>>('/inventario/alertas')),
+      ]);
+
+      this.insumos.set(lista.data.map(toInsumo));
+      this.alertas.set(alertas.data.map(toInsumo));
+      this.meta.set({
+        page: lista.meta.page ?? page,
+        limit: lista.meta.limit ?? limit,
+        total: lista.meta.total ?? lista.data.length,
+        pages: lista.meta.pages ?? 0,
+        totalInsumos: lista.meta.total_insumos ?? lista.meta.total ?? lista.data.length,
+        totalOk: lista.meta.total_ok ?? 0,
+        totalBajo: lista.meta.total_bajo ?? 0,
+        totalCritico: lista.meta.total_critico ?? 0,
+        totalAlertas: lista.meta.total_alertas ?? alertas.data.length,
+        valorInventario: lista.meta.valor_inventario ?? 0,
+      });
       return true;
-    } catch {
+    } catch (error) {
+      this.error.set(mensajeError(error));
       return false;
     } finally {
       this.cargando.set(false);

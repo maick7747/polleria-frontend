@@ -1,3 +1,10 @@
+export interface PageMeta {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
 export interface ApiList<T> {
   data: T[];
   meta: {
@@ -6,6 +13,11 @@ export interface ApiList<T> {
     total?: number;
     pages?: number;
     total_alertas?: number;
+    total_insumos?: number;
+    total_ok?: number;
+    total_bajo?: number;
+    total_critico?: number;
+    valor_inventario?: number;
   };
 }
 

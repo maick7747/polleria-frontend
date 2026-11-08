@@ -1,5 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { InventarioService } from '../../core/data/inventario.service';
 import type { Insumo } from '../../core/models';
 import { formatearMoneda, round2 } from '../../core/utils/format';
@@ -7,6 +14,7 @@ import { ChipComponent, type ChipVariant } from '../../shared/components/chip/ch
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
@@ -35,6 +43,8 @@ const CATEGORIAS: Readonly<Record<Insumo['categoria'], string>> = {
   insumo_general: 'Insumos',
 };
 
+const LIMITES = [10, 20, 50, 100];
+
 @Component({
   selector: 'app-inventario-page',
   standalone: true,
@@ -45,6 +55,7 @@ const CATEGORIAS: Readonly<Record<Insumo['categoria'], string>> = {
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    PaginadorComponent,
     PanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -53,66 +64,93 @@ const CATEGORIAS: Readonly<Record<Insumo['categoria'], string>> = {
 })
 export class InventarioPage {
   private readonly inventario = inject(InventarioService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private buscarTimer: number | null = null;
 
   readonly filtro = signal<FiltroInventario>('todos');
   readonly busqueda = signal<string>('');
+  readonly pagina = signal<number>(1);
+  readonly limite = signal<number>(20);
 
   readonly moneda = formatearMoneda;
   readonly valorInventario = this.inventario.valorInventario;
+  readonly conteos = this.inventario.conteos;
+  readonly meta = this.inventario.meta;
+  readonly cargando = this.inventario.cargando;
+  readonly error = this.inventario.error;
 
   readonly filas = computed<FilaInventario[]>(() =>
     this.inventario.insumos().map((insumo) => this.fila(insumo)),
   );
 
-  readonly conteos = computed(() => {
-    const filas = this.filas();
-    return {
-      todos: filas.length,
-      bajo: filas.filter((fila) => fila.estado !== 'ok').length,
-      critico: filas.filter((fila) => fila.estado === 'critico').length,
-      ok: filas.filter((fila) => fila.estado === 'ok').length,
-    };
-  });
-
   readonly alertas = computed<FilaInventario[]>(() =>
-    this.filas().filter((fila) => fila.estado !== 'ok'),
+    this.inventario.alertas().map((insumo) => this.fila(insumo)),
   );
 
-  readonly visibles = computed<FilaInventario[]>(() => {
-    const filtro = this.filtro();
-    const termino = this.busqueda().trim().toLowerCase();
-    return this.filas().filter((fila) => {
-      const coincideFiltro =
-        filtro === 'todos' ||
-        (filtro === 'bajo' && fila.estado !== 'ok') ||
-        (filtro === 'critico' && fila.estado === 'critico');
-      const coincideTexto =
-        !termino ||
-        fila.nombre.toLowerCase().includes(termino) ||
-        fila.categoria.toLowerCase().includes(termino);
-      return coincideFiltro && coincideTexto;
-    });
-  });
+  readonly visibles = computed<FilaInventario[]>(() => this.filas());
 
   readonly valorRiesgo = computed<number>(() =>
     round2(this.alertas().reduce((suma, fila) => suma + fila.stock * fila.costo, 0)),
   );
 
-  readonly subtitulo = computed(
-    () =>
-      `${this.conteos().todos} insumos · ${this.alertas().length} bajo mínimo · actualizado 17:40`,
-  );
+  readonly subtitulo = computed(() => {
+    const conteos = this.conteos();
+    return `${conteos.todos} insumos · ${conteos.alertas} bajo mínimo`;
+  });
 
   constructor() {
-    void this.inventario.cargar();
+    const params = this.route.snapshot.queryParamMap;
+    const estado = params.get('estado');
+    this.filtro.set(estado === 'bajo' || estado === 'critico' ? estado : 'todos');
+    this.busqueda.set(params.get('q') ?? '');
+    this.pagina.set(Math.max(1, Number(params.get('page')) || 1));
+    const limite = Number(params.get('limit'));
+    this.limite.set(LIMITES.includes(limite) ? limite : 20);
+
+    void this.cargar();
+
+    this.destroyRef.onDestroy(() => {
+      if (this.buscarTimer !== null) {
+        window.clearTimeout(this.buscarTimer);
+      }
+    });
   }
 
   cambiarFiltro(filtro: FiltroInventario): void {
+    if (this.filtro() === filtro) {
+      return;
+    }
     this.filtro.set(filtro);
+    this.pagina.set(1);
+    void this.cargar();
   }
 
   onBuscar(event: Event): void {
     this.busqueda.set((event.target as HTMLInputElement).value);
+    if (this.buscarTimer !== null) {
+      window.clearTimeout(this.buscarTimer);
+    }
+    this.buscarTimer = window.setTimeout(() => {
+      this.pagina.set(1);
+      void this.cargar();
+    }, 350);
+  }
+
+  cambiarPagina(page: number): void {
+    this.pagina.set(page);
+    void this.cargar();
+  }
+
+  cambiarLimite(limit: number): void {
+    this.limite.set(limit);
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  recargar(): void {
+    void this.cargar();
   }
 
   cantidad(valor: number, unidad: string): string {
@@ -139,6 +177,33 @@ export class InventarioPage {
       return 'warning';
     }
     return 'neutral';
+  }
+
+  private async cargar(): Promise<void> {
+    const ok = await this.inventario.cargar({
+      page: this.pagina(),
+      limit: this.limite(),
+      q: this.busqueda(),
+      estado: this.filtro() === 'todos' ? undefined : this.filtro(),
+    });
+    if (ok) {
+      this.pagina.set(this.inventario.meta().page);
+      this.limite.set(this.inventario.meta().limit);
+      this.sincronizarUrl();
+    }
+  }
+
+  private sincronizarUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        page: this.pagina() > 1 ? this.pagina() : null,
+        limit: this.limite() !== 20 ? this.limite() : null,
+        q: this.busqueda().trim() || null,
+        estado: this.filtro() === 'todos' ? null : this.filtro(),
+      },
+      replaceUrl: true,
+    });
   }
 
   private fila(insumo: Insumo): FilaInventario {

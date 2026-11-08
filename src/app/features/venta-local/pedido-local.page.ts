@@ -194,7 +194,7 @@ export class PedidoLocalPage {
     // para no mostrar stock simulado.
     const tareas: Promise<boolean>[] = [];
     if (this.inventario.insumos().length === 0 || USE_API) {
-      tareas.push(this.inventario.cargar());
+      tareas.push(this.inventario.cargar({ limit: 100 }));
     }
     if (this.fichas.platos().length === 0) {
       tareas.push(this.fichas.cargar());

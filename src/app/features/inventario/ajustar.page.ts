@@ -222,7 +222,7 @@ export class InventarioAjustarPage {
   }
 
   private async inicializar(): Promise<void> {
-    await this.inventario.cargar();
+    await this.inventario.cargar({ limit: 100 });
     const lista = this.inventario.insumos();
     const actual = lista.find((insumo) => insumo.id === this.insumoId());
     const inicial =
