@@ -1,0 +1,90 @@
+<app-shell title="Historial de pedidos" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/comandas">
+      <app-icon name="clipboard-text" [size]="14" />
+      Comandas activas
+    </a>
+  </div>
+
+  <div class="toolbar">
+    <label class="campo">
+      <span>Desde</span>
+      <input type="date" [value]="desde()" (change)="cambiarDesde($event)" />
+    </label>
+    <label class="campo">
+      <span>Hasta</span>
+      <input type="date" [value]="hasta()" (change)="cambiarHasta($event)" />
+    </label>
+    <label class="campo">
+      <span>Estado</span>
+      <select [value]="estado()" (change)="cambiarEstado($event)">
+        @for (item of estados; track item) {
+          <option [value]="item">{{ item === 'todos' ? 'Todos' : item }}</option>
+        }
+      </select>
+    </label>
+    <label class="campo">
+      <span>Canal</span>
+      <select [value]="canal()" (change)="cambiarCanal($event)">
+        @for (item of canales; track item.valor) {
+          <option [value]="item.valor">{{ item.texto }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" class="limpiar" (click)="limpiar()">Limpiar</button>
+  </div>
+
+  @if (error()) {
+    <div class="historial-error" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
+  <app-panel class="panel">
+    <div class="panel__inner">
+      <div class="grid grid--head">
+        <span>NÚMERO</span>
+        <span>FECHA</span>
+        <span>CANAL</span>
+        <span>MESA</span>
+        <span>ESTADO</span>
+        <span>ÍTEMS</span>
+        <span>TOTAL</span>
+      </div>
+
+      <div class="rows">
+        @for (pedido of filas(); track pedido.id) {
+          <div class="grid row">
+            <span class="numero">{{ pedido.numero }}</span>
+            <span>{{ hora(pedido) }}</span>
+            <span>{{ canalTexto(pedido.canal) }}</span>
+            <span>{{ mesa(pedido) }}</span>
+            <span>
+              <app-chip [variant]="estadoTono(pedido.estado)">{{ estadoTexto(pedido.estado) }}</app-chip>
+            </span>
+            <span>{{ pedido.items.length }}</span>
+            <span class="total">{{ moneda(pedido.total) }}</span>
+          </div>
+        } @empty {
+          <div class="rows__empty">
+            <app-empty-state
+              icon="clipboard-text"
+              title="Sin pedidos"
+              description="No hay pedidos para el rango y filtros seleccionados."
+            />
+          </div>
+        }
+      </div>
+
+      <app-paginador
+        [page]="pagina()"
+        [pages]="meta()?.pages ?? 0"
+        [total]="meta()?.total ?? 0"
+        [limit]="limite()"
+        (pageChange)="cambiarPagina($event)"
+        (limitChange)="cambiarLimite($event)"
+      />
+    </div>
+  </app-panel>
+</app-shell>

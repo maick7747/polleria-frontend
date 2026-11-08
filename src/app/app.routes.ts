@@ -79,6 +79,17 @@ export const routes: Routes = [
   },
 
   {
+    path: 'historial-pedidos',
+    title: "Historial de pedidos · Fratelli's",
+    canActivate: [roleGuard],
+    data: { roles: roles('Mozo', 'Cajero', 'Dueño/Admin', 'Admin') },
+    loadComponent: () =>
+      import('./features/historial-pedidos/historial-pedidos.page').then(
+        (m) => m.HistorialPedidosPage,
+      ),
+  },
+
+  {
     path: 'delivery-propio',
     title: "Delivery Propio · Fratelli's",
     canActivate: [roleGuard],
