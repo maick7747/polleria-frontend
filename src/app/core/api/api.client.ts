@@ -5,6 +5,7 @@ import {
   HttpParams,
 } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
+import { Router } from '@angular/router';
 import { Observable, TimeoutError, throwError } from 'rxjs';
 import { catchError, timeout } from 'rxjs/operators';
 import { API_BASE_URL, SESSION_STORAGE_KEY, USE_API } from './api.config';
@@ -25,6 +26,8 @@ export type QueryValue = string | number | boolean | null | undefined;
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private redirigiendo = false;
 
   readonly baseUrl = API_BASE_URL;
   readonly habilitado = USE_API;
@@ -130,6 +133,29 @@ export class ApiClient {
           : httpError.message || 'No se pudo completar la solicitud.';
     const details = payload && Array.isArray(payload.details) ? payload.details : [];
     const apiError: ApiError = { status, code, message, details };
+    if (status === 401 && !this.esLogin(httpError.url)) {
+      this.cerrarSesionExpirada();
+    }
     return throwError(() => apiError);
+  }
+
+  private esLogin(url: string | null | undefined): boolean {
+    return typeof url === 'string' && url.includes('/auth/login');
+  }
+
+  private cerrarSesionExpirada(): void {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('fratelli:sesion-expirada'));
+    }
+    if (this.redirigiendo || this.router.url.startsWith('/login')) {
+      return;
+    }
+    this.redirigiendo = true;
+    void this.router.navigateByUrl('/login').finally(() => {
+      this.redirigiendo = false;
+    });
   }
 }

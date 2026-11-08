@@ -46,6 +46,12 @@ export class AuthService {
   private readonly api = inject(ApiClient);
   private readonly sesion = signal<Sesion | null>(this.hidratar());
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('fratelli:sesion-expirada', () => this.sesion.set(null));
+    }
+  }
+
   readonly usuario = computed<Usuario | null>(() => this.sesion()?.usuario ?? null);
   readonly roles = computed<readonly RolNombre[]>(() => this.usuario()?.roles ?? []);
   readonly permisos = computed<readonly string[]>(() => this.usuario()?.permisos ?? []);
