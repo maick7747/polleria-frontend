@@ -214,11 +214,30 @@
             <strong>{{ dineroAbierto() }}</strong>
           </div>
 
-          <button type="button" class="cobrar" (click)="cobrar()">
-            <app-icon name="cash-register" [size]="16" />
-            Cobrar
-          </button>
-          <p class="resumen__note">Un solo comprobante · sin split · SUNAT simulado.</p>
+          @if (sel.rondas === 0) {
+            <button
+              type="button"
+              class="liberar"
+              [disabled]="liberando()"
+              (click)="liberar()"
+            >
+              <app-icon name="trash" [size]="15" />
+              {{ liberando() ? 'Liberando…' : 'Liberar mesa (sin pedidos)' }}
+            </button>
+            <p class="resumen__note">
+              Esta cuenta no tiene pedidos. Puedes liberar la mesa sin cobrar.
+            </p>
+          } @else {
+            <button type="button" class="cobrar" (click)="cobrar()">
+              <app-icon name="cash-register" [size]="16" />
+              Cobrar
+            </button>
+            <p class="resumen__note">Un solo comprobante · sin split · SUNAT simulado.</p>
+          }
+
+          @if (aviso()) {
+            <p class="resumen__error">{{ aviso() }}</p>
+          }
         </div>
       } @else {
         <app-empty-state

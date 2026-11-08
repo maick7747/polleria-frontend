@@ -186,17 +186,11 @@ export class VentaLocalPage {
     }
   }
 
-  // Doble click (o botón "Tomar pedido"): abre cuenta si hace falta y navega.
+  // Doble click (o botón "Tomar pedido"): navega sin crear la cuenta.
+  // La cuenta es perezosa y se crea al enviar la primera ronda.
   async abrirPedido(mesa: Mesa): Promise<void> {
     this.seleccionadaId.set(mesa.id);
-    try {
-      if (!this.cuentas.cuentaDeMesa(mesa.id)) {
-        await this.cuentas.abrirCuenta(mesa.id, this.auth.usuario()?.id ?? 3);
-      }
-      await this.router.navigate(['/venta-local/pedido', mesa.id]);
-    } catch {
-      this.seleccionadaId.set(mesa.id);
-    }
+    await this.router.navigate(['/venta-local/pedido', mesa.id]);
   }
 
   async irAPedido(): Promise<void> {

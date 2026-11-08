@@ -125,8 +125,15 @@ export class PedidoLocalPage {
     round2((this.cuenta()?.total ?? 0) + this.totalRonda()),
   );
 
-  readonly clienteNombre = computed(() => this.cuenta()?.cliente?.nombre ?? 'Sin datos');
-  readonly clienteAccion = computed(() => (this.cuenta()?.cliente ? 'Editar' : 'Agregar'));
+  readonly clientePendiente = computed(
+    () => this.cuentas.clientePendiente(this.mesaId) ?? null,
+  );
+  readonly clienteNombre = computed(
+    () => this.cuenta()?.cliente?.nombre ?? this.clientePendiente()?.nombre ?? 'Sin datos',
+  );
+  readonly clienteAccion = computed(
+    () => ((this.cuenta()?.cliente ?? this.clientePendiente()) ? 'Editar' : 'Agregar'),
+  );
   readonly puedeEnviar = computed(() => this.items().length > 0);
 
   readonly stockBajoTexto = computed(() => {
@@ -158,13 +165,8 @@ export class PedidoLocalPage {
       void this.router.navigate(['/venta-local']);
       return;
     }
-    if (!this.cuentas.cuentaDeMesa(this.mesaId)) {
-      try {
-        await this.cuentas.abrirCuenta(this.mesaId, this.usuarioId);
-      } catch (error) {
-        this.avisar(mensajeError(error));
-      }
-    }
+    // Cuenta perezosa: no se crea aquí. Se crea al enviar la primera ronda,
+    // así "Tomar pedido" por error no deja una mesa ocupada.
     const primeraCategoria = this.categorias()[0];
     if (primeraCategoria) {
       this.categoriaActiva.set(primeraCategoria);
@@ -249,9 +251,9 @@ export class PedidoLocalPage {
   }
 
   async enviar(): Promise<void> {
-    const cuenta = this.cuenta();
+    let cuenta = this.cuenta();
     const items = this.items();
-    if (!cuenta || items.length === 0 || this.toast()) {
+    if (items.length === 0 || this.toast()) {
       return;
     }
     const notas = this.observacion().trim();
@@ -260,6 +262,14 @@ export class PedidoLocalPage {
       notas: notas ? notas : undefined,
     }));
     try {
+      // La cuenta se crea recién aquí (al enviar la primera ronda).
+      if (!cuenta) {
+        cuenta = await this.cuentas.abrirCuenta(this.mesaId, this.usuarioId);
+        if (!cuenta) {
+          this.avisar('No se pudo abrir la cuenta.');
+          return;
+        }
+      }
       const ronda = await this.cuentas.agregarRonda(cuenta.id, conNotas);
       if (!ronda) {
         this.avisar('No se pudo enviar la ronda.');

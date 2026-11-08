@@ -593,6 +593,40 @@
   filter: brightness(1.08);
 }
 
+.liberar {
+  height: 52px;
+  flex: 0 0 52px;
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 107, 112, 0.55);
+  border-radius: 14px;
+  background: transparent;
+  color: #ff8a8f;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background var(--dur) var(--ease);
+}
+
+.liberar:hover:not(:disabled) {
+  background: rgba(255, 107, 112, 0.12);
+}
+
+.liberar:disabled {
+  opacity: 0.6;
+}
+
+.resumen__error {
+  padding-top: 8px;
+  text-align: center;
+  font-size: 11px;
+  color: #ff8a8f;
+}
+
 .resumen__note {
   padding-top: 10px;
   text-align: center;

@@ -95,10 +95,9 @@ export class DatosClientePage {
       void this.router.navigate(['/venta-local']);
       return;
     }
-    if (!this.cuentas.cuentaDeMesa(this.mesaId)) {
-      void this.cuentas.abrirCuenta(this.mesaId, this.usuarioId);
-    }
-    const cliente = this.cuenta()?.cliente;
+    // Cuenta perezosa: no se crea aquí. El cliente se guarda como pendiente
+    // y se aplica cuando la cuenta se cree al enviar la primera ronda.
+    const cliente = this.cuenta()?.cliente ?? this.cuentas.clientePendiente(this.mesaId);
     if (cliente) {
       this.tipo.set(cliente.tipoDocumento);
       this.numero.set(cliente.numeroDocumento);
@@ -163,11 +162,6 @@ export class DatosClientePage {
   }
 
   guardar(): void {
-    const cuenta = this.cuenta();
-    if (!cuenta) {
-      void this.router.navigate(['/venta-local']);
-      return;
-    }
     const largo = this.tipo() === 'DNI' ? 8 : 11;
     if (this.numero().length !== largo) {
       this.estado.set('error');
@@ -187,7 +181,12 @@ export class DatosClientePage {
       telefono: this.telefono().trim() || undefined,
       correo: this.correo().trim() || undefined,
     };
-    this.cuentas.guardarCliente(cuenta.id, cliente);
+    const cuenta = this.cuenta();
+    if (cuenta) {
+      this.cuentas.guardarCliente(cuenta.id, cliente);
+    } else {
+      this.cuentas.guardarClientePendiente(this.mesaId, cliente);
+    }
     void this.router.navigate(['/venta-local/pedido', this.mesaId]);
   }
 

@@ -32,6 +32,9 @@ export class CuentasService {
   private secuencia = 100;
   private secuenciaRonda = 100;
 
+  // Cliente capturado antes de que exista la cuenta (cuenta perezosa).
+  private readonly clientesPendientes = new Map<number, DatosCliente>();
+
   readonly cargando = signal<boolean>(false);
 
   readonly cuentas = signal<Cuenta[]>(
@@ -112,6 +115,14 @@ export class CuentasService {
     return actualizada;
   }
 
+  clientePendiente(mesaId: number): DatosCliente | undefined {
+    return this.clientesPendientes.get(mesaId);
+  }
+
+  guardarClientePendiente(mesaId: number, cliente: DatosCliente): void {
+    this.clientesPendientes.set(mesaId, cliente);
+  }
+
   async abrirCuenta(mesaId: number, usuarioId: number): Promise<Cuenta | null> {
     const existente = this.cuentaDeMesa(mesaId);
     if (existente) {
@@ -124,6 +135,11 @@ export class CuentasService {
           this.api.post<CuentaDto>('/cuentas', { mesa_id: mesaId }),
         );
         const cuenta = toCuenta(dto);
+        const pendiente = this.clientesPendientes.get(mesaId);
+        if (pendiente) {
+          cuenta.cliente = pendiente;
+          this.clientesPendientes.delete(mesaId);
+        }
         this.upsert(cuenta);
         this.mesas.cambiarEstado(mesaId, 'ocupada');
         return cuenta;
@@ -239,6 +255,35 @@ export class CuentasService {
     );
   }
 
+  // Libera una cuenta creada por error. Solo se permite si no tiene rondas.
+  async cancelarCuenta(cuentaId: number): Promise<boolean> {
+    const cuenta = this.porId(cuentaId);
+    if (!cuenta || cuenta.estado !== 'abierta' || cuenta.rondas.length > 0) {
+      return false;
+    }
+
+    if (USE_API) {
+      try {
+        await firstValueFrom(
+          this.api.post(`/cuentas/${cuentaId}/cancelar`, {
+            motivo: 'Cuenta vacía sin pedidos',
+          }),
+        );
+        this.cuentas.update((lista) => lista.filter((actual) => actual.id !== cuentaId));
+        this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+        return true;
+      } catch (error) {
+        if (!esFalloRed(error)) {
+          throw error;
+        }
+      }
+    }
+
+    this.cuentas.update((lista) => lista.filter((actual) => actual.id !== cuentaId));
+    this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+    return true;
+  }
+
   private upsert(cuenta: Cuenta): void {
     this.cuentas.update((lista) => {
       const existe = lista.some((actual) => actual.id === cuenta.id);
@@ -263,7 +308,9 @@ export class CuentasService {
       usuarioAperturaId: usuarioId,
       comprobanteTipo: 'boleta',
       rondas: [],
+      cliente: this.clientesPendientes.get(mesaId),
     };
+    this.clientesPendientes.delete(mesaId);
     this.cuentas.update((lista) => [cuenta, ...lista]);
     this.mesas.cambiarEstado(mesaId, 'ocupada');
     return cuenta;

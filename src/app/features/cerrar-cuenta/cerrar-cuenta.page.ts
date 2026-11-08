@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { mensajeError } from '../../core/api/api.helpers';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MOCK_USUARIOS } from '../../core/data/mock-data';
 import type { Cuenta } from '../../core/models';
@@ -68,6 +69,8 @@ export class CerrarCuentaPage {
   readonly hora = formatearHora;
   readonly filtro = signal<FiltroCuentas>('todas');
   readonly seleccionadaId = signal<number | null>(null);
+  readonly liberando = signal(false);
+  readonly aviso = signal('');
 
   readonly vistas = computed<CuentaVista[]>(() => {
     const lista = this.cuentas
@@ -139,6 +142,28 @@ export class CerrarCuentaPage {
       return;
     }
     void this.router.navigate(['/cerrar-cuenta', seleccionada.cuenta.id]);
+  }
+
+  // Libera la mesa cuando la cuenta se creó por error y todavía no tiene pedidos.
+  async liberar(): Promise<void> {
+    const seleccionada = this.seleccionada();
+    if (!seleccionada || seleccionada.rondas > 0 || this.liberando()) {
+      return;
+    }
+    this.liberando.set(true);
+    this.aviso.set('');
+    try {
+      const liberada = await this.cuentas.cancelarCuenta(seleccionada.cuenta.id);
+      if (liberada) {
+        this.limpiarSeleccion();
+      } else {
+        this.aviso.set('No se pudo liberar la mesa.');
+      }
+    } catch (error) {
+      this.aviso.set(mensajeError(error));
+    } finally {
+      this.liberando.set(false);
+    }
   }
 
   private vista(cuenta: Cuenta): CuentaVista {
