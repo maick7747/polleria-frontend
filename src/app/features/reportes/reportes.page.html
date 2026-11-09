@@ -162,26 +162,43 @@
         </div>
 
         <span class="exportar__label exportar__label--formato">Formato</span>
-        <div class="formatos">
-          <button
-            type="button"
-            class="formato"
-            [class.is-active]="formato() === 'PDF'"
-            (click)="exportar('PDF')"
-          >
-            <app-icon name="download" [size]="15" />
-            PDF
-          </button>
-          <button
-            type="button"
-            class="formato"
-            [class.is-active]="formato() === 'Excel'"
-            (click)="exportar('Excel')"
-          >
-            <app-icon name="download" [size]="15" />
-            Excel
-          </button>
-        </div>
+        @if (!usaApi) {
+          <p class="aviso-exportacion">
+            <app-icon name="warning-circle" [size]="14" />
+            Exportación disponible con el servidor
+          </p>
+        } @else {
+          <span class="exportar__hint">Descarga directa del archivo del servidor</span>
+          <div class="formatos">
+            <button
+              type="button"
+              class="formato"
+              [disabled]="descargando() !== null"
+              [class.is-active]="descargando() === 'pdf'"
+              (click)="descargar('pdf')"
+            >
+              <app-icon name="download" [size]="15" />
+              {{ descargando() === 'pdf' ? 'Generando…' : 'PDF' }}
+            </button>
+            <button
+              type="button"
+              class="formato"
+              [disabled]="descargando() !== null"
+              [class.is-active]="descargando() === 'xlsx'"
+              (click)="descargar('xlsx')"
+            >
+              <app-icon name="download" [size]="15" />
+              {{ descargando() === 'xlsx' ? 'Generando…' : 'Excel' }}
+            </button>
+          </div>
+
+          @if (errorDescarga()) {
+            <div class="error-descarga" role="alert">
+              <span>{{ errorDescarga() }}</span>
+              <button type="button" (click)="reintentarDescarga()">Reintentar</button>
+            </div>
+          }
+        }
 
         <span class="dark-sep"></span>
 
@@ -207,11 +224,9 @@
           <strong>{{ generados() }} reportes</strong>
         </div>
 
-        <button type="button" class="btn-brand" (click)="generar()">
-          <app-icon name="download" [size]="15" />
-          Generar y descargar
-        </button>
-        <span class="exportar__foot">El archivo queda en el historial del turno</span>
+        <span class="exportar__foot">
+          El archivo se descarga al instante · {{ tipoActual().nombre }}
+        </span>
       </div>
     </app-dark-panel>
   </div>

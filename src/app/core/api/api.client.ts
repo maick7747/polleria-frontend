@@ -7,8 +7,8 @@ import {
 } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, of, TimeoutError, throwError } from 'rxjs';
-import { catchError, map, timeout } from 'rxjs/operators';
+import { from, Observable, of, TimeoutError, throwError } from 'rxjs';
+import { catchError, map, mergeMap, timeout } from 'rxjs/operators';
 import { API_BASE_URL, SESSION_STORAGE_KEY, USE_API } from './api.config';
 
 // Cold start de Render: el backend puede tardar ~60 s en despertar. Damos 45 s
@@ -136,6 +136,26 @@ export class ApiClient {
     return query ? `${url}?${query}` : url;
   }
 
+  /**
+   * GET binario (PDF/XLSX). El cuerpo llega como `Blob`; si el servidor
+   * responde con un error JSON, el cuerpo del error también es `Blob`, así que
+   * se lee como texto para conservar el mensaje del backend.
+   */
+  getBlob(path: string, query?: Record<string, QueryValue>): Observable<Blob> {
+    return this.http
+      .get(this.url(path), {
+        headers: this.headersBinarios(),
+        params: this.params(query),
+        responseType: 'blob',
+      })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        catchError((error: unknown) =>
+          error instanceof TimeoutError ? this.fail(error) : this.failBlob(error),
+        ),
+      );
+  }
+
   post<T>(path: string, body: unknown = {}): Observable<T> {
     return this.http
       .post<T>(this.url(path), body, { headers: this.headers() })
@@ -167,6 +187,18 @@ export class ApiClient {
 
   private headers(): HttpHeaders {
     let headers = new HttpHeaders({ Accept: 'application/json' });
+    const token = this.token();
+    if (token) {
+      headers = headers.set('Authorization', `Bearer ${token}`);
+    }
+    return headers;
+  }
+
+  private headersBinarios(): HttpHeaders {
+    let headers = new HttpHeaders({
+      Accept:
+        'application/pdf, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream',
+    });
     const token = this.token();
     if (token) {
       headers = headers.set('Authorization', `Bearer ${token}`);
@@ -215,6 +247,37 @@ export class ApiClient {
     }
 
     const httpError = error as Partial<HttpErrorResponse>;
+    return throwError(() => this.apiErrorDe(httpError));
+  }
+
+  // Igual que fail(), pero con cuerpo `Blob`: lo lee como texto para no perder
+  // el mensaje JSON del backend.
+  private failBlob(error: unknown): Observable<never> {
+    const httpError = error as Partial<HttpErrorResponse>;
+    const cuerpo = httpError.error;
+    if (typeof Blob !== 'undefined' && cuerpo instanceof Blob) {
+      return from(cuerpo.text()).pipe(
+        catchError(() => of('')),
+        map((texto) => this.apiErrorDe({ ...httpError, error: this.parsearCuerpo(texto) })),
+        mergeMap((apiError) => throwError(() => apiError)),
+      );
+    }
+    return this.fail(error);
+  }
+
+  private parsearCuerpo(texto: string): unknown {
+    const limpio = texto.trim();
+    if (!limpio) {
+      return null;
+    }
+    try {
+      return JSON.parse(limpio) as unknown;
+    } catch {
+      return { error: { message: limpio.slice(0, 300) } };
+    }
+  }
+
+  private apiErrorDe(httpError: Partial<HttpErrorResponse>): ApiError {
     const status = typeof httpError.status === 'number' ? httpError.status : 0;
     const cuerpo = httpError.error as
       | { error?: { code?: unknown; message?: unknown; details?: unknown } }
@@ -234,7 +297,7 @@ export class ApiClient {
     if (status === 401 && !this.esLogin(httpError.url)) {
       this.cerrarSesionExpirada();
     }
-    return throwError(() => apiError);
+    return apiError;
   }
 
   private esLogin(url: string | null | undefined): boolean {

@@ -244,6 +244,13 @@ export class CuadreService {
     }
   }
 
+  async descargarPdf(id: number): Promise<Blob> {
+    if (!USE_API) {
+      throw new Error('Exportación disponible con el servidor.');
+    }
+    return firstValueFrom(this.api.getBlob(`/cuadre-caja/${id}/pdf`));
+  }
+
   private aplicar(dto: CuadreDto): void {
     this.cuadreId.set(dto.id);
     this.abierta.set(dto.estado === 'abierta');

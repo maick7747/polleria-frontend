@@ -12,6 +12,19 @@
       <app-icon name="printer" [size]="15" />
       Imprimir arqueo
     </button>
+    @if (!usaApi) {
+      <span class="aviso-exportacion">Exportación disponible con el servidor</span>
+    } @else if (cuadreId() !== null) {
+      <button
+        type="button"
+        class="ghost-link"
+        [disabled]="pdfGenerando() !== null"
+        (click)="descargarPdfDia()"
+      >
+        <app-icon name="download" [size]="15" />
+        {{ pdfGenerando() === cuadreId() ? 'Generando…' : 'PDF del turno' }}
+      </button>
+    }
   </div>
 
   <nav class="tabs" aria-label="Secciones de cuadre de caja">
@@ -302,6 +315,7 @@
               <span class="right">ESPERADO</span>
               <span class="right">CONTADO</span>
               <span class="right">DIFERENCIA</span>
+              <span class="right">PDF</span>
             </div>
 
             @for (fila of historial(); track fila.id) {
@@ -323,6 +337,18 @@
                   <app-chip [variant]="diferenciaTono(fila)">
                     {{ fila.diferencia === null ? 'Sin cierre' : moneda(fila.diferencia) }}
                   </app-chip>
+                </span>
+                <span class="right">
+                  <button
+                    type="button"
+                    class="pdf-row"
+                    [disabled]="!usaApi || pdfGenerando() !== null"
+                    [title]="usaApi ? 'Descargar el cuadre en PDF' : 'Exportación disponible con el servidor'"
+                    (click)="descargarPdfFila(fila)"
+                  >
+                    <app-icon name="download" [size]="12" />
+                    {{ pdfGenerando() === fila.id ? '…' : 'PDF' }}
+                  </button>
                 </span>
               </div>
             } @empty {

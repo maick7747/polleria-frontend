@@ -3,7 +3,7 @@ import { firstValueFrom } from 'rxjs';
 import type { KpiResumen, Reporte } from '../models';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
-import { esApiError, mensajeError } from '../api/api.helpers';
+import { mensajeError } from '../api/api.helpers';
 import type { ReportesTiposDto } from '../api/api.types';
 import {
   limitacionReporte,
@@ -20,12 +20,7 @@ export interface ReporteFiltros {
   canal?: string;
 }
 
-export type ResultadoExportacion = 'ok' | 'no-implementado' | 'error';
-
-export interface ExportacionReporte {
-  estado: ResultadoExportacion;
-  mensaje: string;
-}
+export type FormatoDescarga = 'xlsx' | 'pdf';
 
 @Injectable({ providedIn: 'root' })
 export class ReportesService {
@@ -106,40 +101,21 @@ export class ReportesService {
     }
   }
 
-  async exportar(
+  async descargar(
     tipo: ReporteTipoId,
     filtros: ReporteFiltros,
-    formato: string,
-  ): Promise<ExportacionReporte> {
+    formato: FormatoDescarga,
+  ): Promise<Blob> {
     if (!USE_API) {
-      return {
-        estado: 'ok',
-        mensaje: `Exportando ${tipo} · ${formato} (simulado)`,
-      };
+      throw new Error('Exportación disponible con el servidor.');
     }
-
-    try {
-      await firstValueFrom(
-        this.api.get<unknown>(`/reportes/${tipo}/export`, {
-          desde: filtros.desde || undefined,
-          hasta: filtros.hasta || undefined,
-          formato,
-        }),
-      );
-      return {
-        estado: 'ok',
-        mensaje: `Exportación ${formato} solicitada al servidor.`,
-      };
-    } catch (error) {
-      if (esApiError(error) && error.status === 501) {
-        return {
-          estado: 'no-implementado',
-          mensaje:
-            'La exportación PDF/Excel todavía no está disponible en el servidor (501). Los datos siguen visibles en pantalla.',
-        };
-      }
-      return { estado: 'error', mensaje: mensajeError(error) };
-    }
+    return firstValueFrom(
+      this.api.getBlob(`/reportes/${tipo}/export`, {
+        formato,
+        desde: filtros.desde || undefined,
+        hasta: filtros.hasta || undefined,
+      }),
+    );
   }
 
   recargar(): Promise<boolean> {

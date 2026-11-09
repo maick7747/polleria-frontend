@@ -13,6 +13,7 @@ import { mensajeError } from '../../core/api/api.helpers';
 import { CuadreService, type CuadreHistorialFila } from '../../core/data/cuadre.service';
 import { PagosService } from '../../core/data/pagos.service';
 import type { MetodoPago } from '../../core/models';
+import { descargarBlob } from '../../core/utils/descarga';
 import { abreviarNombre, formatearMoneda, round2 } from '../../core/utils/format';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -85,8 +86,10 @@ export class CuadrePage {
   private toastTimer: number | null = null;
 
   readonly moneda = formatearMoneda;
+  readonly usaApi = USE_API;
 
   readonly abierta = this.cuadre.abierta;
+  readonly cuadreId = this.cuadre.cuadreId;
   readonly fondoInicial = this.cuadre.fondoInicial;
   readonly totalVentas = this.cuadre.totalVentas;
   readonly totalEgresos = this.cuadre.totalEgresos;
@@ -95,6 +98,7 @@ export class CuadrePage {
   readonly efectivoContado = signal<number>(0);
   readonly pagosDigitales = signal<number>(0);
   readonly confirmando = signal<boolean>(false);
+  readonly pdfGenerando = signal<number | null>(null);
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
 
@@ -252,6 +256,38 @@ export class CuadrePage {
 
   imprimir(): void {
     this.avisar('Arqueo enviado a impresión · simulado');
+  }
+
+  async descargarPdfDia(): Promise<void> {
+    const id = this.cuadreId();
+    if (id === null) {
+      return;
+    }
+    await this.descargarPdf(id, this.cuadre.fechaApertura().slice(0, 10));
+  }
+
+  async descargarPdfFila(fila: CuadreHistorialFila): Promise<void> {
+    await this.descargarPdf(fila.id, fila.fecha);
+  }
+
+  private async descargarPdf(id: number, fecha: string): Promise<void> {
+    if (!USE_API) {
+      this.avisar('Exportación disponible con el servidor', true);
+      return;
+    }
+    if (this.pdfGenerando() !== null) {
+      return;
+    }
+    this.pdfGenerando.set(id);
+    try {
+      const blob = await this.cuadre.descargarPdf(id);
+      descargarBlob(blob, `cuadre-${fecha || 'sin-fecha'}.pdf`);
+      this.avisar('PDF del cuadre descargado');
+    } catch (error) {
+      this.avisar(mensajeError(error), true);
+    } finally {
+      this.pdfGenerando.set(null);
+    }
   }
 
   async cerrar(): Promise<void> {

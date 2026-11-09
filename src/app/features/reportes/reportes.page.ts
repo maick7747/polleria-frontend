@@ -7,14 +7,17 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ReportesService } from '../../core/data/reportes.service';
+import { mensajeError } from '../../core/api/api.helpers';
+import {
+  ReportesService,
+  type FormatoDescarga,
+} from '../../core/data/reportes.service';
 import type { ReporteTipoId, ReporteVista } from '../../core/api/api.mappers';
+import { descargarBlob } from '../../core/utils/descarga';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
-
-type FormatoExportacion = 'PDF' | 'Excel';
 
 interface TipoReporte {
   id: ReporteTipoId;
@@ -269,13 +272,15 @@ export class ReportesPage {
   private readonly destroyRef = inject(DestroyRef);
 
   private toastTimer: number | null = null;
+  private ultimoFormato: FormatoDescarga = 'xlsx';
 
   readonly usaApi = this.reportes.usaApi;
 
   readonly seleccion = signal<ReporteTipoId>('ventas');
-  readonly formato = signal<FormatoExportacion>('Excel');
   readonly fechaDesde = signal<string>(HACE_SIETE);
   readonly fechaHasta = signal<string>(HOY);
+  readonly descargando = signal<FormatoDescarga | null>(null);
+  readonly errorDescarga = signal<string>('');
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
 
@@ -394,20 +399,42 @@ export class ReportesPage {
     void this.consultar();
   }
 
-  exportar(formato: FormatoExportacion): void {
-    this.formato.set(formato);
+  async descargar(formato: FormatoDescarga): Promise<void> {
+    if (!this.usaApi) {
+      this.errorDescarga.set('Exportación disponible con el servidor.');
+      return;
+    }
+    if (this.descargando() !== null) {
+      return;
+    }
+
+    this.descargando.set(formato);
+    this.errorDescarga.set('');
+    this.ultimoFormato = formato;
+    try {
+      const blob = await this.reportes.descargar(
+        this.seleccion(),
+        this.filtros(),
+        formato,
+      );
+      descargarBlob(blob, this.nombreArchivo(formato));
+      this.avisar(`Descarga ${formato === 'pdf' ? 'PDF' : 'Excel'} lista`);
+    } catch (error) {
+      this.errorDescarga.set(mensajeError(error));
+    } finally {
+      this.descargando.set(null);
+    }
   }
 
-  async generar(): Promise<void> {
-    const resultado = await this.reportes.exportar(
-      this.seleccion(),
-      this.filtros(),
-      this.formato(),
-    );
-    this.avisar(
-      resultado.mensaje || `Solicitud de exportación ${this.formato()} enviada.`,
-      resultado.estado === 'error',
-    );
+  reintentarDescarga(): void {
+    const formato = this.descargando() ?? this.ultimoFormato;
+    void this.descargar(formato);
+  }
+
+  private nombreArchivo(formato: FormatoDescarga): string {
+    const desde = this.fechaDesde() || 'inicio';
+    const hasta = this.fechaHasta() || 'hoy';
+    return `reporte-${this.seleccion()}-${desde}-${hasta}.${formato}`;
   }
 
   private async inicializar(): Promise<void> {
@@ -416,6 +443,7 @@ export class ReportesPage {
   }
 
   private async consultar(): Promise<void> {
+    this.errorDescarga.set('');
     const ok = await this.reportes.consultar(this.seleccion(), this.filtros());
     if (ok) {
       this.sincronizarUrl();
