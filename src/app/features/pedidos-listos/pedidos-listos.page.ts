@@ -13,7 +13,7 @@ import type { PedidoListoDto } from '../../core/api/api.types';
 import { CocinaService } from '../../core/data/cocina.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
 import { RealtimeService } from '../../core/data/realtime.service';
-import { hora as formatearHora } from '../../core/utils/format';
+import { hora as formatearHora, turnoActual } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
@@ -92,7 +92,7 @@ export class PedidosListosPage {
 
   readonly subtitulo = computed<string>(() => {
     const total = this.total();
-    return `Aviso de cocina al mozo · turno tarde · ${total} ${
+    return `Aviso de cocina al mozo · ${turnoActual()} · ${total} ${
       total === 1 ? 'pedido esperando entrega' : 'pedidos esperando entrega'
     }`;
   });

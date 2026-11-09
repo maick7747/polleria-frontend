@@ -14,7 +14,14 @@ import { CuadreService, type CuadreHistorialFila } from '../../core/data/cuadre.
 import { PagosService } from '../../core/data/pagos.service';
 import type { MetodoPago } from '../../core/models';
 import { descargarBlob } from '../../core/utils/descarga';
-import { abreviarNombre, formatearMoneda, hora as formatearHora, round2 } from '../../core/utils/format';
+import {
+  abreviarNombre,
+  fechaCorta,
+  formatearMoneda,
+  hora as formatearHora,
+  round2,
+  turnoActual,
+} from '../../core/utils/format';
 import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -88,6 +95,13 @@ export class CuadrePage {
 
   readonly moneda = formatearMoneda;
   readonly usaApi = USE_API;
+
+  // Fecha y turno reales (antes estaban fijos en "miércoles 14 de octubre").
+  readonly turno = turnoActual();
+  readonly aperturaHora = computed<string>(() => formatearHora(this.cuadre.fechaApertura()));
+  readonly subtituloCuadre =
+    `Fratelli's · ${fechaCorta()} · ${turnoActual()} · cajero ` +
+    abreviarNombre(this.auth.usuario()?.nombre ?? 'Cajero');
 
   readonly abierta = this.cuadre.abierta;
   readonly estado = this.cuadre.estado;

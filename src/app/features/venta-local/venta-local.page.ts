@@ -97,6 +97,7 @@ export class VentaLocalPage {
   readonly cuentasAbiertas = this.cuentas.abiertas;
   readonly totalAbierto = this.cuentas.totalAbierto;
   readonly moneda = formatearMoneda;
+  readonly turno = turnoActual();
   readonly hora = formatearHora;
 
   readonly tarjetas = computed<MesaVista[]>(() => {

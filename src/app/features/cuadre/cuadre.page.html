@@ -1,10 +1,10 @@
 <app-shell
   title="Cuadre de caja"
-  subtitle="Fratelli's · miércoles 14 de octubre · turno tarde · cajero Maick V."
+  subtitle="{{ subtituloCuadre }}"
 >
   <div actions class="header-actions">
     @if (abierta()) {
-      <app-chip variant="success" [dot]="true">Caja abierta · 11:00</app-chip>
+      <app-chip variant="success" [dot]="true">Caja abierta · {{ aperturaHora() }}</app-chip>
     } @else {
       <app-chip variant="neutral" [dot]="true">Caja cerrada</app-chip>
     }
@@ -69,7 +69,7 @@
       <span class="paso__meta">en curso</span>
     </div>
     <span class="stepper__meta">
-      Turno tarde · 11:00 – 22:00 · umbral de diferencia S/ 0.00
+      {{ turno }} · 11:00 – 22:00 · umbral de diferencia S/ 0.00
     </span>
   </div>
 
@@ -89,7 +89,7 @@
               <span class="bar"></span>
               <h2>Arqueo del turno</h2>
             </div>
-            <span class="pill">Turno tarde</span>
+            <span class="pill">{{ turno }}</span>
           </header>
 
           <span class="hairline"></span>
@@ -191,7 +191,7 @@
           <span class="hairline"></span>
 
           <footer class="arqueo__foot">
-            <span>Conteo verificado por {{ responsable() }} · 18:02</span>
+            <span>Conteo verificado por {{ responsable() }}</span>
             <span>{{ totalCobros() }} cobros del turno · 1 comprobante por cuenta</span>
           </footer>
         </div>

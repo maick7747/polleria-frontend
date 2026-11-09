@@ -9,7 +9,15 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { InventarioService } from '../../core/data/inventario.service';
-import { abreviarNombre, formatearMoneda, round2, round3 } from '../../core/utils/format';
+import {
+  abreviarNombre,
+  fechaCorta,
+  formatearMoneda,
+  horaActual,
+  round2,
+  round3,
+  turnoActual,
+} from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
 import { PanelComponent } from '../../shared/components/panel/panel';
@@ -75,8 +83,10 @@ export class InventarioVerificarPage {
   });
 
   readonly subtitulo = computed(
-    () => `Conteo físico · turno tarde · ${this.filas().length} insumos en revisión`,
+    () => `Conteo físico · ${turnoActual()} · ${this.filas().length} insumos en revisión`,
   );
+
+  readonly selloTiempo = `${horaActual()} · ${fechaCorta()}`;
 
   readonly resumen = computed(() => {
     const filas = this.filas();

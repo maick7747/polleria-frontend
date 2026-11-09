@@ -20,6 +20,7 @@ import {
   hora as formatearHora,
   minutosEntre,
   round2,
+  turnoActual,
 } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -74,6 +75,7 @@ export class CerrarCuentaPage {
 
   readonly umbral = UMBRAL_DEMORA;
   readonly moneda = formatearMoneda;
+  readonly turno = turnoActual();
   readonly hora = formatearHora;
   readonly filtro = signal<FiltroCuentas>('todas');
   readonly seleccionadaId = signal<number | null>(null);

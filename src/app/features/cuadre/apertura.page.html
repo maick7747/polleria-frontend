@@ -1,4 +1,4 @@
-<app-shell title="Apertura de caja" [subtitle]="'Cuadre de caja · miércoles 14 de octubre · turno tarde'">
+<app-shell title="Apertura de caja" [subtitle]="subtitulo">
   <div actions class="header-actions">
     @if (abierta()) {
       <app-chip variant="success" [dot]="true">Caja abierta</app-chip>
@@ -33,7 +33,7 @@
             <span class="bar"></span>
             <h2>Datos del turno</h2>
           </div>
-          <span class="panel-meta">Caja 01 · turno tarde</span>
+          <span class="panel-meta">Caja 01 · {{ turno }}</span>
         </header>
 
         <div class="turno-layout">

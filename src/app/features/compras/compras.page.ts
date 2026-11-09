@@ -14,7 +14,7 @@ import {
   type EstadoSugerencia,
   type OrdenCompra,
 } from '../../core/data/compras.service';
-import { formatearMoneda, formatearNumero } from '../../core/utils/format';
+import { formatearMoneda, formatearNumero, turnoActual } from '../../core/utils/format';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -74,6 +74,7 @@ export class ComprasPage {
 
   readonly estados = ESTADOS;
   readonly usaApi = this.compras.usaApi;
+  readonly turno = turnoActual();
 
   readonly sugerencias = this.compras.sugerencias;
   readonly ordenes = this.compras.ordenes;

@@ -17,6 +17,7 @@ import {
   hora as formatearHora,
   minutosEntre,
   round2,
+  turnoActual,
 } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -64,6 +65,7 @@ export class CuentaDetallePage {
   readonly cuentaId = Number(this.route.snapshot.paramMap.get('cuentaId'));
   readonly metodos = METODOS;
   readonly moneda = formatearMoneda;
+  readonly turno = turnoActual();
 
   readonly cuenta = computed(() => this.cuentas.porId(this.cuentaId) ?? null);
   readonly metodo = signal<MetodoPago>('efectivo');

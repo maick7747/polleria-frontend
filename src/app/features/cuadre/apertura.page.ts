@@ -10,7 +10,7 @@ import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { mensajeError } from '../../core/api/api.helpers';
 import { CuadreService } from '../../core/data/cuadre.service';
-import { abreviarNombre, formatearMoneda, round2 } from '../../core/utils/format';
+import { abreviarNombre, fechaCorta, formatearMoneda, round2, turnoActual } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
@@ -53,9 +53,15 @@ export class AperturaCajaPage {
   private temporizador: number | null = null;
 
   readonly moneda = formatearMoneda;
-  readonly fecha = '14/10/2026';
-  readonly turno = 'Tarde · 11:00 - 22:00';
-  readonly fechaLarga = 'Miércoles 14 de octubre';
+  readonly fecha = new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'America/Lima',
+  }).format(new Date());
+  readonly turno = turnoActual();
+  readonly fechaLarga = fechaCorta();
+  readonly subtitulo = `Cuadre de caja · ${this.fechaLarga} · ${this.turno}`;
 
   readonly abierta = this.cuadre.abierta;
 

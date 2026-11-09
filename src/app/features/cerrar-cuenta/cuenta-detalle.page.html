@@ -1,8 +1,8 @@
-<app-shell [title]="titulo()" [subtitle]="subtitulo()">
+﻿<app-shell [title]="titulo()" [subtitle]="subtitulo()">
   <div actions class="header-actions">
     <span class="caja">
       <span class="caja__dot"></span>
-      Caja abierta · turno tarde
+      Caja abierta · {{ turno }}
     </span>
     <a class="ghost-link" routerLink="/cerrar-cuenta">
       <app-icon name="arrow-left" [size]="14" />

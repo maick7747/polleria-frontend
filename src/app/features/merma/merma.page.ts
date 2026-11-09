@@ -13,7 +13,7 @@ import { InventarioService } from '../../core/data/inventario.service';
 import { MermaService, type MermaQuery, type TipoMerma } from '../../core/data/merma.service';
 import { MOCK_USUARIOS } from '../../core/data/mock-data';
 import type { ClasificacionMerma, EstadoMerma, Merma } from '../../core/models';
-import { abreviarNombre, formatearMoneda, round2 } from '../../core/utils/format';
+import { abreviarNombre, formatearMoneda, round2, turnoActual } from '../../core/utils/format';
 import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -140,7 +140,7 @@ export class MermaPage {
 
   readonly subtitulo = computed<string>(
     () =>
-      `Fratelli's · turno tarde · ${this.merma.registrosHoy()} registros hoy · ${formatearMoneda(this.merma.costoHoy())} acumulado`,
+      `Fratelli's · ${turnoActual()} · ${this.merma.registrosHoy()} registros hoy · ${formatearMoneda(this.merma.costoHoy())} acumulado`,
   );
 
   readonly recientesMeta = computed<string>(
