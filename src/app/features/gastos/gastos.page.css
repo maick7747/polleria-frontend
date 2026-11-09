@@ -52,6 +52,99 @@
   color: var(--c-brand-text);
 }
 
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-danger-soft);
+  border-radius: 10px;
+  background: var(--c-danger-soft);
+  color: var(--c-brand-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.error-banner button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filtros {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.filtro-campo {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.filtro-campo select,
+.filtro-campo input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  background: var(--c-white);
+  color: var(--c-text);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+}
+
+.buscador {
+  height: 34px;
+  min-width: 190px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  background: var(--c-white);
+  color: var(--c-text-3);
+}
+
+.buscador input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--c-text);
+  font-family: var(--font-body);
+  font-size: 12.5px;
+}
+
+.cargando {
+  font-size: 11.5px;
+  color: var(--c-text-3);
+  padding-bottom: 9px;
+}
+
+app-paginador {
+  display: block;
+  padding-top: 8px;
+}
+
 .cuerpo {
   height: 500px;
   flex: 0 0 500px;

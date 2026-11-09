@@ -10,6 +10,13 @@
     </button>
   </div>
 
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="recargar()">Reintentar</button>
+    </div>
+  }
+
   <div class="cuerpo">
     <app-panel class="panel">
       <div class="panel__inner">
@@ -163,6 +170,39 @@
   <section class="recientes">
     <app-section-header title="Gastos recientes" [meta]="recientesMeta()" />
 
+    <div class="filtros">
+      <label class="filtro-campo">
+        <span>Categoría</span>
+        <select [value]="categoriaFiltro()" (change)="onCategoriaFiltro($event)">
+          <option value="todas">Todas</option>
+          @for (c of categorias; track c.id) {
+            <option [value]="c.id">{{ c.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="filtro-campo">
+        <span>Desde</span>
+        <input type="date" [value]="desde()" (change)="onDesde($event)" />
+      </label>
+      <label class="filtro-campo">
+        <span>Hasta</span>
+        <input type="date" [value]="hasta()" (change)="onHasta($event)" />
+      </label>
+      <label class="buscador">
+        <app-icon name="magnifying-glass" [size]="14" />
+        <input
+          type="search"
+          placeholder="Buscar gasto"
+          aria-label="Buscar gasto"
+          [value]="busqueda()"
+          (input)="onBuscar($event)"
+        />
+      </label>
+      @if (cargando()) {
+        <span class="cargando">Cargando…</span>
+      }
+    </div>
+
     <div class="tabla">
       <div class="tabla__head">
         <span>FECHA</span>
@@ -191,11 +231,20 @@
           <app-empty-state
             icon="money"
             title="Sin gastos"
-            description="No hay gastos registrados en el turno."
+            description="No hay gastos que coincidan con los filtros o la búsqueda."
           />
         </div>
       }
     </div>
+
+    <app-paginador
+      [page]="pagina()"
+      [pages]="meta().pages"
+      [total]="meta().total"
+      [limit]="limite()"
+      (pageChange)="cambiarPagina($event)"
+      (limitChange)="cambiarLimite($event)"
+    />
   </section>
 
   <div class="pie">

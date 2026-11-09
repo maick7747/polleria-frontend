@@ -76,6 +76,8 @@ export interface Gasto {
   descuentaCajaChica: boolean;
   comprobanteUrl?: string;
   usuarioId: number;
+  creadoEn?: string;
+  registradoPor?: string;
 }
 
 export interface Mantenimiento {

@@ -325,6 +325,108 @@ export interface DashboardDto {
   top_platillos: DashboardTopPlatilloDto[];
 }
 
+export interface ProveedorDto {
+  id: number;
+  ruc: string;
+  razon_social: string;
+  contacto_nombre: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  email: string | null;
+  activo: boolean;
+}
+
+export type EstadoCompraDto = 'ordenada' | 'recibida' | 'cancelada';
+
+export interface CompraDetalleDto {
+  id: number;
+  compra_id: number;
+  insumo_id: number;
+  cantidad: number;
+  precio_unitario: number;
+  subtotal: number;
+  insumo: string;
+  unidad_medida: string;
+}
+
+export interface PagoCompraDto {
+  id: number;
+  compra_id: number;
+  metodo: string;
+  monto: number;
+  observacion: string | null;
+  fecha?: string;
+  usuario_id?: number;
+}
+
+export interface CompraDto {
+  id: number;
+  proveedor_id: number;
+  fecha: string;
+  estado: EstadoCompraDto;
+  total: number;
+  usuario_id: number;
+  notas: string | null;
+  fecha_recepcion: string | null;
+  creado_en: string;
+  motivo_cancelacion: string | null;
+  fecha_cancelacion: string | null;
+  proveedor: { id: number; ruc: string; razon_social: string } | null;
+  items: number;
+  detalles?: CompraDetalleDto[];
+  pagos?: PagoCompraDto[];
+}
+
+export interface SugerenciaCompraDto {
+  insumo_id: number;
+  codigo: string;
+  nombre: string;
+  unidad_medida: string;
+  stock_actual: number;
+  stock_minimo: number;
+  cantidad_sugerida: number;
+  costo_promedio: number;
+}
+
+export interface SugerenciaMetaDto {
+  total: number;
+  generado_en: string;
+  criterio: string;
+}
+
+export interface SugerenciaResponseDto {
+  data: SugerenciaCompraDto[];
+  meta: SugerenciaMetaDto;
+}
+
+export interface GastoDto {
+  id: number;
+  fecha: string;
+  categoria: string;
+  descripcion: string;
+  monto: number;
+  metodo_pago: string;
+  descuenta_caja_chica: boolean;
+  comprobante_url: string | null;
+  usuario_id: number;
+  creado_en: string;
+  registrado_por: string | null;
+}
+
+export interface GastoResumenCategoriaDto {
+  categoria: string;
+  registros: number;
+  total: number;
+}
+
+export interface GastoResumenDto {
+  desde: string;
+  hasta: string;
+  total: number;
+  registros: number;
+  por_categoria: GastoResumenCategoriaDto[];
+}
+
 export interface IngredientePlatoDto {
   insumo_id: number;
   insumo?: string | null;

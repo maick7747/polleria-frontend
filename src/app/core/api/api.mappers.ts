@@ -1,5 +1,6 @@
 import type {
   CanalPedido,
+  CategoriaGasto,
   CategoriaInsumo,
   CategoriaPlatillo,
   ComprobanteTipo,
@@ -9,6 +10,7 @@ import type {
   EstadoPago,
   EstadoPedido,
   EstadoPreparacion,
+  Gasto,
   Insumo,
   Mesa,
   MetodoPago,
@@ -22,8 +24,17 @@ import type {
   UnidadMedida,
 } from '../models';
 import type {
+  EntradaCompra,
+  EstadoOrden,
+  EstadoSugerencia,
+  OrdenCompra,
+  SugerenciaCompra,
+} from '../data/compras.service';
+import type {
+  CompraDto,
   CuentaDto,
   DetallePedidoDto,
+  GastoDto,
   InsumoDto,
   KdsPedidoDto,
   MesaDto,
@@ -31,6 +42,7 @@ import type {
   PagoDto,
   PedidoDto,
   PlatoDto,
+  SugerenciaCompraDto,
 } from './api.types';
 
 const METODOS: readonly MetodoPago[] = ['efectivo', 'tarjeta', 'yape', 'plin', 'transferencia'];
@@ -297,6 +309,111 @@ export function toMovimiento(dto: MovimientoDto): MovimientoStock {
     usuarioId: dto.usuario_id,
     observacion: dto.observacion ?? '',
     fecha: dto.fecha,
+  };
+}
+
+const CATEGORIAS_GASTO: readonly CategoriaGasto[] = [
+  'servicios_basicos',
+  'alquiler',
+  'mantenimiento',
+  'personal',
+  'transporte',
+  'limpieza',
+  'impuestos',
+  'otros',
+];
+
+const fechaCorta = (fecha: string | null | undefined): string => {
+  if (!fecha) {
+    return '—';
+  }
+  const limpia = fecha.slice(0, 10);
+  return limpia.length === 10
+    ? `${limpia.slice(8, 10)}/${limpia.slice(5, 7)}/${limpia.slice(0, 4)}`
+    : limpia;
+};
+
+function toEstadoOrden(estado: string): EstadoOrden {
+  if (estado === 'recibida') {
+    return 'recibida';
+  }
+  if (estado === 'cancelada') {
+    return 'cancelada';
+  }
+  return 'enviada';
+}
+
+export function toCompra(dto: CompraDto): OrdenCompra {
+  const estado = toEstadoOrden(dto.estado);
+  return {
+    id: dto.id,
+    codigo: `OC-${String(dto.id).padStart(4, '0')}`,
+    proveedor: dto.proveedor?.razon_social ?? '—',
+    proveedorId: dto.proveedor_id ?? dto.proveedor?.id ?? null,
+    fecha: (dto.fecha ?? '').slice(0, 10),
+    entrega:
+      estado === 'recibida'
+        ? `Recibida ${fechaCorta(dto.fecha_recepcion)}`
+        : estado === 'cancelada'
+          ? 'Cancelada'
+          : 'Entrega pendiente',
+    condicion: dto.notas?.trim() || '—',
+    estado,
+    items: Number(dto.items ?? dto.detalles?.length ?? 0),
+    total: Number(dto.total ?? 0),
+    notas: dto.notas ?? undefined,
+    fechaRecepcion: dto.fecha_recepcion ?? null,
+    motivoCancelacion: dto.motivo_cancelacion ?? null,
+  };
+}
+
+export function toEntrada(dto: CompraDto): EntradaCompra {
+  return {
+    id: dto.id,
+    codigo: `E-${String(dto.id).padStart(4, '0')}`,
+    proveedor: dto.proveedor?.razon_social ?? '—',
+    fecha: (dto.fecha_recepcion ?? dto.fecha ?? '').slice(0, 10),
+    items: Number(dto.items ?? dto.detalles?.length ?? 0),
+    total: Number(dto.total ?? 0),
+  };
+}
+
+export function toSugerencia(dto: SugerenciaCompraDto): SugerenciaCompra {
+  const minimo = Number(dto.stock_minimo ?? 0);
+  const actual = Number(dto.stock_actual ?? 0);
+  const ratio = minimo > 0 ? actual / minimo : 1;
+  const estado: EstadoSugerencia = ratio <= 0.6 ? 'critico' : ratio <= 1 ? 'bajo' : 'ok';
+  return {
+    id: dto.insumo_id,
+    insumoId: dto.insumo_id,
+    nombre: dto.nombre,
+    // El endpoint de sugerencia no expone al proveedor por insumo.
+    proveedor: '—',
+    proveedorId: null,
+    categoria: dto.codigo,
+    unidad: dto.unidad_medida,
+    stock: actual,
+    stockMinimo: minimo,
+    sugerido: Number(dto.cantidad_sugerida ?? 0),
+    precioUnitario: Number(dto.costo_promedio ?? 0),
+    estado,
+    seleccionada: true,
+  };
+}
+
+export function toGasto(dto: GastoDto): Gasto {
+  return {
+    id: dto.id,
+    fecha: (dto.fecha ?? '').slice(0, 10),
+    categoria: CATEGORIAS_GASTO.find((valor) => valor === dto.categoria) ?? 'otros',
+    descripcion: dto.descripcion,
+    monto: Number(dto.monto ?? 0),
+    metodoPago: METODOS.find((valor) => valor === dto.metodo_pago) ?? 'efectivo',
+    descuentaCajaChica: Boolean(dto.descuenta_caja_chica),
+    comprobanteUrl: dto.comprobante_url ?? undefined,
+    usuarioId: dto.usuario_id,
+    creadoEn: dto.creado_en,
+    registradoPor: dto.registrado_por ?? undefined,
   };
 }
 
