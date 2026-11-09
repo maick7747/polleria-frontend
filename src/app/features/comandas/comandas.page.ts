@@ -12,6 +12,7 @@ import { PagosService } from '../../core/data/pagos.service';
 import { PedidosService } from '../../core/data/pedidos.service';
 import type { Pedido } from '../../core/models';
 import { formatearMoneda, formatearNumero, minutosEntre } from '../../core/utils/format';
+import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -72,13 +73,35 @@ export class ComandasPage {
   readonly error = this.pedidos.error;
 
   constructor() {
-    const reloj = setInterval(() => this.ahora.set(Date.now()), 30000);
-    this.destroyRef.onDestroy(() => clearInterval(reloj));
+    const reloj = window.setInterval(() => this.ahora.set(Date.now()), 30000);
+    iniciarRefresco({
+      intervaloMs: 15000,
+      destroyRef: this.destroyRef,
+      alVolverVisible: false,
+      tarea: async () => {
+        await this.pagos.cargar(undefined, true);
+      },
+    });
+    document.addEventListener('visibilitychange', this.alCambiarVisibilidad);
+    this.destroyRef.onDestroy(() => {
+      window.clearInterval(reloj);
+      document.removeEventListener('visibilitychange', this.alCambiarVisibilidad);
+    });
     void this.cargar();
   }
 
+  private readonly alCambiarVisibilidad = (): void => {
+    if (document.visibilityState === 'visible') {
+      void this.cargar();
+    }
+  };
+
   private async cargar(): Promise<void> {
-    await Promise.all([this.pedidos.cargarKds(), this.cuentas.cargar()]);
+    await Promise.all([
+      this.pedidos.cargarKds(),
+      this.cuentas.cargar(),
+      this.pagos.cargar(),
+    ]);
   }
 
   reintentar(): void {

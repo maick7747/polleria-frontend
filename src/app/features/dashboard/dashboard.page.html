@@ -35,8 +35,13 @@
           />
         </svg>
         <div class="donut__center">
-          <strong>{{ porcentajeMeta() }}%</strong>
-          <span>de la meta</span>
+          @if (tieneMeta()) {
+            <strong>{{ porcentajeMeta() }}%</strong>
+            <span>de la meta</span>
+          } @else {
+            <strong>—</strong>
+            <span>sin meta</span>
+          }
         </div>
       </div>
 
@@ -48,13 +53,17 @@
           <span class="sales__cur">S/</span>
           <span class="sales__big">{{ ventas() }}</span>
         </div>
-        <div class="sales__delta">
-          <app-chip variant="success">+{{ kpis().deltaPct }}%</app-chip>
-          <span class="sales__note">vs ayer</span>
-        </div>
-        <p class="sales__meta">
-          Meta S/ {{ meta() }} · Faltan <strong>S/ {{ faltante() }}</strong>
-        </p>
+        @if (deltaPct() !== null) {
+          <div class="sales__delta">
+            <app-chip [variant]="deltaTono()">{{ deltaTexto() }}</app-chip>
+            <span class="sales__note">vs ayer</span>
+          </div>
+        }
+        @if (tieneMeta()) {
+          <p class="sales__meta">
+            Meta S/ {{ meta() }} · Faltan <strong>S/ {{ faltante() }}</strong>
+          </p>
+        }
       </div>
 
       <div class="hero__grow"></div>
@@ -91,7 +100,7 @@
   <section class="tops">
     <app-section-header
       title="Más vendidos hoy"
-      [meta]="'actualizado ' + actualizado() + ' · 5 de ' + kpis().totalPlatosCarta + ' platos'"
+      [meta]="'actualizado ' + actualizado() + ' · ' + kpis().topPlatos.length + ' de ' + kpis().totalPlatosCarta + ' platos'"
     />
     <div class="tops__grid">
       @for (plato of kpis().topPlatos; track plato.nombre; let i = $index) {
@@ -116,7 +125,7 @@
       }
     </div>
     <div class="tops__foot">
-      <span>Ingresos S/ {{ ventas() }} · 5 de {{ kpis().pedidosTop }} pedidos</span>
+      <span>Ingresos S/ {{ ventas() }} · {{ kpis().topPlatos.length }} de {{ kpis().pedidosTop }} pedidos</span>
     </div>
   </section>
 
@@ -157,8 +166,8 @@
             <circle
               [attr.cx]="punto.x"
               [attr.cy]="punto.y"
-              [attr.r]="$index === 5 ? 6 : 4"
-              [attr.fill]="$index === 5 ? '#e8262c' : '#ffffff'"
+              [attr.r]="$index === indiceHoy() ? 6 : 4"
+              [attr.fill]="$index === indiceHoy() ? '#e8262c' : '#ffffff'"
               stroke="#e8262c"
               stroke-width="1.5"
               vector-effect="non-scaling-stroke"
@@ -166,9 +175,12 @@
           }
         </svg>
       </div>
+      @if (kpis().serieSemana.length === 0) {
+        <p class="chart-empty">Sin ventas registradas esta semana.</p>
+      }
       <div class="chart-labels">
         @for (punto of kpis().serieSemana; track $index) {
-          <span [class.is-today]="$index === 5">{{ punto.dia }}</span>
+          <span [class.is-today]="$index === indiceHoy()">{{ punto.dia }}</span>
         }
       </div>
     </div>
@@ -180,7 +192,7 @@
             <span class="comandas__bar"></span>
             <h2>Comandas</h2>
           </div>
-          <span class="comandas__meta">4 de 8 abiertas</span>
+          <span class="comandas__meta">{{ comandas().length }} de {{ pedidosActivos() }} abiertas</span>
         </header>
 
         <div class="comandas__list">

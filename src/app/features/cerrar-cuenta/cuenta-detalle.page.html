@@ -131,7 +131,7 @@
         <div class="cobro__inner">
           <header class="cobro__head">
             <h2 class="cobro__title">Cobro</h2>
-            <span class="cobro__pill">{{ abierta() ? 'Cuenta única' : 'Cobrada' }}</span>
+            <span class="cobro__pill">{{ abierta() ? 'Cuenta única' : 'Solo lectura' }}</span>
           </header>
 
           <div class="cobro__total">
@@ -147,76 +147,89 @@
 
           <span class="cobro__grow"></span>
 
-          <span class="cobro__label">Método de pago</span>
-          <div class="metodos">
-            @for (m of metodos; track m.id) {
-              <button
-                type="button"
-                class="metodo"
-                [class.is-sel]="metodo() === m.id"
-                [attr.aria-pressed]="metodo() === m.id"
-                (click)="elegirMetodo(m.id)"
-              >
-                <app-icon [name]="m.icon" [size]="15" />
-                {{ m.label }}
-                @if (metodo() === m.id) {
-                  <app-icon name="check" [size]="13" />
-                }
-              </button>
-            }
-          </div>
-
-          <span class="cobro__grow"></span>
-
-          @if (metodo() === 'efectivo') {
-            <div class="caja-pago">
-              <div class="caja-pago__row">
-                <span>Efectivo recibido</span>
-                <span class="caja-pago__input">
-                  <span>S/</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputmode="decimal"
-                    aria-label="Efectivo recibido"
-                    [value]="recibido()"
-                    (input)="onRecibido($event)"
-                  />
-                </span>
-              </div>
-              <span class="caja-pago__sep"></span>
-              <div class="caja-pago__row">
-                <span>Vuelto</span>
-                <strong class="caja-pago__vuelto">{{ moneda(vuelto()) }}</strong>
-              </div>
-              @if (faltante() > 0) {
-                <span class="caja-pago__falta">Falta {{ moneda(faltante()) }}</span>
+          @if (abierta()) {
+            <span class="cobro__label">Método de pago</span>
+            <div class="metodos">
+              @for (m of metodos; track m.id) {
+                <button
+                  type="button"
+                  class="metodo"
+                  [class.is-sel]="metodo() === m.id"
+                  [attr.aria-pressed]="metodo() === m.id"
+                  (click)="elegirMetodo(m.id)"
+                >
+                  <app-icon [name]="m.icon" [size]="15" />
+                  {{ m.label }}
+                  @if (metodo() === m.id) {
+                    <app-icon name="check" [size]="13" />
+                  }
+                </button>
               }
             </div>
-          } @else {
-            <div class="caja-pago">
-              <div class="caja-pago__row">
-                <span>Monto a cobrar</span>
-                <strong>{{ moneda(total()) }}</strong>
+
+            <span class="cobro__grow"></span>
+
+            @if (metodo() === 'efectivo') {
+              <div class="caja-pago">
+                <div class="caja-pago__row">
+                  <span>Efectivo recibido</span>
+                  <span class="caja-pago__input">
+                    <span>S/</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputmode="decimal"
+                      aria-label="Efectivo recibido"
+                      [value]="recibido()"
+                      (input)="onRecibido($event)"
+                    />
+                  </span>
+                </div>
+                <span class="caja-pago__sep"></span>
+                <div class="caja-pago__row">
+                  <span>Vuelto</span>
+                  <strong class="caja-pago__vuelto">{{ moneda(vuelto()) }}</strong>
+                </div>
+                @if (faltante() > 0) {
+                  <span class="caja-pago__falta">Falta {{ moneda(faltante()) }}</span>
+                }
               </div>
-              <span class="caja-pago__sep"></span>
-              <span class="caja-pago__hint">Pago exacto con {{ metodo() }} · sin vuelto</span>
+            } @else {
+              <div class="caja-pago">
+                <div class="caja-pago__row">
+                  <span>Monto a cobrar</span>
+                  <strong>{{ moneda(total()) }}</strong>
+                </div>
+                <span class="caja-pago__sep"></span>
+                <span class="caja-pago__hint">Pago exacto con {{ metodo() }} · sin vuelto</span>
+              </div>
+            }
+
+            <span class="cobro__grow"></span>
+
+            <button
+              type="button"
+              class="pagar"
+              [disabled]="!puedeCobrar()"
+              (click)="registrarPago()"
+            >
+              <app-icon name="receipt" [size]="15" />
+              Registrar pago y emitir comprobante
+            </button>
+            <p class="cobro__note">Sin split · un solo comprobante. SUNAT simulado.</p>
+          } @else {
+            <div class="solo-lectura" role="status">
+              <app-icon name="receipt" [size]="18" />
+              <strong>{{ estadoEtiqueta() }}</strong>
+              <p>
+                Esta cuenta ya fue cerrada; su detalle se muestra solo para consulta y no admite
+                un segundo cobro.
+              </p>
             </div>
+            <span class="cobro__grow"></span>
+            <p class="cobro__note">Comprobante único · SUNAT simulado.</p>
           }
-
-          <span class="cobro__grow"></span>
-
-          <button
-            type="button"
-            class="pagar"
-            [disabled]="!puedeCobrar()"
-            (click)="registrarPago()"
-          >
-            <app-icon name="receipt" [size]="15" />
-            {{ abierta() ? 'Registrar pago y emitir comprobante' : 'Cuenta cobrada' }}
-          </button>
-          <p class="cobro__note">Sin split · un solo comprobante. SUNAT simulado.</p>
         </div>
       </app-dark-panel>
     </div>

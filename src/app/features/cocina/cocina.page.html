@@ -80,7 +80,7 @@
 
               <div class="card__items">
                 @for (item of comanda.items; track item.id) {
-                  <div class="item">
+                  <div class="item" [class.item--foco]="esItemFoco(item)">
                     <button
                       type="button"
                       class="check"
@@ -93,14 +93,23 @@
                         <app-icon name="check" [size]="8" />
                       }
                     </button>
-                    <app-icon name="flame" [size]="12" class="item__icon" />
-                    <span
-                      class="item__name"
-                      [class.item__name--done]="item.estadoPreparacion === 'listo'"
+                    <button
+                      type="button"
+                      class="item__focus-btn"
+                      [class.item__focus-btn--sel]="esItemFoco(item)"
+                      [attr.aria-pressed]="esItemFoco(item)"
+                      [attr.aria-label]="'Ver detalle de ' + item.nombre + ' en la comanda ' + comanda.etiqueta"
+                      (click)="seleccionarItem(comanda, item, $event)"
                     >
-                      {{ item.nombre }}
-                    </span>
-                    <span class="item__qty">×{{ item.cantidad }}</span>
+                      <app-icon name="flame" [size]="12" class="item__icon" />
+                      <span
+                        class="item__name"
+                        [class.item__name--done]="item.estadoPreparacion === 'listo'"
+                      >
+                        {{ item.nombre }}
+                      </span>
+                      <span class="item__qty">×{{ item.cantidad }}</span>
+                    </button>
                   </div>
                 }
               </div>

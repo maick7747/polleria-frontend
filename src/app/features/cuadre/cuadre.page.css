@@ -582,6 +582,11 @@
   color: var(--c-on-dark-3);
 }
 
+.reapertura-aviso{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--c-warning-soft);color:var(--c-warning);font-size:12px}
+.reapertura-form{display:flex;flex-direction:column;gap:8px}
+.reapertura-field{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#c9c9d2}
+.reapertura-field textarea{min-height:64px;padding:9px 11px;border:1px solid rgba(255,255,255,.16);border-radius:10px;background:rgba(255,255,255,.06);color:#fff;font:12.5px/1.4 var(--font-body)}
+
 .pie {
   flex: 0 0 24px;
   display: flex;

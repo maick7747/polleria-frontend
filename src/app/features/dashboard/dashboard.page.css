@@ -309,6 +309,12 @@
   color: var(--c-text-3);
 }
 
+.chart-empty {
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: var(--c-text-3);
+}
+
 .chart-labels span {
   flex: 1 1 0;
 }

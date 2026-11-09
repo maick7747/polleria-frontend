@@ -150,7 +150,7 @@ export class MermaService {
     }
   }
 
-  async cargar(opciones: MermaQuery = {}): Promise<boolean> {
+  async cargar(opciones: MermaQuery = {}, silencioso = false): Promise<boolean> {
     const page = Math.max(1, opciones.page ?? 1);
     const limit = opciones.limit ?? this.meta().limit;
 
@@ -168,8 +168,10 @@ export class MermaService {
       return this.cargarMock(this.ultimaConsulta);
     }
 
-    this.cargando.set(true);
-    this.error.set(null);
+    if (!silencioso) {
+      this.cargando.set(true);
+      this.error.set(null);
+    }
     try {
       const lista = await firstValueFrom(
         this.api.get<ApiList<MermaDto>>('/merma/mermas', {
@@ -191,12 +193,17 @@ export class MermaService {
         pages: lista.meta.pages ?? (limit > 0 ? Math.ceil(total / limit) : 0),
       });
       this.registrarNombres(lista.data);
+      this.error.set(null);
       return true;
     } catch (error) {
-      this.error.set(mensajeError(error));
+      if (!silencioso || this.mermas().length === 0) {
+        this.error.set(mensajeError(error));
+      }
       return false;
     } finally {
-      this.cargando.set(false);
+      if (!silencioso) {
+        this.cargando.set(false);
+      }
     }
   }
 

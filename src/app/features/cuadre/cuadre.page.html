@@ -8,6 +8,9 @@
     } @else {
       <app-chip variant="neutral" [dot]="true">Caja cerrada</app-chip>
     }
+    @if (reabiertoEn()) {
+      <app-chip variant="warning" [dot]="true">Caja reabierta</app-chip>
+    }
     <button type="button" class="ghost-link" (click)="imprimir()">
       <app-icon name="printer" [size]="15" />
       Imprimir arqueo
@@ -69,6 +72,13 @@
       Turno tarde · 11:00 – 22:00 · umbral de diferencia S/ 0.00
     </span>
   </div>
+
+  @if (reabiertaTexto()) {
+    <div class="reapertura-aviso" role="status">
+      <app-icon name="arrow-clockwise" [size]="13" />
+      <span>{{ reabiertaTexto() }}</span>
+    </div>
+  }
 
   <div class="board">
     <div class="board__left">
@@ -254,21 +264,72 @@
           <span>Cualquier diferencia distinta de S/ 0.00 genera una alerta al dueño.</span>
         </div>
 
-        @if (confirmando()) {
-          <button type="button" class="btn-brand" (click)="cerrar()">
-            <app-icon name="check" [size]="15" />
-            Confirmar cierre
-          </button>
-          <button type="button" class="btn-ghost-dark" (click)="cancelarCierre()">
-            Cancelar
-          </button>
-        } @else {
-          <button type="button" class="btn-brand" (click)="cerrar()">
+        @if (abierta()) {
+          @if (confirmando()) {
+            <button type="button" class="btn-brand" (click)="cerrar()">
+              <app-icon name="check" [size]="15" />
+              Confirmar cierre
+            </button>
+            <button type="button" class="btn-ghost-dark" (click)="cancelarCierre()">
+              Cancelar
+            </button>
+          } @else {
+            <button type="button" class="btn-brand" (click)="cerrar()">
+              <app-icon name="cash-register" [size]="15" />
+              Cerrar caja
+            </button>
+          }
+          <span class="diferencia__foot">
+            Al cerrar se archiva el turno; podrás reabrirlo con un motivo.
+          </span>
+        } @else if (estado() === 'cerrada') {
+          @if (mostrarReabrir()) {
+            <div class="reapertura-form">
+              <label class="reapertura-field">
+                <span>Motivo de reapertura</span>
+                <textarea
+                  rows="3"
+                  maxlength="300"
+                  [value]="motivoReaperturaInput()"
+                  (input)="onMotivo($event)"
+                  placeholder="Ej. Faltó registrar el pago de la mesa 3"
+                ></textarea>
+              </label>
+              @if (errorMotivo()) {
+                <span class="nota nota--bad" role="alert">{{ errorMotivo() }}</span>
+              }
+              <span class="diferencia__foot">
+                {{ motivoReaperturaInput().length }}/300 · mínimo 5 caracteres
+              </span>
+              <button
+                type="button"
+                class="btn-brand"
+                [disabled]="reabriendo()"
+                (click)="confirmarReabrir()"
+              >
+                <app-icon name="arrow-clockwise" [size]="15" />
+                {{ reabriendo() ? 'Reabriendo…' : 'Confirmar reapertura' }}
+              </button>
+              <button type="button" class="btn-ghost-dark" (click)="cancelarReabrir()">
+                Cancelar
+              </button>
+            </div>
+          } @else {
+            <button type="button" class="btn-brand" (click)="abrirReabrir()">
+              <app-icon name="arrow-clockwise" [size]="15" />
+              Reabrir caja
+            </button>
+            <span class="diferencia__foot">
+              La caja está cerrada. Reabrir requiere un motivo y queda registrado.
+            </span>
+          }
+        } @else if (estado() === 'sin_cuadre') {
+          <button type="button" class="btn-brand" (click)="irApertura()">
             <app-icon name="cash-register" [size]="15" />
-            Cerrar caja
+            Abrir caja
           </button>
+          <span class="diferencia__foot">Aún no hay una caja abierta para hoy.</span>
         }
-        <span class="diferencia__foot">Al cerrar se archiva el turno y no se puede reabrir</span>
       </div>
     </app-dark-panel>
   </div>

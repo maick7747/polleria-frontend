@@ -35,12 +35,14 @@
         <span>MOZO</span>
         <span>COMPROBANTE</span>
         <span>TOTAL</span>
+        <span>DETALLE</span>
       </div>
 
       <div class="rows">
         @if (cargando() && filas().length === 0) {
           @for (fila of esqueleto; track fila) {
             <div class="grid row row--skeleton">
+              <span></span>
               <span></span>
               <span></span>
               <span></span>
@@ -62,6 +64,16 @@
               <span>{{ cuenta.usuarioAperturaNombre ?? '—' }}</span>
               <span class="comprobante">{{ comprobante(cuenta) }}</span>
               <span class="total">{{ moneda(cuenta.total) }}</span>
+              <span>
+                <a
+                  class="ver-detalle"
+                  [routerLink]="['/cerrar-cuenta', cuenta.id]"
+                  [attr.aria-label]="'Ver detalle de la cuenta ' + cuenta.id + ' de ' + mesa(cuenta)"
+                >
+                  <app-icon name="arrow-right" [size]="13" />
+                  Ver detalle
+                </a>
+              </span>
             </div>
           } @empty {
             <div class="rows__empty">

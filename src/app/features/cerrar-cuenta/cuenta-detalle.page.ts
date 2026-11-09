@@ -119,18 +119,32 @@ export class CuentaDetallePage {
   readonly numeroMesa = computed<string>(() =>
     String(this.cuenta()?.mesaId ?? 0).padStart(2, '0'),
   );
-  readonly titulo = computed<string>(() => `Cerrar cuenta · Mesa ${this.numeroMesa()}`);
+  readonly titulo = computed<string>(() =>
+    this.abierta()
+      ? `Cerrar cuenta · Mesa ${this.numeroMesa()}`
+      : `Detalle de cuenta · Mesa ${this.numeroMesa()}`,
+  );
   readonly subtitulo = computed<string>(() => {
     const cuenta = this.cuenta();
     if (!cuenta) {
       return 'Cuenta no encontrada';
     }
-    const minutos = minutosEntre(cuenta.fechaApertura, AHORA);
     const mozo = abreviarNombre(cuenta.usuarioAperturaNombre ?? '');
+    if (cuenta.estado !== 'abierta') {
+      return `${this.estadoEtiqueta()} · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
+    }
+    const minutos = minutosEntre(cuenta.fechaApertura, AHORA);
     return `Abierta ${minutos} min · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
   });
 
   readonly abierta = computed<boolean>(() => this.cuenta()?.estado === 'abierta');
+  readonly estadoEtiqueta = computed<string>(() => {
+    switch (this.cuenta()?.estado) {
+      case 'cobrada': return 'Cuenta cobrada · solo lectura';
+      case 'cancelada': return 'Cuenta cancelada · solo lectura';
+      default: return 'Cuenta abierta';
+    }
+  });
   readonly total = computed<number>(() => this.cuenta()?.total ?? 0);
   readonly subtotal = computed<number>(() => round2(this.total() / 1.18));
   readonly igv = computed<number>(() => round2(this.total() - this.subtotal()));

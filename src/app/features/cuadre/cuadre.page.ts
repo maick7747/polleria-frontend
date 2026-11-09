@@ -14,7 +14,8 @@ import { CuadreService, type CuadreHistorialFila } from '../../core/data/cuadre.
 import { PagosService } from '../../core/data/pagos.service';
 import type { MetodoPago } from '../../core/models';
 import { descargarBlob } from '../../core/utils/descarga';
-import { abreviarNombre, formatearMoneda, round2 } from '../../core/utils/format';
+import { abreviarNombre, formatearMoneda, hora as formatearHora, round2 } from '../../core/utils/format';
+import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -89,6 +90,9 @@ export class CuadrePage {
   readonly usaApi = USE_API;
 
   readonly abierta = this.cuadre.abierta;
+  readonly estado = this.cuadre.estado;
+  readonly reabiertoEn = this.cuadre.reabiertoEn;
+  readonly motivoReapertura = this.cuadre.motivoReapertura;
   readonly cuadreId = this.cuadre.cuadreId;
   readonly fondoInicial = this.cuadre.fondoInicial;
   readonly totalVentas = this.cuadre.totalVentas;
@@ -101,6 +105,20 @@ export class CuadrePage {
   readonly pdfGenerando = signal<number | null>(null);
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
+
+  readonly mostrarReabrir = signal<boolean>(false);
+  readonly motivoReaperturaInput = signal<string>('');
+  readonly errorMotivo = signal<string>('');
+  readonly reabriendo = signal<boolean>(false);
+
+  readonly reabiertaTexto = computed<string>(() => {
+    const fecha = this.reabiertoEn();
+    if (!fecha) {
+      return '';
+    }
+    const motivo = this.motivoReapertura();
+    return motivo ? `Reabierta ${formatearHora(fecha)} · ${motivo}` : `Reabierta ${formatearHora(fecha)}`;
+  });
 
   readonly vista = signal<VistaCuadre>('dia');
   readonly histDesde = signal<string>(HIST_DESDE_INICIAL);
@@ -165,6 +183,12 @@ export class CuadrePage {
       void this.cargarHistorial();
     }
 
+    iniciarRefresco({
+      intervaloMs: 30000,
+      destroyRef: this.destroyRef,
+      tarea: () => this.refrescarSilencioso(),
+    });
+
     this.destroyRef.onDestroy(() => {
       if (this.temporizador !== null) {
         window.clearTimeout(this.temporizador);
@@ -226,20 +250,34 @@ export class CuadrePage {
     if (!ok) {
       this.avisar(this.cuadre.error() ?? 'No se pudo cargar el cuadre de caja.', true);
     }
+    // Pagos reales del turno: desglose por método y "N cobros" sin inventar.
+    await this.pagos.cargar(this.fechaDelCuadre());
     this.inicializarCampos();
   }
 
+  private fechaDelCuadre(): string | undefined {
+    if (this.cuadreId() === null) {
+      return undefined;
+    }
+    return this.cuadre.fechaApertura().slice(0, 10) || undefined;
+  }
+
+  /**
+   * Refresco silencioso: actualiza totales y desglose sin tocar los campos
+   * que el cajero está escribiendo (`efectivoContado`/`pagosDigitales`).
+   */
+  private async refrescarSilencioso(): Promise<void> {
+    await this.cuadre.cargar(true);
+    await this.pagos.cargar(this.fechaDelCuadre(), true);
+  }
+
   private inicializarCampos(): void {
+    // Sin datos guardados no se precarga nada: los campos arrancan en 0.
     const contadoGuardado = this.cuadre.efectivoContado();
     const digitalGuardado = this.cuadre.pagosDigitales();
-    const digitales = digitalGuardado > 0 ? digitalGuardado : 1000;
-    const contado =
-      contadoGuardado > 0
-        ? contadoGuardado
-        : round2(Math.max(0, this.cuadre.montoEsperado() - digitales));
 
-    this.pagosDigitales.set(digitales);
-    this.efectivoContado.set(contado);
+    this.pagosDigitales.set(digitalGuardado > 0 ? digitalGuardado : 0);
+    this.efectivoContado.set(contadoGuardado > 0 ? contadoGuardado : 0);
   }
 
   onEfectivo(event: Event): void {
@@ -322,6 +360,60 @@ export class CuadrePage {
 
   cancelarCierre(): void {
     this.confirmando.set(false);
+  }
+
+  irApertura(): void {
+    void this.router.navigate(['/cuadre-caja/apertura']);
+  }
+
+  abrirReabrir(): void {
+    this.mostrarReabrir.set(true);
+    this.motivoReaperturaInput.set('');
+    this.errorMotivo.set('');
+  }
+
+  cancelarReabrir(): void {
+    this.mostrarReabrir.set(false);
+    this.motivoReaperturaInput.set('');
+    this.errorMotivo.set('');
+  }
+
+  onMotivo(event: Event): void {
+    this.motivoReaperturaInput.set((event.target as HTMLTextAreaElement).value);
+    this.errorMotivo.set('');
+  }
+
+  async confirmarReabrir(): Promise<void> {
+    if (this.reabriendo()) {
+      return;
+    }
+    const motivo = this.motivoReaperturaInput().trim();
+    if (motivo.length < 5) {
+      this.errorMotivo.set('El motivo debe tener al menos 5 caracteres.');
+      return;
+    }
+    if (motivo.length > 300) {
+      this.errorMotivo.set('El motivo no puede superar los 300 caracteres.');
+      return;
+    }
+
+    this.reabriendo.set(true);
+    this.errorMotivo.set('');
+    try {
+      await this.cuadre.reabrir(motivo);
+      this.mostrarReabrir.set(false);
+      this.motivoReaperturaInput.set('');
+      // Recarga estado y avisos; los pagos se refrescan con la fecha real.
+      await this.cuadre.cargar();
+      await this.pagos.cargar(this.fechaDelCuadre());
+      this.inicializarCampos();
+      this.avisar('Caja reabierta · ' + motivo);
+    } catch (error) {
+      // 409/422 llegan con el mensaje del servidor (ApiError).
+      this.avisar(mensajeError(error), true);
+    } finally {
+      this.reabriendo.set(false);
+    }
   }
 
   private async cargarHistorial(): Promise<void> {

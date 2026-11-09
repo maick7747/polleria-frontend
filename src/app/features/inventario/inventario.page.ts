@@ -7,9 +7,10 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { InventarioService } from '../../core/data/inventario.service';
+import { InventarioService, type InventarioQuery } from '../../core/data/inventario.service';
 import type { Insumo } from '../../core/models';
 import { formatearMoneda, round2 } from '../../core/utils/format';
+import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -111,6 +112,12 @@ export class InventarioPage {
 
     void this.cargar();
 
+    iniciarRefresco({
+      intervaloMs: 45000,
+      destroyRef: this.destroyRef,
+      tarea: () => this.refrescarSilencioso(),
+    });
+
     this.destroyRef.onDestroy(() => {
       if (this.buscarTimer !== null) {
         window.clearTimeout(this.buscarTimer);
@@ -180,17 +187,29 @@ export class InventarioPage {
   }
 
   private async cargar(): Promise<void> {
-    const ok = await this.inventario.cargar({
-      page: this.pagina(),
-      limit: this.limite(),
-      q: this.busqueda(),
-      estado: this.filtro() === 'todos' ? undefined : this.filtro(),
-    });
+    const ok = await this.inventario.cargar(this.consultaLista());
     if (ok) {
       this.pagina.set(this.inventario.meta().page);
       this.limite.set(this.inventario.meta().limit);
       this.sincronizarUrl();
     }
+  }
+
+  private consultaLista(): InventarioQuery {
+    return {
+      page: this.pagina(),
+      limit: this.limite(),
+      q: this.busqueda(),
+      estado: this.filtro() === 'todos' ? undefined : this.filtro(),
+    };
+  }
+
+  /**
+   * Refresco silencioso con la misma página, filtro y búsqueda, sin URL ni
+   * spinner.
+   */
+  private async refrescarSilencioso(): Promise<void> {
+    await this.inventario.cargar(this.consultaLista(), true);
   }
 
   private sincronizarUrl(): void {

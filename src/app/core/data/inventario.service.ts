@@ -201,7 +201,7 @@ export class InventarioService {
     }
   }
 
-  async cargar(opciones: InventarioQuery = {}): Promise<boolean> {
+  async cargar(opciones: InventarioQuery = {}, silencioso = false): Promise<boolean> {
     if (!USE_API) {
       return false;
     }
@@ -210,8 +210,10 @@ export class InventarioService {
     const q = opciones.q?.trim() || undefined;
     const estado = opciones.estado || undefined;
 
-    this.cargando.set(true);
-    this.error.set(null);
+    if (!silencioso) {
+      this.cargando.set(true);
+      this.error.set(null);
+    }
     try {
       const [lista, alertas] = await Promise.all([
         firstValueFrom(
@@ -234,12 +236,17 @@ export class InventarioService {
         totalAlertas: lista.meta.total_alertas ?? alertas.data.length,
         valorInventario: lista.meta.valor_inventario ?? 0,
       });
+      this.error.set(null);
       return true;
     } catch (error) {
-      this.error.set(mensajeError(error));
+      if (!silencioso || this.insumos().length === 0) {
+        this.error.set(mensajeError(error));
+      }
       return false;
     } finally {
-      this.cargando.set(false);
+      if (!silencioso) {
+        this.cargando.set(false);
+      }
     }
   }
 

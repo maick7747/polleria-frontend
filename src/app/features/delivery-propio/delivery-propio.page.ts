@@ -13,8 +13,10 @@ import { ClientesService } from '../../core/data/clientes.service';
 import {
   COSTO_DELIVERY_PROPIO,
   DeliveryService,
+  type DeliveryPropioQuery,
 } from '../../core/data/delivery.service';
 import { formatearMoneda, hora, round2 } from '../../core/utils/format';
+import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -185,6 +187,12 @@ export class DeliveryPropioPage {
     }
 
     void this.cargar();
+
+    iniciarRefresco({
+      intervaloMs: 25000,
+      destroyRef: this.destroyRef,
+      tarea: () => this.refrescarSilencioso(),
+    });
 
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
@@ -467,13 +475,7 @@ export class DeliveryPropioPage {
   }
 
   private async cargar(): Promise<void> {
-    const ok = await this.delivery.cargarPropios({
-      page: this.pagina(),
-      limit: this.limite(),
-      estado: this.estado() === 'todos' ? undefined : this.estado(),
-      desde: this.desde() || undefined,
-      hasta: this.hasta() || undefined,
-    });
+    const ok = await this.delivery.cargarPropios(this.consultaLista());
     if (ok) {
       const meta = this.meta();
       this.pagina.set(meta.page);
@@ -482,6 +484,24 @@ export class DeliveryPropioPage {
       this.seleccionId.set(seleccion ? seleccion.id : null);
       this.sincronizarUrl();
     }
+  }
+
+  private consultaLista(): DeliveryPropioQuery {
+    return {
+      page: this.pagina(),
+      limit: this.limite(),
+      estado: this.estado() === 'todos' ? undefined : this.estado(),
+      desde: this.desde() || undefined,
+      hasta: this.hasta() || undefined,
+    };
+  }
+
+  /**
+   * Refresco silencioso: misma página y filtros, conserva la selección y el
+   * formulario de alta intactos.
+   */
+  private async refrescarSilencioso(): Promise<void> {
+    await this.delivery.cargarPropios(this.consultaLista(), true);
   }
 
   private sincronizarUrl(): void {

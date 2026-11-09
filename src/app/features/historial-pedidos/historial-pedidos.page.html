@@ -51,20 +51,97 @@
         <span>ESTADO</span>
         <span>ÍTEMS</span>
         <span>TOTAL</span>
+        <span class="sr-only">DETALLE</span>
       </div>
 
       <div class="rows">
         @for (pedido of filas(); track pedido.id) {
-          <div class="grid row">
-            <span class="numero">{{ pedido.numero }}</span>
-            <span>{{ hora(pedido) }}</span>
-            <span>{{ canalTexto(pedido.canal) }}</span>
-            <span>{{ mesa(pedido) }}</span>
-            <span>
-              <app-chip [variant]="estadoTono(pedido.estado)">{{ estadoTexto(pedido.estado) }}</app-chip>
-            </span>
-            <span>{{ pedido.items.length }}</span>
-            <span class="total">{{ moneda(pedido.total) }}</span>
+          <div class="fila" [class.fila--abierta]="estaExpandida(pedido)">
+            <div class="grid row">
+              <span class="numero">{{ pedido.numero }}</span>
+              <span>{{ hora(pedido) }}</span>
+              <span>{{ canalTexto(pedido.canal) }}</span>
+              <span>{{ mesa(pedido) }}</span>
+              <span>
+                <app-chip [variant]="estadoTono(pedido.estado)">{{ estadoTexto(pedido.estado) }}</app-chip>
+              </span>
+              <span>{{ pedido.items.length }}</span>
+              <span class="total">{{ moneda(pedido.total) }}</span>
+              <button
+                type="button"
+                class="toggle"
+                [class.toggle--abierto]="estaExpandida(pedido)"
+                [attr.aria-expanded]="estaExpandida(pedido)"
+                [attr.aria-controls]="'pedido-detalle-' + pedido.id"
+                [attr.aria-label]="
+                  (estaExpandida(pedido) ? 'Ocultar detalle del pedido ' : 'Ver detalle del pedido ') +
+                  pedido.numero
+                "
+                (click)="alternarDetalle(pedido)"
+              >
+                <app-icon name="caret-right" [size]="14" />
+              </button>
+            </div>
+
+            @if (estaExpandida(pedido)) {
+              <div
+                class="detalle"
+                [id]="'pedido-detalle-' + pedido.id"
+                role="region"
+                [attr.aria-label]="'Detalle del pedido ' + pedido.numero"
+              >
+                <div class="detalle__items">
+                  <div class="detalle__head">
+                    <span>PLATO</span>
+                    <span>CANT. × P. UNIT.</span>
+                    <span>ESTADO</span>
+                    <span>SUBTOTAL</span>
+                  </div>
+                  @for (item of pedido.items; track item.id) {
+                    <div class="detalle__item">
+                      <span class="detalle__name">
+                        {{ item.nombre }}
+                        @if (item.notas) {
+                          <span class="detalle__nota">{{ item.notas }}</span>
+                        }
+                      </span>
+                      <span>{{ item.cantidad }} × {{ moneda(item.precioUnitario) }}</span>
+                      <span>
+                        <app-chip [variant]="preparacionTono(item.estadoPreparacion)">
+                          {{ preparacionTexto(item.estadoPreparacion) }}
+                        </app-chip>
+                      </span>
+                      <span class="detalle__subtotal">{{ moneda(item.subtotal) }}</span>
+                    </div>
+                  } @empty {
+                    <p class="detalle__vacio">El pedido no tiene platos registrados.</p>
+                  }
+                </div>
+
+                <div class="detalle__pie">
+                  @if (pedido.observaciones) {
+                    <div class="detalle__obs">
+                      <span class="detalle__obs-label">OBSERVACIONES</span>
+                      <span>{{ pedido.observaciones }}</span>
+                    </div>
+                  }
+                  <div class="detalle__totales">
+                    <span class="detalle__total-row">
+                      <span>Subtotal</span>
+                      <strong>{{ moneda(pedido.subtotal) }}</strong>
+                    </span>
+                    <span class="detalle__total-row">
+                      <span>IGV (18%)</span>
+                      <strong>{{ moneda(pedido.igv) }}</strong>
+                    </span>
+                    <span class="detalle__total-row detalle__total-row--strong">
+                      <span>Total</span>
+                      <strong>{{ moneda(pedido.total) }}</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            }
           </div>
         } @empty {
           <div class="rows__empty">

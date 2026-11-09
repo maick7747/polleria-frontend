@@ -10,7 +10,7 @@ import { DashboardService } from '../../core/data/dashboard.service';
 import { formatearNumero } from '../../core/utils/format';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 import { ButtonComponent } from '../../shared/components/button/button';
-import { ChipComponent } from '../../shared/components/chip/chip';
+import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
 import { PanelComponent } from '../../shared/components/panel/panel';
@@ -118,9 +118,25 @@ export class DashboardPage {
   }
 
   readonly ventas = computed(() => formatearNumero(this.kpis().ventasHoy));
-  readonly meta = computed(() => formatearNumero(this.kpis().metaVentas));
+  readonly meta = computed(() => formatearNumero(this.kpis().metaVentas ?? 0));
   readonly faltante = computed(() => formatearNumero(this.dashboard.faltanteMeta()));
   readonly mermasMonto = computed(() => formatearNumero(this.mermasHoy()));
+  readonly tieneMeta = this.dashboard.tieneMeta;
+
+  readonly deltaPct = computed<number | null>(() => this.kpis().deltaPct);
+  readonly deltaTexto = computed<string>(() => {
+    const delta = this.deltaPct();
+    if (delta === null) {
+      return '';
+    }
+    return `${delta >= 0 ? '+' : ''}${delta}%`;
+  });
+  readonly deltaTono = computed<ChipVariant>(() => {
+    const delta = this.deltaPct();
+    return delta !== null && delta < 0 ? 'danger' : 'success';
+  });
+
+  readonly indiceHoy = computed(() => Math.max(0, this.kpis().serieSemana.length - 1));
 
   readonly guias: readonly number[] = [24, 84, 144];
 
@@ -136,6 +152,11 @@ export class DashboardPage {
     const alto = 190;
     const techo = 16;
     const base = 174;
+    // Sin una serie real (0 o 1 punto) no hay línea que dibujar ni forma de
+    // dividir por cero: se devuelve vacío y el SVG queda limpio.
+    if (valores.length < 2) {
+      return { linea: '', area: '', puntos: [] };
+    }
     const maximo = Math.max(...valores);
     const minimo = Math.min(...valores);
     const rango = maximo - minimo || 1;

@@ -81,6 +81,9 @@ export class CuadreService {
   readonly historialError = signal<string | null>(null);
 
   readonly abierta = signal<boolean>(false);
+  readonly estado = signal<string>(USE_API ? '' : 'abierta');
+  readonly reabiertoEn = signal<string | null>(null);
+  readonly motivoReapertura = signal<string | null>(null);
   readonly fondoInicial = signal<number>(200);
   readonly totalVentas = signal<number>(2450);
   readonly totalEgresos = signal<number>(225);
@@ -100,13 +103,15 @@ export class CuadreService {
     round2(this.totalReal() - this.montoEsperado()),
   );
 
-  async cargar(): Promise<boolean> {
+  async cargar(silencioso = false): Promise<boolean> {
     if (!USE_API) {
       this.error.set(null);
       return true;
     }
-    this.cargando.set(true);
-    this.error.set(null);
+    if (!silencioso) {
+      this.cargando.set(true);
+      this.error.set(null);
+    }
     try {
       const dto = await firstValueFrom(this.api.get<CuadreDto | null>('/cuadre-caja'));
       if (dto) {
@@ -114,15 +119,23 @@ export class CuadreService {
       } else {
         this.cuadreId.set(null);
         this.abierta.set(false);
+        this.estado.set('sin_cuadre');
+        this.reabiertoEn.set(null);
+        this.motivoReapertura.set(null);
         this.totalVentas.set(0);
         this.totalEgresos.set(0);
       }
+      this.error.set(null);
       return true;
     } catch (error) {
-      this.error.set(mensajeError(error));
+      if (!silencioso) {
+        this.error.set(mensajeError(error));
+      }
       return false;
     } finally {
-      this.cargando.set(false);
+      if (!silencioso) {
+        this.cargando.set(false);
+      }
     }
   }
 
@@ -191,6 +204,37 @@ export class CuadreService {
     this.efectivoContado.set(efectivoContado);
     this.pagosDigitales.set(pagosDigitales);
     this.abierta.set(false);
+    this.estado.set('cerrada');
+    return true;
+  }
+
+  /**
+   * Reabre el cuadre cerrado del día. El motivo es obligatorio (5–300
+   * caracteres). Si el backend rechaza la operación (409/422) el `ApiError`
+   * se propaga con el mensaje del servidor para que la página lo muestre.
+   */
+  async reabrir(motivo: string): Promise<boolean> {
+    const id = this.cuadreId();
+    if (id === null) {
+      await this.cargar();
+    }
+    const cuadreId = this.cuadreId();
+
+    if (!USE_API || cuadreId === null) {
+      if (cuadreId === null && USE_API) {
+        throw new Error('No hay un cuadre de caja para reabrir.');
+      }
+      this.abierta.set(true);
+      this.estado.set('abierta');
+      this.reabiertoEn.set(new Date().toISOString());
+      this.motivoReapertura.set(motivo);
+      return true;
+    }
+
+    const dto = await firstValueFrom(
+      this.api.post<CuadreDto>(`/cuadre-caja/${cuadreId}/reabrir`, { motivo }),
+    );
+    this.aplicar(dto);
     return true;
   }
 
@@ -253,7 +297,10 @@ export class CuadreService {
 
   private aplicar(dto: CuadreDto): void {
     this.cuadreId.set(dto.id);
+    this.estado.set(dto.estado);
     this.abierta.set(dto.estado === 'abierta');
+    this.reabiertoEn.set(dto.reabierto_en ?? null);
+    this.motivoReapertura.set(dto.motivo_reapertura ?? null);
     this.fondoInicial.set(dto.fondo_inicial);
     this.totalVentas.set(dto.resumen?.total_ventas ?? dto.total_ventas);
     this.totalEgresos.set(dto.resumen?.total_egresos ?? dto.total_egresos);

@@ -13,6 +13,23 @@ import { MermaService } from './merma.service';
 import { MOCK_KPIS } from './mock-data';
 import { PedidosService } from './pedidos.service';
 
+// En modo API no se arranca con los KPIs de demostración: hasta que llegue la
+// primera respuesta no hay ventas de hoy, ni "ayer", ni serie semanal.
+const KPIS_VACIOS: KpiResumen = {
+  ventasHoy: 0,
+  ventasAyer: null,
+  metaVentas: null,
+  deltaPct: null,
+  actualizado: '--:--',
+  totalPlatosCarta: 0,
+  pedidosTop: 0,
+  ingresosTop: 0,
+  mejorDia: '—',
+  mejorDiaMonto: 0,
+  topPlatos: [],
+  serieSemana: [],
+};
+
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
   private readonly api = inject(ApiClient);
@@ -25,7 +42,7 @@ export class DashboardService {
   readonly cargando = signal<boolean>(false);
   readonly error = signal<string | null>(null);
 
-  readonly kpis = signal<KpiResumen>(MOCK_KPIS);
+  readonly kpis = signal<KpiResumen>(USE_API ? KPIS_VACIOS : MOCK_KPIS);
   // Hora Lima (HH:mm) de la última respuesta CON datos nuevos.
   readonly actualizado = signal<string>('--:--');
 
@@ -86,15 +103,25 @@ export class DashboardService {
   readonly registrosMerma = this.merma.registrosHoy;
   readonly totalAbierto = this.cuentas.totalAbierto;
 
-  readonly faltanteMeta = computed<number>(() =>
-    Math.max(0, this.kpis().metaVentas - this.kpis().ventasHoy),
-  );
+  readonly faltanteMeta = computed<number>(() => {
+    const meta = this.kpis().metaVentas;
+    if (meta === null || meta <= 0) {
+      return 0;
+    }
+    return Math.max(0, meta - this.kpis().ventasHoy);
+  });
 
-  readonly porcentajeMeta = computed<number>(() =>
-    this.kpis().metaVentas > 0
-      ? Math.round((this.kpis().ventasHoy / this.kpis().metaVentas) * 100)
-      : 0,
-  );
+  readonly tieneMeta = computed<boolean>(() => {
+    const meta = this.kpis().metaVentas;
+    return meta !== null && meta > 0;
+  });
+
+  readonly porcentajeMeta = computed<number>(() => {
+    const meta = this.kpis().metaVentas;
+    return meta !== null && meta > 0
+      ? Math.round((this.kpis().ventasHoy / meta) * 100)
+      : 0;
+  });
 
   readonly nombresStockBajo = computed<string>(() =>
     this.stockBajo()
@@ -184,7 +211,7 @@ export class DashboardService {
   }
 
   private aplicarKpis(dto: DashboardDto): void {
-    const base = MOCK_KPIS;
+    const base = KPIS_VACIOS;
     const totalTop = dto.top_platillos.reduce((suma, item) => suma + item.monto, 0);
     const topPlatos: TopPlato[] = dto.top_platillos.map((item) => ({
       nombre: item.platillo ?? `Platillo ${item.platillo_id}`,
@@ -192,20 +219,46 @@ export class DashboardService {
       unidades: item.cantidad,
       porcentaje: totalTop > 0 ? Math.round((item.monto / totalTop) * 100) : 0,
     }));
+
     const ventasHoy = dto.kpis.ventas;
+    const ventasAyer =
+      typeof dto.ventas_ayer === 'number' && dto.ventas_ayer > 0
+        ? dto.ventas_ayer
+        : null;
+    // Sin base real de "ayer" no hay comparación: el chip se oculta en la UI.
     const deltaPct =
-      base.ventasAyer > 0
-        ? Math.round(((ventasHoy - base.ventasAyer) / base.ventasAyer) * 100)
-        : 0;
+      ventasAyer !== null
+        ? Math.round(((ventasHoy - ventasAyer) / ventasAyer) * 100)
+        : null;
+
+    const serieSemana = (dto.serie_semana ?? []).map((punto) => ({
+      dia: punto.dia,
+      monto: Number(punto.monto) || 0,
+    }));
+    const mejor = serieSemana.reduce<{ dia: string; monto: number } | null>(
+      (actual, punto) => (actual === null || punto.monto > actual.monto ? punto : actual),
+      null,
+    );
+
+    const metaVentas =
+      typeof dto.kpis.meta_ventas === 'number' && dto.kpis.meta_ventas > 0
+        ? dto.kpis.meta_ventas
+        : null;
+
     const ahora = new Date();
     const hora = horaActual(ahora);
     this.kpis.set({
       ...base,
       ventasHoy,
+      ventasAyer,
+      metaVentas,
       deltaPct,
       actualizado: hora,
       pedidosTop: dto.kpis.pedidos,
       topPlatos,
+      serieSemana,
+      mejorDia: mejor?.dia ?? '—',
+      mejorDiaMonto: mejor?.monto ?? 0,
     });
     this.ahora.set(ahora);
     this.actualizado.set(hora);

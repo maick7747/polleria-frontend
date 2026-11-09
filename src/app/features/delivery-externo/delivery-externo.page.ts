@@ -12,9 +12,12 @@ import { USE_API } from '../../core/api/api.config';
 import {
   COMISION_PLATAFORMA,
   DeliveryService,
+  type DeliveryExternoQuery,
+  type LiquidacionesQuery,
   type PlataformaExterna,
 } from '../../core/data/delivery.service';
 import { formatearMoneda, hora, round2 } from '../../core/utils/format';
+import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -190,6 +193,12 @@ export class DeliveryExternoPage {
     } else {
       void this.cargar();
     }
+
+    iniciarRefresco({
+      intervaloMs: 25000,
+      destroyRef: this.destroyRef,
+      tarea: () => this.refrescarSilencioso(),
+    });
 
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
@@ -388,14 +397,7 @@ export class DeliveryExternoPage {
   }
 
   private async cargar(): Promise<void> {
-    const ok = await this.delivery.cargarExternos({
-      page: this.pagina(),
-      limit: this.limite(),
-      plataforma: this.plataforma() === 'todas' ? undefined : this.plataforma(),
-      estado: this.estado() === 'todos' ? undefined : this.estado(),
-      desde: this.desde() || undefined,
-      hasta: this.hasta() || undefined,
-    });
+    const ok = await this.delivery.cargarExternos(this.consultaExternos());
     if (ok) {
       const meta = this.meta();
       this.pagina.set(meta.page);
@@ -406,19 +408,46 @@ export class DeliveryExternoPage {
     }
   }
 
-  private async cargarLiquidaciones(): Promise<void> {
-    const ok = await this.delivery.cargarLiquidaciones({
-      page: this.liqPagina(),
-      limit: this.liqLimite(),
+  private consultaExternos(): DeliveryExternoQuery {
+    return {
+      page: this.pagina(),
+      limit: this.limite(),
       plataforma: this.plataforma() === 'todas' ? undefined : this.plataforma(),
+      estado: this.estado() === 'todos' ? undefined : this.estado(),
       desde: this.desde() || undefined,
       hasta: this.hasta() || undefined,
-    });
+    };
+  }
+
+  private async cargarLiquidaciones(): Promise<void> {
+    const ok = await this.delivery.cargarLiquidaciones(this.consultaLiquidaciones());
     if (ok) {
       const meta = this.liquidacionesMeta();
       this.liqPagina.set(meta.page);
       this.liqLimite.set(meta.limit);
       this.sincronizarUrl();
+    }
+  }
+
+  private consultaLiquidaciones(): LiquidacionesQuery {
+    return {
+      page: this.liqPagina(),
+      limit: this.liqLimite(),
+      plataforma: this.plataforma() === 'todas' ? undefined : this.plataforma(),
+      desde: this.desde() || undefined,
+      hasta: this.hasta() || undefined,
+    };
+  }
+
+  /**
+   * Refresco silencioso de la vista activa (pedidos o liquidaciones) con la
+   * misma página y filtros, sin tocar la selección ni el formulario.
+   */
+  private async refrescarSilencioso(): Promise<void> {
+    if (this.vista() === 'liquidaciones') {
+      await this.delivery.cargarLiquidaciones(this.consultaLiquidaciones(), true);
+    } else {
+      await this.delivery.cargarExternos(this.consultaExternos(), true);
     }
   }
 

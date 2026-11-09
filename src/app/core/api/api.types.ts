@@ -136,6 +136,20 @@ export interface PagoDto {
   usuario_id: number;
 }
 
+export interface PagoMetodoResumenDto {
+  metodo: string;
+  monto: number;
+  cantidad: number;
+}
+
+export interface PagosResponseDto {
+  fecha: string;
+  data: PagoDto[];
+  total: number;
+  cantidad: number;
+  por_metodo?: PagoMetodoResumenDto[];
+}
+
 export interface CuentaResumenDto {
   id: number;
   mesa_id: number;
@@ -329,6 +343,9 @@ export interface CuadreDto {
   observaciones: string | null;
   usuario_cierre_id: number | null;
   fecha_cierre: string | null;
+  reabierto_en?: string | null;
+  usuario_reabre_id?: number | null;
+  motivo_reapertura?: string | null;
   resumen?: CuadreResumenDto;
 }
 
@@ -351,12 +368,21 @@ export interface DashboardKpisDto {
   mermas_pendientes: number;
   devoluciones_pendientes: number;
   alertas_stock: number;
+  meta_ventas?: number;
+}
+
+export interface DashboardSerieDiaDto {
+  fecha: string;
+  dia: string;
+  monto: number;
 }
 
 export interface DashboardDto {
   fecha: string;
   kpis: DashboardKpisDto;
   top_platillos: DashboardTopPlatilloDto[];
+  ventas_ayer?: number;
+  serie_semana?: DashboardSerieDiaDto[];
 }
 
 export interface ProveedorDto {

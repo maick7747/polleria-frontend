@@ -95,6 +95,7 @@ export class CocinaPage {
 
   readonly ahora = signal(Date.now());
   readonly seleccionadaId = signal<number>(this.cocina.comandas()[0]?.pedidoId ?? 0);
+  readonly itemFocoId = signal<number | null>(null);
   readonly toast = signal<string>('');
   readonly error = this.pedidos.error;
 
@@ -133,6 +134,7 @@ export class CocinaPage {
     const primera = this.cocina.comandas()[0];
     if (primera) {
       this.seleccionadaId.set(primera.pedidoId);
+      this.itemFocoId.set(null);
     }
   }
 
@@ -162,8 +164,11 @@ export class CocinaPage {
     if (!comanda || comanda.items.length === 0) {
       return null;
     }
+    const seleccionado = comanda.items.find((detalle) => detalle.id === this.itemFocoId());
     const item =
-      comanda.items.find((detalle) => detalle.estadoPreparacion !== 'listo') ?? comanda.items[0];
+      seleccionado ??
+      comanda.items.find((detalle) => detalle.estadoPreparacion !== 'listo') ??
+      comanda.items[0];
     const plato = this.fichas.porId(item.platilloId);
     const pedido = this.pedidos.porId(comanda.pedidoId);
     return {
@@ -243,11 +248,28 @@ export class CocinaPage {
   });
 
   seleccionar(pedidoId: number): void {
-    this.seleccionadaId.set(pedidoId);
+    this.enfocarComanda(pedidoId);
+  }
+
+  seleccionarItem(comanda: ComandaVista, item: PedidoDetalle, event?: Event): void {
+    event?.stopPropagation();
+    this.enfocarComanda(comanda.pedidoId);
+    this.itemFocoId.set(item.id);
+  }
+
+  esItemFoco(item: PedidoDetalle): boolean {
+    return this.itemFocoId() === item.id;
   }
 
   esSeleccionada(pedidoId: number): boolean {
     return this.seleccionadaId() === pedidoId;
+  }
+
+  private enfocarComanda(pedidoId: number): void {
+    if (this.seleccionadaId() !== pedidoId) {
+      this.itemFocoId.set(null);
+      this.seleccionadaId.set(pedidoId);
+    }
   }
 
   async marcarItem(comanda: ComandaVista, item: PedidoDetalle, event: Event): Promise<void> {
@@ -255,7 +277,7 @@ export class CocinaPage {
     if (item.estadoPreparacion === 'listo') {
       return;
     }
-    this.seleccionadaId.set(comanda.pedidoId);
+    this.enfocarComanda(comanda.pedidoId);
     try {
       await this.cocina.marcarListo(comanda.pedidoId, item.id);
       this.avisar(`Plato listo · ${item.nombre}`);

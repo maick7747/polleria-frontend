@@ -14,6 +14,7 @@ import { MermaService, type MermaQuery, type TipoMerma } from '../../core/data/m
 import { MOCK_USUARIOS } from '../../core/data/mock-data';
 import type { ClasificacionMerma, EstadoMerma, Merma } from '../../core/models';
 import { abreviarNombre, formatearMoneda, round2 } from '../../core/utils/format';
+import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -166,6 +167,12 @@ export class MermaPage {
     this.limite.set(LIMITES.includes(limite) ? limite : 20);
 
     void this.inicializar();
+
+    iniciarRefresco({
+      intervaloMs: 30000,
+      destroyRef: this.destroyRef,
+      tarea: () => this.refrescarSilencioso(),
+    });
 
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
@@ -390,7 +397,14 @@ export class MermaPage {
   }
 
   private async cargarLista(): Promise<void> {
-    const query: MermaQuery = {
+    const ok = await this.merma.cargar(this.consultaLista());
+    if (ok) {
+      this.sincronizarMeta();
+    }
+  }
+
+  private consultaLista(): MermaQuery {
+    return {
       page: this.pagina(),
       limit: this.limite(),
       estado: this.estadoFiltro() === 'todos' ? undefined : this.estadoFiltro(),
@@ -399,10 +413,14 @@ export class MermaPage {
       hasta: this.hasta() || undefined,
       sort: 'fecha:desc',
     };
-    const ok = await this.merma.cargar(query);
-    if (ok) {
-      this.sincronizarMeta();
-    }
+  }
+
+  /**
+   * Refresco silencioso de la lista con la misma página y filtros, sin
+   * sincronizar URL ni tocar el formulario de registro.
+   */
+  private async refrescarSilencioso(): Promise<void> {
+    await this.merma.cargar(this.consultaLista(), true);
   }
 
   private sincronizarMeta(): void {

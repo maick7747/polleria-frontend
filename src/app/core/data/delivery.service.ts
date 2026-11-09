@@ -228,7 +228,10 @@ export class DeliveryService {
   // Listados
   // -------------------------------------------------------------------------
 
-  async cargarPropios(opciones: DeliveryPropioQuery = {}): Promise<boolean> {
+  async cargarPropios(
+    opciones: DeliveryPropioQuery = {},
+    silencioso = false,
+  ): Promise<boolean> {
     const page = Math.max(1, opciones.page ?? 1);
     const limit = opciones.limit ?? 20;
     const estado = opciones.estado || undefined;
@@ -264,8 +267,10 @@ export class DeliveryService {
       return true;
     }
 
-    this.propiosCargando.set(true);
-    this.propiosError.set(null);
+    if (!silencioso) {
+      this.propiosCargando.set(true);
+      this.propiosError.set(null);
+    }
     try {
       const lista = await firstValueFrom(
         this.api.get<ApiList<DeliveryPropioPedidoDto>>('/delivery-propio/pedidos', {
@@ -286,16 +291,24 @@ export class DeliveryService {
         total,
         pages: lista.meta.pages ?? (limit > 0 ? Math.ceil(total / limit) : 0),
       });
+      this.propiosError.set(null);
       return true;
     } catch (error) {
-      this.propiosError.set(mensajeError(error));
+      if (!silencioso || this.propios().length === 0) {
+        this.propiosError.set(mensajeError(error));
+      }
       return false;
     } finally {
-      this.propiosCargando.set(false);
+      if (!silencioso) {
+        this.propiosCargando.set(false);
+      }
     }
   }
 
-  async cargarExternos(opciones: DeliveryExternoQuery = {}): Promise<boolean> {
+  async cargarExternos(
+    opciones: DeliveryExternoQuery = {},
+    silencioso = false,
+  ): Promise<boolean> {
     const page = Math.max(1, opciones.page ?? 1);
     const limit = opciones.limit ?? 20;
     const plataforma = opciones.plataforma || undefined;
@@ -325,8 +338,10 @@ export class DeliveryService {
       return true;
     }
 
-    this.externosCargando.set(true);
-    this.externosError.set(null);
+    if (!silencioso) {
+      this.externosCargando.set(true);
+      this.externosError.set(null);
+    }
     try {
       const lista = await firstValueFrom(
         this.api.get<ApiList<DeliveryExternoPedidoDto>>('/delivery-externo/pedidos', {
@@ -347,16 +362,24 @@ export class DeliveryService {
         total,
         pages: lista.meta.pages ?? (limit > 0 ? Math.ceil(total / limit) : 0),
       });
+      this.externosError.set(null);
       return true;
     } catch (error) {
-      this.externosError.set(mensajeError(error));
+      if (!silencioso || this.externos().length === 0) {
+        this.externosError.set(mensajeError(error));
+      }
       return false;
     } finally {
-      this.externosCargando.set(false);
+      if (!silencioso) {
+        this.externosCargando.set(false);
+      }
     }
   }
 
-  async cargarLiquidaciones(opciones: LiquidacionesQuery = {}): Promise<boolean> {
+  async cargarLiquidaciones(
+    opciones: LiquidacionesQuery = {},
+    silencioso = false,
+  ): Promise<boolean> {
     const page = Math.max(1, opciones.page ?? 1);
     const limit = opciones.limit ?? 20;
 
@@ -374,8 +397,10 @@ export class DeliveryService {
       return true;
     }
 
-    this.liquidacionesCargando.set(true);
-    this.liquidacionesError.set(null);
+    if (!silencioso) {
+      this.liquidacionesCargando.set(true);
+      this.liquidacionesError.set(null);
+    }
     try {
       const lista = await firstValueFrom(
         this.api.get<ApiList<LiquidacionDeliveryDto>>('/delivery-externo/liquidaciones', {
@@ -394,12 +419,17 @@ export class DeliveryService {
         total,
         pages: lista.meta.pages ?? (limit > 0 ? Math.ceil(total / limit) : 0),
       });
+      this.liquidacionesError.set(null);
       return true;
     } catch (error) {
-      this.liquidacionesError.set(mensajeError(error));
+      if (!silencioso || this.liquidaciones().length === 0) {
+        this.liquidacionesError.set(mensajeError(error));
+      }
       return false;
     } finally {
-      this.liquidacionesCargando.set(false);
+      if (!silencioso) {
+        this.liquidacionesCargando.set(false);
+      }
     }
   }
 

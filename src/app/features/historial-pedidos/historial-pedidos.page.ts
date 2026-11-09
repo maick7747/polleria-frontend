@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PedidosService } from '../../core/data/pedidos.service';
-import type { EstadoPedido, Pedido } from '../../core/models';
+import type { EstadoPedido, EstadoPreparacion, Pedido } from '../../core/models';
 import { formatearMoneda } from '../../core/utils/format';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -80,6 +80,7 @@ export class HistorialPedidosPage {
   readonly hasta = signal<string>(fechaLima(new Date()));
   readonly pagina = signal<number>(1);
   readonly limite = signal<number>(20);
+  readonly expandidaId = signal<number | null>(null);
 
   readonly cargando = this.pedidos.cargando;
   readonly error = this.pedidos.error;
@@ -164,6 +165,30 @@ export class HistorialPedidosPage {
 
   reintentar(): void {
     void this.cargar();
+  }
+
+  alternarDetalle(pedido: Pedido): void {
+    this.expandidaId.update((actual) => (actual === pedido.id ? null : pedido.id));
+  }
+
+  estaExpandida(pedido: Pedido): boolean {
+    return this.expandidaId() === pedido.id;
+  }
+
+  preparacionTexto(estado: EstadoPreparacion): string {
+    switch (estado) {
+      case 'listo': return 'Listo';
+      case 'en_preparacion': return 'En preparación';
+      default: return 'Pendiente';
+    }
+  }
+
+  preparacionTono(estado: EstadoPreparacion): ChipVariant {
+    switch (estado) {
+      case 'listo': return 'success';
+      case 'en_preparacion': return 'info';
+      default: return 'neutral';
+    }
   }
 
   estadoTexto(estado: EstadoPedido): string {

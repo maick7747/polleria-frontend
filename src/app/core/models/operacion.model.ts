@@ -155,9 +155,9 @@ export interface ComandaResumen {
 
 export interface KpiResumen {
   ventasHoy: number;
-  ventasAyer: number;
-  metaVentas: number;
-  deltaPct: number;
+  ventasAyer: number | null;
+  metaVentas: number | null;
+  deltaPct: number | null;
   actualizado: string;
   totalPlatosCarta: number;
   pedidosTop: number;

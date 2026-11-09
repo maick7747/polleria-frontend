@@ -98,4 +98,39 @@ describe('DashboardService (ETag)', () => {
     expect(servicio.kpis()).toBe(kpis);
     expect(servicio.actualizado()).toBe(hora);
   });
+
+  it('sin ventas_ayer ni serie_semana no inventa comparación ni gráfico', async () => {
+    api.respuesta = { data: DTO, changed: true, status: 200 };
+    await servicio.cargar();
+
+    expect(servicio.kpis().deltaPct).toBeNull();
+    expect(servicio.kpis().ventasAyer).toBeNull();
+    expect(servicio.kpis().metaVentas).toBeNull();
+    expect(servicio.kpis().serieSemana).toEqual([]);
+    expect(servicio.tieneMeta()).toBe(false);
+  });
+
+  it('usa ventas_ayer, serie_semana y meta_ventas reales cuando llegan', async () => {
+    const dto: DashboardDto = {
+      ...DTO,
+      kpis: { ...DTO.kpis, meta_ventas: 5000 },
+      ventas_ayer: 4000,
+      serie_semana: [
+        { fecha: '2026-11-03', dia: 'L', monto: 100 },
+        { fecha: '2026-11-09', dia: 'D', monto: 300 },
+      ],
+    };
+    api.respuesta = { data: dto, changed: true, status: 200 };
+
+    await servicio.cargar();
+
+    // (4321 - 4000) / 4000 = 8.025% -> 8
+    expect(servicio.kpis().deltaPct).toBe(8);
+    expect(servicio.kpis().ventasAyer).toBe(4000);
+    expect(servicio.kpis().metaVentas).toBe(5000);
+    expect(servicio.tieneMeta()).toBe(true);
+    expect(servicio.kpis().serieSemana).toHaveLength(2);
+    expect(servicio.kpis().mejorDia).toBe('D');
+    expect(servicio.kpis().mejorDiaMonto).toBe(300);
+  });
 });
