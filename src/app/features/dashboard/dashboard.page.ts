@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DashboardService } from '../../core/data/dashboard.service';
 import { formatearNumero } from '../../core/utils/format';
@@ -15,6 +21,8 @@ interface PuntoGrafico {
   x: number;
   y: number;
 }
+
+const REFRESCO_MS = 30000;
 
 interface TrazosGrafico {
   linea: string;
@@ -42,9 +50,13 @@ interface TrazosGrafico {
 })
 export class DashboardPage {
   private readonly dashboard = inject(DashboardService);
+  private readonly destroyRef = inject(DestroyRef);
+  private temporizador: number | null = null;
 
   readonly kpis = this.dashboard.kpis;
   readonly fecha = this.dashboard.fecha;
+  readonly turno = this.dashboard.turno;
+  readonly actualizado = this.dashboard.actualizado;
   readonly comandas = this.dashboard.comandas;
   readonly error = this.dashboard.error;
 
@@ -66,6 +78,39 @@ export class DashboardPage {
 
   constructor() {
     void this.dashboard.cargarDatos();
+
+    // Auto-refresco cada 30 s, solo con la pestaña visible. Al volver el foco
+    // o la visibilidad se refresca de inmediato (ETag: un 304 no repinta).
+    this.temporizador = window.setInterval(() => this.refrescarSiVisible(), REFRESCO_MS);
+    document.addEventListener('visibilitychange', this.alCambiarVisibilidad);
+    window.addEventListener('focus', this.alRecuperarFoco);
+
+    this.destroyRef.onDestroy(() => {
+      if (this.temporizador !== null) {
+        window.clearInterval(this.temporizador);
+      }
+      document.removeEventListener('visibilitychange', this.alCambiarVisibilidad);
+      window.removeEventListener('focus', this.alRecuperarFoco);
+    });
+  }
+
+  private readonly alCambiarVisibilidad = (): void => {
+    if (document.visibilityState === 'visible') {
+      void this.dashboard.refrescarSilencioso();
+    }
+  };
+
+  private readonly alRecuperarFoco = (): void => {
+    if (document.visibilityState === 'visible') {
+      void this.dashboard.refrescarSilencioso();
+    }
+  };
+
+  private refrescarSiVisible(): void {
+    if (document.visibilityState !== 'visible') {
+      return;
+    }
+    void this.dashboard.refrescarSilencioso();
   }
 
   reintentar(): void {

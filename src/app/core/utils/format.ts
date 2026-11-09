@@ -25,6 +25,14 @@ export const minutosEntre = (desde: string, hasta: number): number =>
 
 const ZONA_LIMA = 'America/Lima';
 
+export const horaActual = (fecha: Date = new Date()): string =>
+  new Intl.DateTimeFormat('es-PE', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: ZONA_LIMA,
+  }).format(fecha);
+
 export const hora = (iso?: string | null): string => {
   if (!iso) {
     return '—';
@@ -33,13 +41,19 @@ export const hora = (iso?: string | null): string => {
   if (Number.isNaN(fecha.getTime())) {
     return '—';
   }
-  return new Intl.DateTimeFormat('es-PE', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: ZONA_LIMA,
-  }).format(fecha);
+  return horaActual(fecha);
 };
+
+// "lunes 9 de noviembre" (sin año ni coma), para encabezados de turno.
+export const fechaCorta = (fecha: Date = new Date()): string =>
+  new Intl.DateTimeFormat('es-PE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: ZONA_LIMA,
+  })
+    .format(fecha)
+    .replace(',', '');
 
 export const fechaLarga = (fecha: Date = new Date()): string =>
   new Intl.DateTimeFormat('es-PE', {

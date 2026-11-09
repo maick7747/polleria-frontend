@@ -1,4 +1,4 @@
-<app-shell title="Pulso del turno" [subtitle]="fecha">
+<app-shell title="Pulso del turno" [subtitle]="fecha()">
   <div actions class="header-actions">
     <span class="live">
       <span class="live__dot"></span>
@@ -82,7 +82,7 @@
           tone="brand"
           label="Mermas hoy"
           [value]="'S/ ' + mermasMonto()"
-          [hint]="registrosMerma() + ' registros · turno tarde'"
+          [hint]="registrosMerma() + ' registros · ' + turno()"
         />
       </div>
     </div>
@@ -91,7 +91,7 @@
   <section class="tops">
     <app-section-header
       title="Más vendidos hoy"
-      [meta]="'actualizado ' + kpis().actualizado + ' · 5 de ' + kpis().totalPlatosCarta + ' platos'"
+      [meta]="'actualizado ' + actualizado() + ' · 5 de ' + kpis().totalPlatosCarta + ' platos'"
     />
     <div class="tops__grid">
       @for (plato of kpis().topPlatos; track plato.nombre; let i = $index) {

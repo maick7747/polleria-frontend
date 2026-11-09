@@ -5,7 +5,7 @@ import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
 import { mensajeError } from '../api/api.helpers';
 import type { DashboardDto } from '../api/api.types';
-import { round2 } from '../utils/format';
+import { fechaCorta, horaActual, round2, turnoActual } from '../utils/format';
 import { CocinaService } from './cocina.service';
 import { CuentasService } from './cuentas.service';
 import { InventarioService } from './inventario.service';
@@ -26,7 +26,19 @@ export class DashboardService {
   readonly error = signal<string | null>(null);
 
   readonly kpis = signal<KpiResumen>(MOCK_KPIS);
-  readonly fecha = "Fratelli's · miércoles 14 de octubre · turno tarde";
+  // Hora Lima (HH:mm) de la última respuesta CON datos nuevos.
+  readonly actualizado = signal<string>('--:--');
+
+  private readonly ahora = signal<Date>(new Date());
+  readonly fecha = computed<string>(
+    () => `Fratelli's · ${fechaCorta(this.ahora())} · ${turnoActual(this.ahora())}`,
+  );
+  readonly turno = computed<string>(() => turnoActual(this.ahora()));
+
+  // Evita solapar refrescos silenciosos y decide cuándo mostrar el banner
+  // de error (solo si nunca se cargaron datos).
+  private refrescando = false;
+  private primeraCarga = true;
 
   readonly comandas = computed<ComandaResumen[]>(() =>
     this.cocina.comandas().slice(0, 4).map((comanda) => {
@@ -102,6 +114,9 @@ export class DashboardService {
       this.error.set(
         this.error() ?? 'No se pudieron cargar todos los datos del turno. Reintenta.',
       );
+    } else {
+      this.primeraCarga = false;
+      this.error.set(null);
     }
   }
 
@@ -111,35 +126,88 @@ export class DashboardService {
     }
     this.cargando.set(true);
     try {
-      const dto = await firstValueFrom(this.api.get<DashboardDto>('/dashboard'));
-      const base = MOCK_KPIS;
-      const totalTop = dto.top_platillos.reduce((suma, item) => suma + item.monto, 0);
-      const topPlatos: TopPlato[] = dto.top_platillos.map((item) => ({
-        nombre: item.platillo ?? `Platillo ${item.platillo_id}`,
-        monto: item.monto,
-        unidades: item.cantidad,
-        porcentaje:
-          totalTop > 0 ? Math.round((item.monto / totalTop) * 100) : 0,
-      }));
-      const ventasHoy = dto.kpis.ventas;
-      const deltaPct =
-        base.ventasAyer > 0
-          ? Math.round(((ventasHoy - base.ventasAyer) / base.ventasAyer) * 100)
-          : 0;
-      this.kpis.set({
-        ...base,
-        ventasHoy,
-        deltaPct,
-        actualizado: new Date().toISOString().slice(11, 16),
-        pedidosTop: dto.kpis.pedidos,
-        topPlatos,
-      });
-      return true;
-    } catch (error) {
-      this.error.set(mensajeError(error));
-      return false;
+      return await this.solicitarDashboard(false);
     } finally {
       this.cargando.set(false);
     }
+  }
+
+  /**
+   * Refresco periódico: misma carga que `cargarDatos()` pero sin spinner y sin
+   * pisar el error si ya hay datos. Si una petición sigue en curso, se ignora.
+   */
+  async refrescarSilencioso(): Promise<void> {
+    if (!USE_API || this.refrescando) {
+      return;
+    }
+    this.refrescando = true;
+    try {
+      const [dashboardOk, pedidosOk, cuentasOk, inventarioOk] = await Promise.all([
+        this.solicitarDashboard(true),
+        this.pedidos.cargarKds(),
+        this.cuentas.cargar(true),
+        this.inventario.cargar(),
+      ]);
+      if (dashboardOk && pedidosOk && cuentasOk && inventarioOk) {
+        this.error.set(null);
+      } else if (this.primeraCarga) {
+        this.error.set(
+          this.error() ?? 'No se pudieron cargar todos los datos del turno. Reintenta.',
+        );
+      }
+    } finally {
+      this.refrescando = false;
+    }
+  }
+
+  private async solicitarDashboard(silencioso: boolean): Promise<boolean> {
+    try {
+      const respuesta = await firstValueFrom(
+        this.api.getConEtag<DashboardDto>('/dashboard'),
+      );
+      // 304 (o cuerpo nulo): los datos no cambiaron, no se repinta ni la hora.
+      if (respuesta.changed && respuesta.data !== null) {
+        this.aplicarKpis(respuesta.data);
+      } else {
+        // Mantiene la fecha y el turno al día aunque la respuesta sea un 304
+        // (p. ej. si el turno cambia a medianoche sin movimientos).
+        this.ahora.set(new Date());
+      }
+      this.primeraCarga = false;
+      return true;
+    } catch (error) {
+      if (!silencioso || this.primeraCarga) {
+        this.error.set(mensajeError(error));
+      }
+      return false;
+    }
+  }
+
+  private aplicarKpis(dto: DashboardDto): void {
+    const base = MOCK_KPIS;
+    const totalTop = dto.top_platillos.reduce((suma, item) => suma + item.monto, 0);
+    const topPlatos: TopPlato[] = dto.top_platillos.map((item) => ({
+      nombre: item.platillo ?? `Platillo ${item.platillo_id}`,
+      monto: item.monto,
+      unidades: item.cantidad,
+      porcentaje: totalTop > 0 ? Math.round((item.monto / totalTop) * 100) : 0,
+    }));
+    const ventasHoy = dto.kpis.ventas;
+    const deltaPct =
+      base.ventasAyer > 0
+        ? Math.round(((ventasHoy - base.ventasAyer) / base.ventasAyer) * 100)
+        : 0;
+    const ahora = new Date();
+    const hora = horaActual(ahora);
+    this.kpis.set({
+      ...base,
+      ventasHoy,
+      deltaPct,
+      actualizado: hora,
+      pedidosTop: dto.kpis.pedidos,
+      topPlatos,
+    });
+    this.ahora.set(ahora);
+    this.actualizado.set(hora);
   }
 }
