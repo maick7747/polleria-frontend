@@ -20,6 +20,14 @@ export interface ApiList<T> {
     valor_inventario?: number;
     prioritarios?: number;
     sla_min?: number;
+    total_activos?: number;
+    categorias?: { nombre: string; total: number }[];
+    margen_promedio?: number;
+    food_cost_promedio?: number;
+    costo_promedio?: number;
+    sobre_30?: number;
+    mejor?: { id: number; nombre: string; margen: number; food_cost_pct: number } | null;
+    menor?: { id: number; nombre: string; margen: number; food_cost_pct: number } | null;
   };
 }
 

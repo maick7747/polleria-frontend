@@ -6,13 +6,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FichasService } from '../../core/data/fichas.service';
 import type { CategoriaPlatillo, Plato } from '../../core/models';
 import { formatearMoneda, round2 } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
@@ -42,10 +43,12 @@ interface ResumenRentabilidad {
   total: number;
   margenPromedio: number;
   foodCostPromedio: number;
-  mejor: FilaFicha | null;
-  menor: FilaFicha | null;
+  mejor: { nombre: string; margen: number } | null;
+  menor: { nombre: string; margen: number } | null;
   sobre30: number;
 }
+
+const LIMITES = [10, 20, 50, 100];
 
 @Component({
   selector: 'app-fichas-page',
@@ -56,6 +59,7 @@ interface ResumenRentabilidad {
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    PaginadorComponent,
     PanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,8 +68,11 @@ interface ResumenRentabilidad {
 })
 export class FichasPage {
   private readonly fichas = inject(FichasService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private toastTimer: number | null = null;
+  private buscarTimer: number | null = null;
 
   readonly categoria = signal<FiltroCategoria>('Todas');
   readonly busqueda = signal<string>('');
@@ -74,6 +81,11 @@ export class FichasPage {
   readonly formNombre = signal<string>('');
   readonly formPrecio = signal<number>(0);
   readonly toast = signal<string>('');
+  readonly pagina = signal<number>(1);
+  readonly limite = signal<number>(20);
+  readonly meta = this.fichas.meta;
+  readonly cargando = this.fichas.cargando;
+  readonly error = this.fichas.error;
 
   readonly moneda = formatearMoneda;
 
@@ -82,6 +94,16 @@ export class FichasPage {
   );
 
   readonly categorias = computed<readonly { nombre: FiltroCategoria; total: number }[]>(() => {
+    const meta = this.meta();
+    if (meta) {
+      return [
+        { nombre: 'Todas', total: meta.totalActivos },
+        ...meta.categorias.map((item) => ({
+          nombre: item.nombre as FiltroCategoria,
+          total: item.total,
+        })),
+      ];
+    }
     const filas = this.filas();
     const conteo = new Map<CategoriaPlatillo, number>();
     for (const fila of filas) {
@@ -96,18 +118,7 @@ export class FichasPage {
     return lista;
   });
 
-  readonly visibles = computed<FilaFicha[]>(() => {
-    const categoria = this.categoria();
-    const termino = this.busqueda().trim().toLowerCase();
-    return this.filas().filter((fila) => {
-      const coincideCategoria = categoria === 'Todas' || fila.categoria === categoria;
-      const coincideTexto =
-        !termino ||
-        fila.nombre.toLowerCase().includes(termino) ||
-        fila.categoria.toLowerCase().includes(termino);
-      return coincideCategoria && coincideTexto;
-    });
-  });
+  readonly visibles = computed<FilaFicha[]>(() => this.filas());
 
   readonly seleccionado = computed<FilaFicha | null>(
     () => this.filas().find((fila) => fila.id === this.platoId()) ?? null,
@@ -132,6 +143,10 @@ export class FichasPage {
   );
 
   readonly promedioCosto = computed<number>(() => {
+    const meta = this.meta();
+    if (meta) {
+      return meta.costoPromedio;
+    }
     const filas = this.filas();
     if (filas.length === 0) {
       return 0;
@@ -140,6 +155,17 @@ export class FichasPage {
   });
 
   readonly resumen = computed<ResumenRentabilidad>(() => {
+    const meta = this.meta();
+    if (meta) {
+      return {
+        total: meta.totalActivos,
+        margenPromedio: meta.margenPromedio,
+        foodCostPromedio: meta.foodCostPromedio,
+        mejor: meta.mejor,
+        menor: meta.menor,
+        sobre30: meta.sobre30,
+      };
+    }
     const filas = this.filas();
     if (filas.length === 0) {
       return {
@@ -197,28 +223,38 @@ export class FichasPage {
 
   readonly subtitulo = computed<string>(() => {
     const categoria = this.categoria();
-    const total = this.filas().length;
-    return `${total} platos · ${this.visibles().length} visibles · ${categoria === 'Todas' ? 'todas las categorías' : categoria}`;
+    const meta = this.meta();
+    const total = meta?.total ?? this.filas().length;
+    return `${total} platos · página ${meta?.page ?? 1} de ${meta?.pages || 1} · ${
+      categoria === 'Todas' ? 'todas las categorías' : categoria
+    }`;
   });
 
   constructor() {
-    void this.inicializar();
+    const params = this.route.snapshot.queryParamMap;
+    const categoria = params.get('categoria');
+    this.categoria.set(
+      categoria && categoria !== 'Todas' ? (categoria as FiltroCategoria) : 'Todas',
+    );
+    this.busqueda.set(params.get('q') ?? '');
+    this.pagina.set(Math.max(1, Number(params.get('page')) || 1));
+    const limite = Number(params.get('limit'));
+    this.limite.set(LIMITES.includes(limite) ? limite : 20);
+
+    void this.cargar();
+
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
       }
+      if (this.buscarTimer !== null) {
+        window.clearTimeout(this.buscarTimer);
+      }
     });
   }
 
-  private async inicializar(): Promise<void> {
-    await this.fichas.cargar();
-    const actual = this.platoId();
-    if (actual === 0 || !this.fichas.porId(actual)) {
-      const inicial = this.fichas.platos()[0];
-      if (inicial) {
-        this.platoId.set(inicial.id);
-      }
-    }
+  reintentar(): void {
+    void this.cargar();
   }
 
   cantidad(valor: number): string {
@@ -239,13 +275,34 @@ export class FichasPage {
   }
 
   cambiarCategoria(categoria: FiltroCategoria): void {
+    if (this.categoria() === categoria) {
+      return;
+    }
     this.categoria.set(categoria);
-    this.asegurarSeleccion();
+    this.pagina.set(1);
+    void this.cargar();
   }
 
   onBuscar(event: Event): void {
     this.busqueda.set((event.target as HTMLInputElement).value);
-    this.asegurarSeleccion();
+    if (this.buscarTimer !== null) {
+      window.clearTimeout(this.buscarTimer);
+    }
+    this.buscarTimer = window.setTimeout(() => {
+      this.pagina.set(1);
+      void this.cargar();
+    }, 350);
+  }
+
+  cambiarPagina(page: number): void {
+    this.pagina.set(page);
+    void this.cargar();
+  }
+
+  cambiarLimite(limit: number): void {
+    this.limite.set(limit);
+    this.pagina.set(1);
+    void this.cargar();
   }
 
   seleccionar(id: number): void {
@@ -256,7 +313,37 @@ export class FichasPage {
   verTodas(): void {
     this.categoria.set('Todas');
     this.busqueda.set('');
-    this.asegurarSeleccion();
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  private async cargar(): Promise<void> {
+    const ok = await this.fichas.cargar({
+      page: this.pagina(),
+      limit: this.limite(),
+      q: this.busqueda(),
+      categoria: this.categoria() === 'Todas' ? undefined : this.categoria(),
+    });
+    if (ok) {
+      const meta = this.fichas.meta();
+      this.pagina.set(meta?.page ?? 1);
+      this.limite.set(meta?.limit ?? 20);
+      this.asegurarSeleccion();
+      this.sincronizarUrl();
+    }
+  }
+
+  private sincronizarUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        categoria: this.categoria() === 'Todas' ? null : this.categoria(),
+        q: this.busqueda().trim() || null,
+        page: this.pagina() > 1 ? this.pagina() : null,
+        limit: this.limite() !== 20 ? this.limite() : null,
+      },
+      replaceUrl: true,
+    });
   }
 
   private asegurarSeleccion(): void {
