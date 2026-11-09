@@ -59,6 +59,7 @@ export interface Ronda {
 export interface Cuenta {
   id: number;
   mesaId: number;
+  mesaNumero?: number;
   estado: EstadoCuenta;
   total: number;
   fechaApertura: string;

@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -11,6 +12,7 @@ import { mensajeError } from '../../core/api/api.helpers';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { FichasService } from '../../core/data/fichas.service';
 import { PedidosService } from '../../core/data/pedidos.service';
+import { RealtimeService } from '../../core/data/realtime.service';
 import type { PedidoDetalle } from '../../core/models';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -83,11 +85,13 @@ export class CocinaPage {
   private readonly pedidos = inject(PedidosService);
   private readonly cuentas = inject(CuentasService);
   private readonly fichas = inject(FichasService);
+  private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly umbral = UMBRAL_KDS_MIN;
   readonly reloj = reloj;
   private temporizador: number | null = null;
+  private ultimaRevision = 0;
 
   readonly ahora = signal(Date.now());
   readonly seleccionadaId = signal<number>(this.cocina.comandas()[0]?.pedidoId ?? 0);
@@ -97,9 +101,22 @@ export class CocinaPage {
   constructor() {
     const relojIntervalo = setInterval(() => this.ahora.set(Date.now()), 10000);
     const refresco = setInterval(() => void this.refrescar(), 10000);
+    this.realtime.iniciar();
+    // Realtime adelanta el refresco del KDS; el intervalo de 10 s se mantiene.
+    effect(() => {
+      const revision = this.realtime.revision();
+      if (revision === this.ultimaRevision) {
+        return;
+      }
+      this.ultimaRevision = revision;
+      if (revision > 0) {
+        void this.refrescar();
+      }
+    });
     this.destroyRef.onDestroy(() => {
       clearInterval(relojIntervalo);
       clearInterval(refresco);
+      this.realtime.detener();
       if (this.temporizador !== null) {
         window.clearTimeout(this.temporizador);
       }

@@ -120,6 +120,7 @@
                   <input
                     type="text"
                     [value]="formNombre()"
+                    [disabled]="guardando()"
                     (input)="onFormNombre($event)"
                   />
                 </label>
@@ -130,6 +131,7 @@
                     min="0"
                     step="0.5"
                     [value]="formPrecio()"
+                    [disabled]="guardando()"
                     (input)="onFormPrecio($event)"
                   />
                 </label>
@@ -266,11 +268,21 @@
         </div>
 
         @if (editando()) {
-          <button type="button" class="btn-primary" (click)="guardarEdicion()">
+          <button
+            type="button"
+            class="btn-primary"
+            [disabled]="guardando()"
+            (click)="guardarEdicion()"
+          >
             <app-icon name="check-circle" [size]="15" />
-            Guardar cambios
+            {{ guardando() ? 'Guardando…' : 'Guardar cambios' }}
           </button>
-          <button type="button" class="btn-secondary" (click)="cancelarEdicion()">
+          <button
+            type="button"
+            class="btn-secondary"
+            [disabled]="guardando()"
+            (click)="cancelarEdicion()"
+          >
             <app-icon name="x" [size]="14" />
             Cancelar
           </button>

@@ -576,3 +576,17 @@
     display: none;
   }
 }
+
+.ficha-error {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-danger-soft);
+  border-radius: 10px;
+  background: var(--c-danger-soft);
+  color: var(--c-brand-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+}

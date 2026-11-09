@@ -85,6 +85,7 @@ export class FichasPage {
   readonly limite = signal<number>(20);
   readonly meta = this.fichas.meta;
   readonly cargando = this.fichas.cargando;
+  readonly guardando = this.fichas.guardando;
   readonly error = this.fichas.error;
 
   readonly moneda = formatearMoneda;
@@ -377,9 +378,9 @@ export class FichasPage {
     this.formPrecio.set(Number.isFinite(valor) && valor >= 0 ? round2(valor) : 0);
   }
 
-  guardarEdicion(): void {
+  async guardarEdicion(): Promise<void> {
     const plato = this.fichas.porId(this.platoId());
-    if (!plato) {
+    if (!plato || this.guardando()) {
       return;
     }
     const nombre = this.formNombre().trim();
@@ -388,8 +389,13 @@ export class FichasPage {
       this.mostrarToast('Ingresa un nombre y un precio mayor a 0');
       return;
     }
-    this.fichas.guardar({ ...plato, nombre, precioVenta: precio });
+    const ok = await this.fichas.guardar({ ...plato, nombre, precioVenta: precio });
+    if (!ok) {
+      // El modal de edición queda abierto; el error se muestra en el banner.
+      return;
+    }
     this.editando.set(false);
+    this.asegurarSeleccion();
     this.mostrarToast(`Ficha "${nombre}" actualizada`);
   }
 

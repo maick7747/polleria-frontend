@@ -136,6 +136,28 @@ export interface PagoDto {
   usuario_id: number;
 }
 
+export interface CuentaResumenDto {
+  id: number;
+  mesa_id: number;
+  estado: string;
+  total: number;
+  fecha_apertura: string;
+  usuario_apertura_id: number;
+  usuario_apertura_nombre?: string | null;
+  fecha_cierre: string | null;
+  usuario_cierre_id: number | null;
+  comprobante_tipo: string;
+  comprobante_numero: string | null;
+  mesa_numero?: number | null;
+  cliente_id?: number | null;
+  cliente?: ClienteDto | null;
+  subtotal?: number;
+  igv?: number;
+  total_consolidado?: number;
+  rondas?: number;
+  pedidos?: number[];
+}
+
 export interface CuentaDto {
   id: number;
   mesa_id: number;

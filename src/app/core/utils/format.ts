@@ -1,6 +1,18 @@
-export const round2 = (n: number): number => Math.round(n * 100) / 100;
+const redondear = (n: number, decimales: number): number => {
+  if (!Number.isFinite(n)) {
+    return n;
+  }
+  const factor = 10 ** decimales;
+  const escalado = Number(`${n}e${decimales}`);
+  if (!Number.isFinite(escalado)) {
+    return Math.round(n * factor) / factor;
+  }
+  return Number(`${Math.round(escalado)}e-${decimales}`);
+};
 
-export const round3 = (n: number): number => Math.round(n * 1000) / 1000;
+export const round2 = (n: number): number => redondear(n, 2);
+
+export const round3 = (n: number): number => redondear(n, 3);
 
 export const formatearMoneda = (monto: number): string =>
   `S/ ${monto.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

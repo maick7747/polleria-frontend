@@ -1,0 +1,88 @@
+<app-shell title="Historial de cuentas" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/cerrar-cuenta">
+      <app-icon name="cash-register" [size]="14" />
+      Mesas abiertas
+    </a>
+  </div>
+
+  <div class="toolbar">
+    <label class="campo">
+      <span>Estado</span>
+      <select [value]="estado()" (change)="cambiarEstado($event)">
+        @for (item of estados; track item) {
+          <option [value]="item">{{ item === 'todos' ? 'Todos' : estadoTexto(item) }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" class="limpiar" (click)="limpiar()">Limpiar</button>
+  </div>
+
+  @if (error()) {
+    <div class="historial-error" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
+  <app-panel class="panel">
+    <div class="panel__inner">
+      <div class="grid grid--head">
+        <span>CUENTA</span>
+        <span>MESA</span>
+        <span>ESTADO</span>
+        <span>APERTURA</span>
+        <span>MOZO</span>
+        <span>COMPROBANTE</span>
+        <span>TOTAL</span>
+      </div>
+
+      <div class="rows">
+        @if (cargando() && filas().length === 0) {
+          @for (fila of esqueleto; track fila) {
+            <div class="grid row row--skeleton">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          }
+        } @else {
+          @for (cuenta of filas(); track cuenta.id) {
+            <div class="grid row">
+              <span class="numero">#{{ cuenta.id }}</span>
+              <span>{{ mesa(cuenta) }}</span>
+              <span>
+                <app-chip [variant]="estadoTono(cuenta.estado)">{{ estadoTexto(cuenta.estado) }}</app-chip>
+              </span>
+              <span>{{ apertura(cuenta) }}</span>
+              <span>{{ cuenta.usuarioAperturaNombre ?? '—' }}</span>
+              <span class="comprobante">{{ comprobante(cuenta) }}</span>
+              <span class="total">{{ moneda(cuenta.total) }}</span>
+            </div>
+          } @empty {
+            <div class="rows__empty">
+              <app-empty-state
+                icon="receipt"
+                title="Sin cuentas"
+                description="No hay cuentas para el estado seleccionado."
+              />
+            </div>
+          }
+        }
+      </div>
+
+      <app-paginador
+        [page]="pagina()"
+        [pages]="meta().pages"
+        [total]="meta().total"
+        [limit]="limite()"
+        (pageChange)="cambiarPagina($event)"
+        (limitChange)="cambiarLimite($event)"
+      />
+    </div>
+  </app-panel>
+</app-shell>

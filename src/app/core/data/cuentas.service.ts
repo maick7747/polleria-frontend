@@ -14,15 +14,46 @@ import type { ApiError } from '../api/api.client';
 import { USE_API } from '../api/api.config';
 import { esApiError, esFalloRed, mensajeError } from '../api/api.helpers';
 import type {
+  ApiList,
   CobroResponseDto,
   CuentaDto,
+  CuentaResumenDto,
+  PageMeta,
   PedidoDto,
   TableroDto,
 } from '../api/api.types';
-import { toCuenta, toPago, toRonda } from '../api/api.mappers';
+import { toCuenta, toCuentaResumen, toPago, toRonda } from '../api/api.mappers';
 import { MesasService } from './mesas.service';
 import { MOCK_CUENTAS } from './mock-data';
 import { PagosService } from './pagos.service';
+
+export interface CuentasQuery {
+  page?: number;
+  limit?: number;
+  estado?: 'abierta' | 'cobrada' | 'cancelada';
+  after?: number;
+}
+
+const META_INICIAL: PageMeta = {
+  page: 1,
+  limit: 10,
+  total: USE_API ? 0 : MOCK_CUENTAS.length,
+  pages: USE_API ? 0 : Math.ceil(MOCK_CUENTAS.length / 10),
+};
+
+const paginar = (
+  lista: readonly Cuenta[],
+  page: number,
+  limit: number,
+): { items: Cuenta[]; meta: PageMeta } => {
+  const total = lista.length;
+  const pages = total === 0 ? 0 : Math.ceil(total / limit);
+  const inicio = (Math.max(1, page) - 1) * limit;
+  return {
+    items: lista.slice(inicio, inicio + limit),
+    meta: { page: Math.max(1, page), limit, total, pages },
+  };
+};
 
 @Injectable({ providedIn: 'root' })
 export class CuentasService {
@@ -40,6 +71,9 @@ export class CuentasService {
   readonly error = signal<string | null>(null);
   readonly errorDetalle = signal<ApiError | null>(null);
   readonly aviso = signal<string | null>(null);
+
+  readonly meta = signal<PageMeta>({ ...META_INICIAL });
+  readonly historial = signal<Cuenta[]>([]);
 
   // En modo API arranca vacío: los mocks solo se usan en modo demo.
   readonly cuentas = signal<Cuenta[]>(
@@ -101,6 +135,50 @@ export class CuentasService {
       if (!silencioso) {
         this.cargando.set(false);
       }
+    }
+  }
+
+  async listar(opciones: CuentasQuery = {}): Promise<boolean> {
+    const page = Math.max(1, opciones.page ?? 1);
+    const limit = opciones.limit ?? 10;
+    const estado = opciones.estado;
+
+    if (!USE_API) {
+      const filtradas = estado
+        ? MOCK_CUENTAS.filter((cuenta) => cuenta.estado === estado)
+        : MOCK_CUENTAS;
+      const { items, meta } = paginar(filtradas, page, limit);
+      this.historial.set(items.map((cuenta) => ({ ...cuenta, rondas: [] })));
+      this.meta.set(meta);
+      this.error.set(null);
+      return true;
+    }
+
+    this.cargando.set(true);
+    this.error.set(null);
+    try {
+      const lista = await firstValueFrom(
+        this.api.get<ApiList<CuentaResumenDto>>('/cuentas', {
+          page,
+          limit,
+          estado,
+          after: opciones.after,
+        }),
+      );
+      const total = lista.meta.total ?? lista.data.length;
+      this.historial.set(lista.data.map(toCuentaResumen));
+      this.meta.set({
+        page: lista.meta.page ?? page,
+        limit: lista.meta.limit ?? limit,
+        total,
+        pages: lista.meta.pages ?? (limit > 0 ? Math.ceil(total / limit) : 0),
+      });
+      return true;
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return false;
+    } finally {
+      this.cargando.set(false);
     }
   }
 

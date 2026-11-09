@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -11,6 +12,7 @@ import { mensajeError } from '../../core/api/api.helpers';
 import type { PedidoListoDto } from '../../core/api/api.types';
 import { CocinaService } from '../../core/data/cocina.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
+import { RealtimeService } from '../../core/data/realtime.service';
 import { hora as formatearHora } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -61,9 +63,11 @@ const FORMATO_DIA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' 
 export class PedidosListosPage {
   private readonly cocina = inject(CocinaService);
   private readonly notificaciones = inject(NotificacionesService);
+  private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
 
   private temporizador: number | null = null;
+  private ultimaRevision = 0;
   private entregados = this.leerEntregados();
 
   readonly pedidos = signal<PedidoListo[]>([]);
@@ -101,8 +105,22 @@ export class PedidosListosPage {
 
   constructor() {
     const refresco = setInterval(() => void this.refrescar(), REFRESCO_MS);
+    this.realtime.iniciar();
+    // Realtime (si está disponible) adelanta el mismo refresco silencioso;
+    // el intervalo de 15 s se conserva como respaldo. La revisión 0 no cuenta.
+    effect(() => {
+      const revision = this.realtime.revision();
+      if (revision === this.ultimaRevision) {
+        return;
+      }
+      this.ultimaRevision = revision;
+      if (revision > 0) {
+        void this.refrescar();
+      }
+    });
     this.destroyRef.onDestroy(() => {
       clearInterval(refresco);
+      this.realtime.detener();
       if (this.temporizador !== null) {
         window.clearTimeout(this.temporizador);
       }

@@ -7,6 +7,7 @@ import type {
   CategoriaPlatillo,
   ComprobanteTipo,
   Cuenta,
+  DatosCliente,
   Devolucion,
   EstadoActivo,
   EstadoCuenta,
@@ -48,9 +49,11 @@ import type {
 import type {
   ActivoAlertaDto,
   ActivoDto,
+  ClienteDto,
   ClienteListaDto,
   CompraDto,
   CuentaDto,
+  CuentaResumenDto,
   DeliveryExternoPedidoDto,
   DeliveryPropioPedidoDto,
   DetallePedidoDto,
@@ -257,11 +260,21 @@ export function toPedidoKds(dto: KdsPedidoDto): Pedido {
   };
 }
 
+function toDatosCliente(dto: ClienteDto): DatosCliente {
+  return {
+    tipoDocumento: dto.tipo_documento === 'RUC' ? 'RUC' : 'DNI',
+    numeroDocumento: dto.numero_documento ?? '',
+    nombre: dto.nombre,
+    telefono: dto.telefono ?? undefined,
+  };
+}
+
 export function toCuenta(dto: CuentaDto): Cuenta {
   const rondas = (dto.pedidos ?? []).map((pedido, indice) => toRonda(pedido, indice + 1));
   return {
     id: dto.id,
     mesaId: dto.mesa_id,
+    mesaNumero: dto.mesa_numero ?? undefined,
     estado: toEstadoCuenta(dto.estado),
     total: dto.total,
     fechaApertura: dto.fecha_apertura,
@@ -271,17 +284,29 @@ export function toCuenta(dto: CuentaDto): Cuenta {
     usuarioCierreId: dto.usuario_cierre_id ?? undefined,
     comprobanteTipo: toComprobanteTipo(dto.comprobante_tipo),
     comprobanteNumero: dto.comprobante_numero ?? undefined,
-    ...(dto.cliente
-      ? {
-          cliente: {
-            tipoDocumento: dto.cliente.tipo_documento === 'RUC' ? 'RUC' : 'DNI',
-            numeroDocumento: dto.cliente.numero_documento ?? '',
-            nombre: dto.cliente.nombre,
-            telefono: dto.cliente.telefono ?? undefined,
-          },
-        }
-      : {}),
+    ...(dto.cliente ? { cliente: toDatosCliente(dto.cliente) } : {}),
     rondas,
+  };
+}
+
+// Resumen de lista: `GET /cuentas` devuelve `pedidos` como ids y `rondas`
+// como conteo, así que no se mapean rondas completas.
+export function toCuentaResumen(dto: CuentaResumenDto): Cuenta {
+  return {
+    id: dto.id,
+    mesaId: dto.mesa_id,
+    mesaNumero: dto.mesa_numero ?? undefined,
+    estado: toEstadoCuenta(dto.estado),
+    total: dto.total,
+    fechaApertura: dto.fecha_apertura,
+    usuarioAperturaId: dto.usuario_apertura_id,
+    usuarioAperturaNombre: dto.usuario_apertura_nombre ?? undefined,
+    fechaCierre: dto.fecha_cierre ?? undefined,
+    usuarioCierreId: dto.usuario_cierre_id ?? undefined,
+    comprobanteTipo: toComprobanteTipo(dto.comprobante_tipo),
+    comprobanteNumero: dto.comprobante_numero ?? undefined,
+    ...(dto.cliente ? { cliente: toDatosCliente(dto.cliente) } : {}),
+    rondas: [],
   };
 }
 

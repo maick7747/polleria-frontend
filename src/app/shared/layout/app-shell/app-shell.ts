@@ -24,6 +24,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Venta en Local', route: '/venta-local', icon: 'receipt', roles: ['Mozo', 'Cajero', 'Dueño/Admin'], exact: false },
   { label: 'Comandas', route: '/comandas', icon: 'clipboard-text', roles: ['Mozo', 'Cajero', 'Cocinero', 'Dueño/Admin'], exact: false },
   { label: 'Historial de pedidos', route: '/historial-pedidos', icon: 'clock', roles: ['Mozo', 'Cajero', 'Dueño/Admin', 'Admin'], exact: false },
+  { label: 'Historial de cuentas', route: '/historial-cuentas', icon: 'receipt', roles: ['Mozo', 'Cajero', 'Dueño/Admin', 'Admin'], exact: false },
   { label: 'Pedidos listos', route: '/pedidos-listos', icon: 'bell-ringing', roles: ['Mozo', 'Cajero', 'Dueño/Admin'], exact: false },
   { label: 'Cocina KDS', route: '/cocina', icon: 'flame', roles: ['Cocinero', 'Dueño/Admin'], exact: false },
   { label: 'Cerrar cuenta', route: '/cerrar-cuenta', icon: 'cash-register', roles: ['Cajero', 'Dueño/Admin'], exact: false },

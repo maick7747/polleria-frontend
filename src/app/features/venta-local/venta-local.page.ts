@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   HostListener,
   inject,
   signal,
@@ -11,6 +12,7 @@ import { Router, RouterLink } from '@angular/router';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MesasService } from '../../core/data/mesas.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
+import { RealtimeService } from '../../core/data/realtime.service';
 import type { Cuenta, Mesa, Ronda } from '../../core/models';
 import {
   abreviarNombre,
@@ -68,10 +70,12 @@ export class VentaLocalPage {
   private readonly mesas = inject(MesasService);
   private readonly cuentas = inject(CuentasService);
   private readonly notificaciones = inject(NotificacionesService);
+  private readonly realtime = inject(RealtimeService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   private toastTimer: number | null = null;
+  private ultimaRevision = 0;
 
   private readonly ahora = signal(Date.now());
 
@@ -175,9 +179,23 @@ export class VentaLocalPage {
   constructor() {
     const reloj = setInterval(() => this.ahora.set(Date.now()), 30000);
     const refresco = setInterval(() => void this.refrescar(), 15000);
+    this.realtime.iniciar();
+    // Realtime (si está disponible) adelanta el mismo refresco silencioso.
+    // La revisión 0 es la inicial y no debe disparar una segunda carga.
+    effect(() => {
+      const revision = this.realtime.revision();
+      if (revision === this.ultimaRevision) {
+        return;
+      }
+      this.ultimaRevision = revision;
+      if (revision > 0) {
+        void this.refrescar();
+      }
+    });
     this.destroyRef.onDestroy(() => {
       clearInterval(reloj);
       clearInterval(refresco);
+      this.realtime.detener();
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
       }

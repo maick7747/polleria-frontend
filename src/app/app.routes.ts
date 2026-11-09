@@ -90,6 +90,17 @@ export const routes: Routes = [
   },
 
   {
+    path: 'historial-cuentas',
+    title: "Historial de cuentas · Fratelli's",
+    canActivate: [roleGuard],
+    data: { roles: roles('Mozo', 'Cajero', 'Dueño/Admin', 'Admin') },
+    loadComponent: () =>
+      import('./features/historial-cuentas/historial-cuentas.page').then(
+        (m) => m.HistorialCuentasPage,
+      ),
+  },
+
+  {
     path: 'delivery-propio',
     title: "Delivery Propio · Fratelli's",
     canActivate: [roleGuard],

@@ -75,6 +75,8 @@ export class FichasIngredientesPage {
   readonly categoria = signal<FiltroInsumo>('todos');
   readonly seleccionados = signal<number[]>([]);
   readonly toast = signal<string>('');
+  readonly guardando = this.fichas.guardando;
+  readonly error = this.fichas.error;
 
   readonly moneda = formatearMoneda;
 
@@ -225,10 +227,13 @@ export class FichasIngredientesPage {
     return this.seleccionados().includes(id);
   }
 
-  agregar(): void {
+  async agregar(): Promise<void> {
     const plato = this.plato();
     if (!plato) {
       this.mostrarToast('No hay una ficha seleccionada');
+      return;
+    }
+    if (this.guardando()) {
       return;
     }
     const ids = this.seleccionados();
@@ -254,10 +259,15 @@ export class FichasIngredientesPage {
       this.mostrarToast('Los insumos ya están en la ficha');
       return;
     }
-    this.fichas.guardar({
+    const ok = await this.fichas.guardar({
       ...plato,
       ingredientes: [...plato.ingredientes, ...nuevos],
     });
+    if (!ok) {
+      // Se conserva la selección y el error queda visible en el banner.
+      return;
+    }
+    this.seleccionados.set([]);
     this.mostrarToast(
       `${nuevos.length} ingrediente${nuevos.length === 1 ? '' : 's'} agregado${nuevos.length === 1 ? '' : 's'}`,
       true,

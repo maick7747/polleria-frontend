@@ -6,6 +6,12 @@
     </a>
   </div>
 
+  @if (error()) {
+    <div class="ficha-error" role="alert">
+      <span>{{ error() }}</span>
+    </div>
+  }
+
   <div class="board">
     <app-panel class="panel">
       <div class="panel__inner">
@@ -152,11 +158,11 @@
         <button
           type="button"
           class="btn-primary"
-          [disabled]="seleccionadosVista().length === 0"
+          [disabled]="seleccionadosVista().length === 0 || guardando()"
           (click)="agregar()"
         >
           <app-icon name="plus" [size]="15" />
-          Agregar a ficha
+          {{ guardando() ? 'Guardando…' : 'Agregar a ficha' }}
         </button>
         <p class="seleccion__foot">Las cantidades se ajustan después de agregar</p>
       </div>
