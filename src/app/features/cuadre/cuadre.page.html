@@ -8,7 +8,7 @@
     } @else {
       <app-chip variant="neutral" [dot]="true">Caja cerrada</app-chip>
     }
-    @if (reabiertoEn()) {
+    @if (abierta() && reabiertoEn()) {
       <app-chip variant="warning" [dot]="true">Caja reabierta</app-chip>
     }
     <button type="button" class="ghost-link" (click)="imprimir()">

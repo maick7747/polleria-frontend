@@ -148,8 +148,10 @@ export class CuadrePage {
   readonly cierreBloqueado = signal<string>('');
 
   readonly reabiertaTexto = computed<string>(() => {
+    // Solo mientras la caja está reabierta. Si ya se volvió a cerrar, la
+    // reapertura queda como dato histórico y no debe mostrarse como estado.
     const fecha = this.reabiertoEn();
-    if (!fecha) {
+    if (!fecha || !this.abierta()) {
       return '';
     }
     const motivo = this.motivoReapertura();
