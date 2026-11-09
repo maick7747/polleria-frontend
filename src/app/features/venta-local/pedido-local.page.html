@@ -7,6 +7,14 @@
     </a>
   </div>
 
+  @if (cajaCerrada()) {
+    <div class="caja-aviso" role="alert">
+      <app-icon name="warning-circle" [size]="15" />
+      <span>{{ cajaCerrada() }}</span>
+      <a class="caja-aviso__link" routerLink="/cuadre-caja/apertura">Abrir caja</a>
+    </div>
+  }
+
   <div class="categorias">
     <div class="categorias__chips" role="group" aria-label="Categorías del menú">
       @for (categoria of categorias(); track categoria) {

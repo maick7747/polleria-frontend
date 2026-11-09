@@ -50,6 +50,136 @@
   </nav>
 
   @if (vista() === 'dia') {
+  @if (pendientes().length > 0) {
+    <section class="pendientes" role="status">
+      <header class="pendientes__head">
+        <div class="pendientes__title">
+          <span class="bar"></span>
+          <div>
+            <strong>Cajas pendientes de cierre</strong>
+            <span>
+              {{ pendientes().length }}
+              {{ pendientes().length === 1 ? 'caja de un día anterior sigue abierta' : 'cajas de días anteriores siguen abiertas' }}.
+            </span>
+          </div>
+        </div>
+        <span class="pendientes__meta">Ciérralas antes de operar el día de hoy</span>
+      </header>
+
+      @if (errorPendientes()) {
+        <div class="pendientes__error" role="alert">{{ errorPendientes() }}</div>
+      }
+
+      @for (pendiente of pendientes(); track pendiente.id) {
+        <div class="pendiente">
+          <div class="pendiente__info">
+            <strong>Caja del {{ fechaPendiente(pendiente.fecha) }}</strong>
+            <span>esperado {{ moneda(pendiente.montoEsperado) }}</span>
+          </div>
+
+          @if (!puedeAdministrar()) {
+            <span class="pendiente__nota">
+              Hay una caja anterior sin cerrar. Pide al Dueño/Admin que la cierre.
+            </span>
+          } @else if (pendienteActiva() === pendiente.id) {
+            <div class="pendiente__form">
+              <div class="pendiente__campos">
+                <label class="pendiente__campo">
+                  <span>Efectivo contado</span>
+                  <span class="inline-input">
+                    <span class="inline-input__cur">S/</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputmode="decimal"
+                      aria-label="Efectivo contado de la caja pendiente"
+                      [value]="pendienteEfectivo()"
+                      (input)="onPendienteEfectivo($event)"
+                    />
+                  </span>
+                </label>
+                <label class="pendiente__campo">
+                  <span>Pagos digitales</span>
+                  <span class="inline-input">
+                    <span class="inline-input__cur">S/</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      inputmode="decimal"
+                      aria-label="Pagos digitales de la caja pendiente"
+                      [value]="pendienteDigitales()"
+                      (input)="onPendienteDigitales($event)"
+                    />
+                  </span>
+                </label>
+                <span class="pendiente__dif">
+                  Diferencia
+                  <strong
+                    [class.is-ok]="pendienteCuadrada(pendiente)"
+                    [class.is-bad]="!pendienteCuadrada(pendiente)"
+                  >
+                    {{ moneda(diferenciaPendiente(pendiente)) }}
+                  </strong>
+                </span>
+              </div>
+
+              <label class="pendiente__campo pendiente__campo--full">
+                <span>Observaciones <em>(obligatorias si hay diferencia)</em></span>
+                <textarea
+                  rows="2"
+                  maxlength="300"
+                  [value]="pendienteObservaciones()"
+                  (input)="onPendienteObservaciones($event)"
+                  placeholder="Ej. Cierre tardío por falta de personal"
+                ></textarea>
+              </label>
+
+              @if (errorPendiente()) {
+                <span class="nota nota--bad" role="alert">{{ errorPendiente() }}</span>
+              }
+
+              <div class="pendiente__acciones">
+                <span class="pendiente__contador">
+                  {{ pendienteObservaciones().length }}/300 · mínimo 5 caracteres
+                </span>
+                <button type="button" class="btn-ghost-dark" (click)="cancelarCerrarPendiente()">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  class="btn-brand btn-brand--compact"
+                  [disabled]="cerrandoPendiente()"
+                  (click)="confirmarCerrarPendiente(pendiente)"
+                >
+                  <app-icon name="check" [size]="14" />
+                  {{ cerrandoPendiente() ? 'Cerrando…' : 'Confirmar cierre' }}
+                </button>
+              </div>
+            </div>
+          } @else {
+            <button type="button" class="btn-pendiente" (click)="abrirCerrarPendiente(pendiente)">
+              <app-icon name="cash-register" [size]="14" />
+              Cerrar caja pendiente
+            </button>
+          }
+        </div>
+      }
+    </section>
+  }
+
+  @if (cierreBloqueado()) {
+    <div class="cierre-bloqueo" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <div class="cierre-bloqueo__texto">
+        <strong>No se pudo cerrar la caja</strong>
+        <span>{{ cierreBloqueado() }}</span>
+      </div>
+      <a class="cierre-bloqueo__link" routerLink="/cerrar-cuenta">Ver mesas abiertas</a>
+    </div>
+  }
+
   <div class="stepper">
     <div class="stepper__pasos">
       <a class="paso-done" routerLink="/cuadre-caja/apertura" title="Ir a apertura de caja">
@@ -283,7 +413,11 @@
             Al cerrar se archiva el turno; podrás reabrirlo con un motivo.
           </span>
         } @else if (estado() === 'cerrada') {
-          @if (mostrarReabrir()) {
+          @if (!puedeAdministrar()) {
+            <span class="diferencia__foot">
+              Solo el Dueño/Admin puede reabrir la caja.
+            </span>
+          } @else if (mostrarReabrir()) {
             <div class="reapertura-form">
               <label class="reapertura-field">
                 <span>Motivo de reapertura</span>

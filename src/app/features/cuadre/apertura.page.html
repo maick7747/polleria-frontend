@@ -11,6 +11,16 @@
     </span>
   </div>
 
+  @if (error()) {
+    <div class="error-apertura" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <span class="error-apertura__texto">{{ error() }}</span>
+      @if (cajaAnteriorAbierta()) {
+        <a class="error-apertura__link" routerLink="/cuadre-caja">Ir a Cuadre de caja</a>
+      }
+    </div>
+  }
+
   <div class="stepper">
     <div class="stepper__pasos">
       <span class="paso paso--activo">1</span>

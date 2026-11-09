@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { mensajeError } from '../../core/api/api.helpers';
+import { esApiError, mensajeError } from '../../core/api/api.helpers';
 import { USE_API } from '../../core/api/api.config';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { FichasService } from '../../core/data/fichas.service';
@@ -75,6 +75,7 @@ export class PedidoLocalPage {
   readonly items = signal<PedidoDetalle[]>([]);
   readonly observacion = signal<string>('');
   readonly toast = signal<string>('');
+  readonly cajaCerrada = signal<string>('');
   readonly enviando = signal(false);
   readonly moneda = formatearMoneda;
 
@@ -305,6 +306,7 @@ export class PedidoLocalPage {
       return;
     }
     this.enviando.set(true);
+    this.cajaCerrada.set('');
     try {
       let cuenta = this.cuenta();
       const items = this.items();
@@ -338,7 +340,11 @@ export class PedidoLocalPage {
         void this.router.navigate(['/venta-local']);
       }, 950);
     } catch (error) {
-      this.avisar(mensajeError(error));
+      const mensaje = mensajeError(error);
+      if (esApiError(error) && error.code === 'CAJA_CERRADA') {
+        this.cajaCerrada.set(mensaje);
+      }
+      this.avisar(mensaje);
     } finally {
       this.enviando.set(false);
     }

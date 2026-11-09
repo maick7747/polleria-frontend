@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { mensajeError } from '../../core/api/api.helpers';
+import { esApiError, mensajeError } from '../../core/api/api.helpers';
 import { CuentasService } from '../../core/data/cuentas.service';
 import type { MetodoPago } from '../../core/models';
 import {
@@ -76,6 +76,7 @@ export class CuentaDetallePage {
   readonly error = signal<string | null>(null);
   readonly toast = signal('');
   readonly toastError = signal(false);
+  readonly cajaCerrada = signal('');
 
   private toastTimer: number | null = null;
   private navTimer: number | null = null;
@@ -220,6 +221,7 @@ export class CuentaDetallePage {
     }
 
     this.procesando.set(true);
+    this.cajaCerrada.set('');
     const numero = this.numeroComprobante(cuenta.comprobanteTipo);
     try {
       const cerrada = await this.cuentas.cerrar(
@@ -243,7 +245,11 @@ export class CuentaDetallePage {
       }, 1600);
     } catch (error) {
       this.procesando.set(false);
-      this.avisar(mensajeError(error), true);
+      const mensaje = mensajeError(error);
+      if (esApiError(error) && error.code === 'CAJA_CERRADA') {
+        this.cajaCerrada.set(mensaje);
+      }
+      this.avisar(mensaje, true);
     }
   }
 

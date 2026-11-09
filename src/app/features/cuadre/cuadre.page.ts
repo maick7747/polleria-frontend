@@ -9,8 +9,12 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { USE_API } from '../../core/api/api.config';
-import { mensajeError } from '../../core/api/api.helpers';
-import { CuadreService, type CuadreHistorialFila } from '../../core/data/cuadre.service';
+import { mensajeError, esApiError } from '../../core/api/api.helpers';
+import {
+  CuadreService,
+  type CuadreHistorialFila,
+  type CuadrePendiente,
+} from '../../core/data/cuadre.service';
 import { PagosService } from '../../core/data/pagos.service';
 import type { MetodoPago } from '../../core/models';
 import { descargarBlob } from '../../core/utils/descarga';
@@ -124,6 +128,24 @@ export class CuadrePage {
   readonly motivoReaperturaInput = signal<string>('');
   readonly errorMotivo = signal<string>('');
   readonly reabriendo = signal<boolean>(false);
+
+  readonly puedeAdministrar = computed<boolean>(() =>
+    this.auth.hasAnyRole(['Dueño/Admin', 'Admin'] as const),
+  );
+
+  // Cajas de días anteriores sin cerrar.
+  readonly pendientes = this.cuadre.pendientes;
+  readonly cargandoPendientes = this.cuadre.cargandoPendientes;
+  readonly errorPendientes = this.cuadre.errorPendientes;
+  readonly pendienteActiva = signal<number | null>(null);
+  readonly pendienteEfectivo = signal<number>(0);
+  readonly pendienteDigitales = signal<number>(0);
+  readonly pendienteObservaciones = signal<string>('');
+  readonly errorPendiente = signal<string>('');
+  readonly cerrandoPendiente = signal<boolean>(false);
+
+  // Cierre bloqueado por cuentas abiertas (409 CUENTAS_ABIERTAS).
+  readonly cierreBloqueado = signal<string>('');
 
   readonly reabiertaTexto = computed<string>(() => {
     const fecha = this.reabiertoEn();
@@ -350,6 +372,7 @@ export class CuadrePage {
     }
 
     if (!this.confirmando()) {
+      this.cierreBloqueado.set('');
       this.confirmando.set(true);
       return;
     }
@@ -357,6 +380,7 @@ export class CuadrePage {
     try {
       await this.cuadre.cerrar(this.efectivoContado(), this.pagosDigitales());
       this.confirmando.set(false);
+      this.cierreBloqueado.set('');
 
       const mensaje = this.cuadrado()
         ? 'Caja cerrada · cuadre exacto'
@@ -368,6 +392,11 @@ export class CuadrePage {
       }, 1100);
     } catch (error) {
       this.confirmando.set(false);
+      // El backend responde 409 CUENTAS_ABIERTAS con el número de cuentas:
+      // se muestra el mensaje del servidor y un acceso directo a las mesas.
+      if (esApiError(error) && error.code === 'CUENTAS_ABIERTAS') {
+        this.cierreBloqueado.set(mensajeError(error));
+      }
       this.avisar(mensajeError(error), true);
     }
   }
@@ -380,7 +409,99 @@ export class CuadrePage {
     void this.router.navigate(['/cuadre-caja/apertura']);
   }
 
+  fechaPendiente(fecha: string): string {
+    const [anio, mes, dia] = fecha.slice(0, 10).split('-');
+    return anio && mes && dia ? `${dia}/${mes}/${anio}` : fecha;
+  }
+
+  diferenciaPendiente(pendiente: CuadrePendiente): number {
+    return round2(
+      this.pendienteEfectivo() + this.pendienteDigitales() - pendiente.montoEsperado,
+    );
+  }
+
+  pendienteCuadrada(pendiente: CuadrePendiente): boolean {
+    return Math.abs(this.diferenciaPendiente(pendiente)) < 0.005;
+  }
+
+  abrirCerrarPendiente(pendiente: CuadrePendiente): void {
+    if (!this.puedeAdministrar() || this.cerrandoPendiente()) {
+      return;
+    }
+    this.pendienteActiva.set(pendiente.id);
+    this.pendienteEfectivo.set(0);
+    this.pendienteDigitales.set(0);
+    this.pendienteObservaciones.set('');
+    this.errorPendiente.set('');
+  }
+
+  cancelarCerrarPendiente(): void {
+    this.pendienteActiva.set(null);
+    this.pendienteObservaciones.set('');
+    this.errorPendiente.set('');
+  }
+
+  onPendienteEfectivo(event: Event): void {
+    const valor = Number((event.target as HTMLInputElement).value);
+    this.pendienteEfectivo.set(Number.isFinite(valor) ? round2(Math.max(0, valor)) : 0);
+    this.errorPendiente.set('');
+  }
+
+  onPendienteDigitales(event: Event): void {
+    const valor = Number((event.target as HTMLInputElement).value);
+    this.pendienteDigitales.set(Number.isFinite(valor) ? round2(Math.max(0, valor)) : 0);
+    this.errorPendiente.set('');
+  }
+
+  onPendienteObservaciones(event: Event): void {
+    this.pendienteObservaciones.set((event.target as HTMLTextAreaElement).value);
+    this.errorPendiente.set('');
+  }
+
+  async confirmarCerrarPendiente(pendiente: CuadrePendiente): Promise<void> {
+    if (!this.puedeAdministrar() || this.cerrandoPendiente()) {
+      return;
+    }
+    const observaciones = this.pendienteObservaciones().trim();
+    const diferencia = this.diferenciaPendiente(pendiente);
+
+    if (observaciones.length > 300) {
+      this.errorPendiente.set('La observación no puede superar los 300 caracteres.');
+      return;
+    }
+    if (observaciones.length > 0 && observaciones.length < 5) {
+      this.errorPendiente.set('La observación debe tener al menos 5 caracteres.');
+      return;
+    }
+    if (Math.abs(diferencia) >= 0.005 && observaciones.length === 0) {
+      this.errorPendiente.set('Registra una observación cuando hay diferencia.');
+      return;
+    }
+
+    this.cerrandoPendiente.set(true);
+    this.errorPendiente.set('');
+    try {
+      await this.cuadre.cerrarPendiente(
+        pendiente.id,
+        this.pendienteEfectivo(),
+        this.pendienteDigitales(),
+        observaciones,
+      );
+      this.pendienteActiva.set(null);
+      this.pendienteObservaciones.set('');
+      this.avisar(`Caja del ${this.fechaPendiente(pendiente.fecha)} cerrada`);
+    } catch (error) {
+      // 403/409/422 llegan con el mensaje del servidor (ApiError).
+      this.errorPendiente.set(mensajeError(error));
+    } finally {
+      this.cerrandoPendiente.set(false);
+    }
+  }
+
   abrirReabrir(): void {
+    if (!this.puedeAdministrar()) {
+      return;
+    }
     this.mostrarReabrir.set(true);
     this.motivoReaperturaInput.set('');
     this.errorMotivo.set('');
@@ -399,6 +520,10 @@ export class CuadrePage {
 
   async confirmarReabrir(): Promise<void> {
     if (this.reabriendo()) {
+      return;
+    }
+    if (!this.puedeAdministrar()) {
+      this.errorMotivo.set('Solo el Dueño/Admin puede reabrir la caja.');
       return;
     }
     const motivo = this.motivoReaperturaInput().trim();

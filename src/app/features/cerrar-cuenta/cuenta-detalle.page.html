@@ -10,6 +10,17 @@
     </a>
   </div>
 
+  @if (cajaCerrada()) {
+    <div class="estado estado--error" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <div class="estado__texto">
+        <strong>Caja cerrada</strong>
+        <span>{{ cajaCerrada() }}</span>
+      </div>
+      <a class="estado__btn" routerLink="/cuadre-caja/apertura">Abrir caja</a>
+    </div>
+  }
+
   @if (error() && cuenta()) {
     <div class="estado estado--error" role="alert">
       <app-icon name="warning-circle" [size]="16" />

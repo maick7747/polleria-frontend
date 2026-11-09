@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { mensajeError } from '../../core/api/api.helpers';
+import { esApiError, mensajeError } from '../../core/api/api.helpers';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
 import { RealtimeService } from '../../core/data/realtime.service';
@@ -83,6 +83,7 @@ export class CerrarCuentaPage {
   readonly aviso = signal('');
   readonly avisoLento = signal(false);
   readonly toast = signal('');
+  readonly cajaCerrada = signal('');
 
   readonly cargando = this.cuentas.cargando;
   readonly error = this.cuentas.error;
@@ -229,6 +230,7 @@ export class CerrarCuentaPage {
     }
     this.liberando.set(true);
     this.aviso.set('');
+    this.cajaCerrada.set('');
     try {
       const liberada = await this.cuentas.cancelarCuenta(seleccionada.cuenta.id);
       if (liberada) {
@@ -237,7 +239,11 @@ export class CerrarCuentaPage {
         this.aviso.set('No se pudo liberar la mesa.');
       }
     } catch (error) {
-      this.aviso.set(mensajeError(error));
+      const mensaje = mensajeError(error);
+      if (esApiError(error) && error.code === 'CAJA_CERRADA') {
+        this.cajaCerrada.set(mensaje);
+      }
+      this.aviso.set(mensaje);
     } finally {
       this.liberando.set(false);
     }

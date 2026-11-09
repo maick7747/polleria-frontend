@@ -6,9 +6,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { mensajeError } from '../../core/api/api.helpers';
+import { esApiError, mensajeError } from '../../core/api/api.helpers';
 import { CuadreService } from '../../core/data/cuadre.service';
 import { abreviarNombre, fechaCorta, formatearMoneda, round2, turnoActual } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
@@ -34,6 +34,7 @@ const DENOMINACIONES_INICIALES: readonly Denominacion[] = [
   selector: 'app-apertura-caja-page',
   standalone: true,
   imports: [
+    RouterLink,
     AppShellComponent,
     ChipComponent,
     DarkPanelComponent,
@@ -73,6 +74,8 @@ export class AperturaCajaPage {
     DENOMINACIONES_INICIALES.map((denominacion) => ({ ...denominacion })),
   );
   readonly toast = signal('');
+  readonly error = signal('');
+  readonly cajaAnteriorAbierta = signal(false);
 
   readonly responsable = computed<string>(() => {
     const usuario = this.auth.usuario();
@@ -143,6 +146,8 @@ export class AperturaCajaPage {
       return;
     }
     const fondo = this.fondoInicial();
+    this.error.set('');
+    this.cajaAnteriorAbierta.set(false);
     try {
       await this.cuadre.abrir(fondo);
       this.toast.set(`Caja abierta · fondo ${this.moneda(fondo)}`);
@@ -150,8 +155,11 @@ export class AperturaCajaPage {
         void this.router.navigate(['/dashboard']);
       }, 950);
     } catch (error) {
-      this.toast.set(mensajeError(error));
-      this.temporizador = window.setTimeout(() => this.toast.set(''), 2600);
+      // Error persistente: el usuario debe verlo y decidir (no hay navegación).
+      this.error.set(mensajeError(error));
+      if (esApiError(error) && error.code === 'CAJA_ANTERIOR_ABIERTA') {
+        this.cajaAnteriorAbierta.set(true);
+      }
     }
   }
 }

@@ -884,3 +884,242 @@
     min-width: 860px;
   }
 }
+
+/* --- Cajas pendientes de cierre (Opción A) ------------------------------ */
+.pendientes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--c-warning-soft);
+  border-radius: 14px;
+  background: var(--c-warning-soft);
+}
+
+.pendientes__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.pendientes__title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pendientes__title strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--c-warning);
+}
+
+.pendientes__title span {
+  font-size: 11.5px;
+  color: var(--c-text-2);
+}
+
+.pendientes__meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-warning);
+  white-space: nowrap;
+}
+
+.pendientes__error {
+  padding: 8px 12px;
+  border: 1px solid var(--c-danger-soft);
+  border-radius: 10px;
+  background: var(--c-danger-soft);
+  color: var(--c-brand-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pendiente {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  background: var(--c-white);
+}
+
+.pendiente__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pendiente__info strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.pendiente__info span {
+  font-size: 11.5px;
+  color: var(--c-text-2);
+}
+
+.pendiente__nota {
+  font-size: 11.5px;
+  color: var(--c-text-2);
+}
+
+.pendiente__form {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--c-hairline);
+}
+
+.pendiente__campos {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.pendiente__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.pendiente__campo em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--c-text-3);
+}
+
+.pendiente__campo--full {
+  width: 100%;
+}
+
+.pendiente__campo textarea {
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 10px;
+  background: var(--c-white);
+  color: var(--c-text);
+  font: 12.5px/1.4 var(--font-body);
+  resize: vertical;
+}
+
+.pendiente__dif {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 4px;
+  font-size: 11.5px;
+  color: var(--c-text-2);
+}
+
+.pendiente__dif strong {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pendiente__acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pendiente__contador {
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--c-text-3);
+}
+
+.btn-pendiente {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--c-warning);
+  border-radius: var(--r-pill);
+  background: var(--c-white);
+  color: var(--c-warning);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.btn-pendiente:hover {
+  background: #fffaf1;
+}
+
+.btn-brand--compact {
+  height: 38px;
+  flex: 0 0 38px;
+  margin-top: 0;
+  padding: 0 16px;
+  font-size: 12px;
+}
+
+/* --- Cierre bloqueado por cuentas abiertas ----------------------------- */
+.cierre-bloqueo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-danger-soft);
+  border-radius: 12px;
+  background: var(--c-danger-soft);
+  color: var(--c-brand-text);
+}
+
+.cierre-bloqueo__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+
+.cierre-bloqueo__texto strong {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.cierre-bloqueo__texto span {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cierre-bloqueo__link {
+  height: 32px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cierre-bloqueo__link:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+

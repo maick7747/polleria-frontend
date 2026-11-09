@@ -14,6 +14,31 @@ export interface CuadreHistorialQuery {
   sort?: string;
 }
 
+export interface CuadrePendienteDto {
+  id: number;
+  fecha: string;
+  estado: string;
+  fondo_inicial: number;
+  total_ventas?: number;
+  total_egresos?: number;
+  monto_esperado?: number;
+  resumen?: {
+    total_ventas?: number;
+    total_egresos?: number;
+    monto_esperado?: number;
+  };
+}
+
+export interface CuadrePendiente {
+  id: number;
+  fecha: string;
+  estado: string;
+  fondoInicial: number;
+  totalVentas: number;
+  totalEgresos: number;
+  montoEsperado: number;
+}
+
 export interface CuadreHistorialFila {
   id: number;
   fecha: string;
@@ -44,6 +69,16 @@ const HISTORIAL_META_INICIAL: PageMeta = {
   total: USE_API ? 0 : HISTORIAL_DEMO.length,
   pages: USE_API ? 0 : Math.ceil(HISTORIAL_DEMO.length / 10),
 };
+
+const mapaPendiente = (dto: CuadrePendienteDto): CuadrePendiente => ({
+  id: dto.id,
+  fecha: dto.fecha,
+  estado: dto.estado,
+  fondoInicial: Number(dto.fondo_inicial ?? 0),
+  totalVentas: Number(dto.resumen?.total_ventas ?? dto.total_ventas ?? 0),
+  totalEgresos: Number(dto.resumen?.total_egresos ?? dto.total_egresos ?? 0),
+  montoEsperado: Number(dto.resumen?.monto_esperado ?? dto.monto_esperado ?? 0),
+});
 
 const mapaCuadre = (dto: CuadreDto): CuadreHistorialFila => ({
   id: dto.id,
@@ -80,6 +115,11 @@ export class CuadreService {
   readonly historialCargando = signal<boolean>(false);
   readonly historialError = signal<string | null>(null);
 
+  // Cajas de días anteriores que siguen abiertas (Opción A: 1 caja por día).
+  readonly pendientes = signal<CuadrePendiente[]>([]);
+  readonly cargandoPendientes = signal<boolean>(false);
+  readonly errorPendientes = signal<string | null>(null);
+
   readonly abierta = signal<boolean>(false);
   readonly estado = signal<string>(USE_API ? '' : 'abierta');
   readonly reabiertoEn = signal<string | null>(null);
@@ -111,6 +151,8 @@ export class CuadreService {
     if (!silencioso) {
       this.cargando.set(true);
       this.error.set(null);
+      // Las cajas pendientes acompañan la carga del día; un fallo no bloquea.
+      void this.cargarPendientes();
     }
     try {
       const dto = await firstValueFrom(this.api.get<CuadreDto | null>('/cuadre-caja'));
@@ -137,6 +179,59 @@ export class CuadreService {
         this.cargando.set(false);
       }
     }
+  }
+
+  /**
+   * Cajas abiertas de días anteriores. Se listan para cerrarlas antes de
+   * operar el día de hoy (Opción A: una sola caja por día).
+   */
+  async cargarPendientes(): Promise<boolean> {
+    if (!USE_API) {
+      this.pendientes.set([]);
+      this.errorPendientes.set(null);
+      return true;
+    }
+    this.cargandoPendientes.set(true);
+    this.errorPendientes.set(null);
+    try {
+      const respuesta = await firstValueFrom(
+        this.api.get<{ data: CuadrePendienteDto[] }>('/cuadre-caja/pendientes'),
+      );
+      this.pendientes.set((respuesta?.data ?? []).map(mapaPendiente));
+      return true;
+    } catch (error) {
+      this.errorPendientes.set(mensajeError(error));
+      return false;
+    } finally {
+      this.cargandoPendientes.set(false);
+    }
+  }
+
+  /**
+   * Cierra una caja de un día anterior. Propaga el `ApiError` del servidor
+   * (403 SOLO_ADMIN, 409 CUENTAS_ABIERTAS, 422) para que la página lo muestre.
+   */
+  async cerrarPendiente(
+    id: number,
+    efectivoContado: number,
+    pagosDigitales: number,
+    observaciones: string,
+  ): Promise<boolean> {
+    const obs = observaciones.trim();
+    if (!USE_API) {
+      this.pendientes.update((lista) => lista.filter((pendiente) => pendiente.id !== id));
+      return true;
+    }
+    await firstValueFrom(
+      this.api.post<CuadreDto>(`/cuadre-caja/${id}/cierre`, {
+        efectivo_contado: efectivoContado,
+        pagos_digitales: pagosDigitales,
+        observaciones: obs ? obs : null,
+      }),
+    );
+    await this.cargarPendientes();
+    await this.cargar();
+    return true;
   }
 
   async abrir(fondoInicial: number): Promise<boolean> {
