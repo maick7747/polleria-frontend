@@ -101,6 +101,7 @@ export class AuthService {
       void firstValueFrom(this.api.post<void>('/auth/logout')).catch(() => undefined);
     }
     this.sesion.set(null);
+    this.api.limpiarCacheEtag();
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
     }

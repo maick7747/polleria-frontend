@@ -132,18 +132,22 @@ export class PedidosService {
     this.cargando.set(true);
     this.error.set(null);
     try {
-      const respuesta = await firstValueFrom(
-        this.api.get<ApiList<KdsPedidoDto>>('/kds/pedidos'),
+      const resultado = await firstValueFrom(
+        this.api.getConEtag<ApiList<KdsPedidoDto>>('/kds/pedidos'),
       );
-      this.pedidos.set(respuesta.data.map(toPedidoKds));
-      this.meta.set({
-        page: 1,
-        limit: respuesta.data.length,
-        total: respuesta.meta.total ?? respuesta.data.length,
-        pages: 1,
-        prioritarios: respuesta.meta.prioritarios,
-        sla_min: respuesta.meta.sla_min,
-      });
+      // 304: el KDS no cambió; se conserva la lista actual sin repintar.
+      if (resultado.changed && resultado.data) {
+        const respuesta = resultado.data;
+        this.pedidos.set(respuesta.data.map(toPedidoKds));
+        this.meta.set({
+          page: 1,
+          limit: respuesta.data.length,
+          total: respuesta.meta.total ?? respuesta.data.length,
+          pages: 1,
+          prioritarios: respuesta.meta.prioritarios,
+          sla_min: respuesta.meta.sla_min,
+        });
+      }
       return true;
     } catch (error) {
       this.error.set(mensajeError(error));

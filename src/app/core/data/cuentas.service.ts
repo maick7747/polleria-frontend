@@ -80,11 +80,15 @@ export class CuentasService {
       this.aviso.set(null);
     }
     try {
-      const tablero = await firstValueFrom(
-        this.api.get<TableroDto>('/venta-local/tablero'),
+      const resultado = await firstValueFrom(
+        this.api.getConEtag<TableroDto>('/venta-local/tablero'),
       );
-      this.cuentas.set(tablero.cuentas.map(toCuenta));
-      this.mesas.reemplazar(tablero.mesas);
+      // 304: el tablero no cambió; no se reasignan señales (evita repintado).
+      if (resultado.changed && resultado.data) {
+        const tablero = resultado.data;
+        this.cuentas.set(tablero.cuentas.map(toCuenta));
+        this.mesas.reemplazar(tablero.mesas);
+      }
       this.error.set(null);
       this.aviso.set(null);
       return true;

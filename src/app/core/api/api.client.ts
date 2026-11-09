@@ -3,11 +3,12 @@ import {
   HttpErrorResponse,
   HttpHeaders,
   HttpParams,
+  HttpResponse,
 } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, TimeoutError, throwError } from 'rxjs';
-import { catchError, timeout } from 'rxjs/operators';
+import { Observable, of, TimeoutError, throwError } from 'rxjs';
+import { catchError, map, timeout } from 'rxjs/operators';
 import { API_BASE_URL, SESSION_STORAGE_KEY, USE_API } from './api.config';
 
 // Cold start de Render: el backend puede tardar ~60 s en despertar. Damos 45 s
@@ -23,19 +24,116 @@ export interface ApiError {
 
 export type QueryValue = string | number | boolean | null | undefined;
 
+export interface EtagResponse<T> {
+  data: T | null;
+  changed: boolean;
+  status: number;
+}
+
+interface EntradaEtag {
+  etag: string;
+  data: unknown;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiClient {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private redirigiendo = false;
 
+  // Caché en memoria de respuestas condicionales (ETag + body) por URL+query.
+  private readonly cacheEtag = new Map<string, EntradaEtag>();
+
   readonly baseUrl = API_BASE_URL;
   readonly habilitado = USE_API;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('fratelli:sesion-expirada', () =>
+        this.limpiarCacheEtag(),
+      );
+    }
+  }
 
   get<T>(path: string, query?: Record<string, QueryValue>): Observable<T> {
     return this.http
       .get<T>(this.url(path), { headers: this.headers(), params: this.params(query) })
       .pipe(timeout(REQUEST_TIMEOUT_MS), catchError((error: unknown) => this.fail(error)));
+  }
+
+  /**
+   * GET condicional: envía `If-None-Match` con el ETag guardado para esa
+   * URL+query y, si el servidor responde 304, reutiliza el body cacheado sin
+   * pasar por `fail()` (no cierra sesión ni redirige).
+   */
+  getConEtag<T>(
+    path: string,
+    query?: Record<string, QueryValue>,
+  ): Observable<EtagResponse<T>> {
+    const url = this.url(path);
+    const params = this.params(query);
+    const clave = this.claveEtag(url, params);
+    const cacheado = this.cacheEtag.get(clave);
+
+    let headers = this.headers();
+    if (cacheado) {
+      headers = headers.set('If-None-Match', cacheado.etag);
+    }
+
+    return this.http
+      .get<T>(url, { headers, params, observe: 'response' })
+      .pipe(
+        timeout(REQUEST_TIMEOUT_MS),
+        map((respuesta: HttpResponse<T>) =>
+          this.leerRespuesta(clave, respuesta, cacheado),
+        ),
+        catchError((error: unknown) => {
+          const httpError = error as Partial<HttpErrorResponse>;
+          if (httpError.status === 304) {
+            return of<EtagResponse<T>>({
+              data: (cacheado?.data as T | undefined) ?? null,
+              changed: false,
+              status: 304,
+            });
+          }
+          return this.fail(error);
+        }),
+      );
+  }
+
+  // Descarta el caché condicional (logout o sesión expirada).
+  limpiarCacheEtag(): void {
+    this.cacheEtag.clear();
+  }
+
+  private leerRespuesta<T>(
+    clave: string,
+    respuesta: HttpResponse<T>,
+    cacheado: EntradaEtag | undefined,
+  ): EtagResponse<T> {
+    // Algunos clientes entregan el 304 por el camino de éxito: mismo trato.
+    if (respuesta.status === 304) {
+      return {
+        data: (cacheado?.data as T | undefined) ?? null,
+        changed: false,
+        status: 304,
+      };
+    }
+
+    const etag = respuesta.headers.get('ETag') ?? respuesta.headers.get('etag');
+    if (etag) {
+      this.cacheEtag.set(clave, { etag, data: respuesta.body });
+    } else {
+      // Sin ETag no hay validación posible: no reutilizar una entrada vieja.
+      this.cacheEtag.delete(clave);
+    }
+
+    return { data: respuesta.body, changed: true, status: respuesta.status };
+  }
+
+  private claveEtag(url: string, params: HttpParams): string {
+    const query = params.toString();
+    return query ? `${url}?${query}` : url;
   }
 
   post<T>(path: string, body: unknown = {}): Observable<T> {
@@ -144,6 +242,7 @@ export class ApiClient {
   }
 
   private cerrarSesionExpirada(): void {
+    this.limpiarCacheEtag();
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(SESSION_STORAGE_KEY);
     }

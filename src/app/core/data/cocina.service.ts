@@ -68,10 +68,12 @@ export class CocinaService {
     if (!USE_API) {
       return [];
     }
-    const respuesta = await firstValueFrom(
-      this.api.get<ApiList<PedidoListoDto>>('/pedidos-listos'),
+    const resultado = await firstValueFrom(
+      this.api.getConEtag<ApiList<PedidoListoDto>>('/pedidos-listos'),
     );
-    return respuesta.data;
+    // 304: se devuelve el array cacheado (misma referencia) para que el
+    // consumidor no repinte la lista.
+    return resultado.data?.data ?? [];
   }
 
   private origen(pedido: Pedido): ComandaKds['origen'] {
