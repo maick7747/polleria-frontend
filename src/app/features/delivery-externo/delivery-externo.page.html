@@ -1,205 +1,387 @@
-<app-shell
-  [title]="'Delivery externo · ' + etiquetaPlataforma()"
-  [subtitle]="numeroPedido + ' · recibido 17:04 · la plataforma cobra al cliente'"
->
+<app-shell [title]="'Delivery externo'" [subtitle]="subtitulo()">
   <div actions class="header-actions">
     <span class="live">
       <span class="live__dot"></span>
-      En vivo · 2 pedidos externos
+      Rappi · LlamaFood
     </span>
     <a class="ghost-link" routerLink="/dashboard">
       <app-icon name="clock" [size]="14" />
-      Actualizar
+      Volver al tablero
     </a>
   </div>
 
-  <div class="plataformas">
-    <div class="plataformas__chips" role="group" aria-label="Plataforma externa">
-      <button
-        type="button"
-        class="plat"
-        [class.is-active]="plataforma() === 'rappi'"
-        (click)="plataforma.set('rappi')"
-      >
-        <app-icon name="package" [size]="12" />
-        Rappi
-        <span class="plat__pct">25%</span>
-      </button>
-      <button
-        type="button"
-        class="plat"
-        [class.is-active]="plataforma() === 'llamafood'"
-        (click)="plataforma.set('llamafood')"
-      >
-        <app-icon name="package" [size]="12" />
-        LlamaFood
-        <span class="plat__pct">20%</span>
+  <nav class="tabs" aria-label="Secciones de delivery externo">
+    <button
+      type="button"
+      class="tab"
+      [class.is-active]="vista() === 'pedidos'"
+      (click)="cambiarVista('pedidos')"
+    >
+      Pedidos
+    </button>
+    <button
+      type="button"
+      class="tab"
+      [class.is-active]="vista() === 'liquidaciones'"
+      (click)="cambiarVista('liquidaciones')"
+    >
+      Liquidaciones
+    </button>
+  </nav>
+
+  <div class="canales">
+    <div class="filtros">
+      <label class="filtro-campo">
+        <span>Plataforma</span>
+        <select [value]="plataforma()" (change)="onPlataforma($event)">
+          @for (item of plataformas; track item.valor) {
+            <option [value]="item.valor">{{ item.texto }}</option>
+          }
+        </select>
+      </label>
+      @if (vista() === 'pedidos') {
+        <label class="filtro-campo">
+          <span>Estado</span>
+          <select [value]="estado()" (change)="onEstado($event)">
+            @for (item of estados; track item.valor) {
+              <option [value]="item.valor">{{ item.texto }}</option>
+            }
+          </select>
+        </label>
+      }
+      <label class="filtro-campo">
+        <span>Desde</span>
+        <input type="date" [value]="desde()" (change)="onDesde($event)" />
+      </label>
+      <label class="filtro-campo">
+        <span>Hasta</span>
+        <input type="date" [value]="hasta()" (change)="onHasta($event)" />
+      </label>
+      @if (cargando() || liquidacionesCargando()) {
+        <span class="cargando">Cargando…</span>
+      }
+    </div>
+
+    <div class="canales__acciones">
+      <button type="button" class="ghost-link" (click)="reintentar()">
+        <app-icon name="arrow-clockwise" [size]="14" />
+        Actualizar
       </button>
     </div>
-    <span class="plataformas__meta">
-      Sin cobro en el local · la comisión se descuenta al depositar
-    </span>
   </div>
 
-  <div class="board">
-    <app-panel class="pedido">
-      <div class="pedido__inner">
-        <header class="pedido__head">
-          <span class="pedido__numero">{{ numeroPedido }}</span>
-          <span class="tag tag--info">{{ etiquetaPlataforma() }}</span>
-          <span class="tag tag--warning">En cocina</span>
-          <span class="pedido__recibido">Recibido 17:04 · hace 12 min</span>
-        </header>
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
 
-        <span class="sep"></span>
+  @if (liquidacionesError()) {
+    <div class="error-banner" role="alert">
+      <span>{{ liquidacionesError() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
 
-        <div class="datos">
-          <div class="datos__col">
-            <div class="dato">
-              <span class="dato__label">Cliente</span>
-              <strong class="dato__valor">{{ clienteNombre }}</strong>
+  @if (vista() === 'pedidos') {
+    <div class="board">
+      <app-panel class="pedido">
+        <div class="pedido__inner">
+          <header class="panel-head">
+            <div class="panel-title">
+              <span class="bar"></span>
+              <h2>Pedidos de plataforma</h2>
             </div>
-            <div class="dato">
-              <span class="dato__label">Teléfono</span>
-              <span class="dato__valor">{{ clienteTelefono }}</span>
+            <span class="panel-meta">{{ meta().total }} pedidos · {{ lista().length }} en pantalla</span>
+          </header>
+
+          <div class="lista">
+            <div class="fila fila--head">
+              <span>PEDIDO</span>
+              <span>CLIENTE / DIRECCIÓN</span>
+              <span>PLATAFORMA</span>
+              <span>COMISIÓN</span>
+              <span>ESTADO</span>
+              <span class="right">NETO</span>
             </div>
-            <div class="dato">
-              <span class="dato__label">Dirección</span>
-              <span class="dato__valor">{{ direccion }}</span>
-            </div>
-            <div class="dato">
-              <span class="dato__label">Referencia</span>
-              <span class="dato__valor dato__valor--muted">{{ referencia }}</span>
-            </div>
-          </div>
 
-          <span class="col-sep"></span>
-
-          <aside class="repartidor">
-            <span class="repartidor__label">Repartidor asignado</span>
-            <div class="repartidor__row">
-              <span class="repartidor__avatar">RC</span>
-              <div class="repartidor__data">
-                <span class="repartidor__nombre">Repartidor Rappi</span>
-                <span class="repartidor__meta">Asignado por la app</span>
-              </div>
-            </div>
-          </aside>
-        </div>
-
-        <span class="sep"></span>
-
-        <div class="items__head">
-          <h2>Ítems del pedido</h2>
-          <span>3 ítems · plaza Rappi</span>
-        </div>
-
-        @for (item of items; track item.id; let i = $index) {
-          <div class="item">
-            <span class="item__idx">{{ i + 1 }}</span>
-            <app-icon name="flame" [size]="15" class="item__icon" />
-            <div class="item__data">
-              <span class="item__name">{{ item.nombre }}</span>
-              <span class="item__notas">{{ item.notas }}</span>
-            </div>
-            <span class="item__price">{{ moneda(item.subtotal) }}</span>
-          </div>
-        }
-
-        <p class="obs">
-          <app-icon name="warning-circle" [size]="13" />
-          Observaciones: {{ observaciones }}
-        </p>
-
-        <div class="pedido__grow"></div>
-
-        <span class="sep"></span>
-
-        <div class="total">
-          <span>Total del pedido</span>
-          <div class="total__amount">
-            <span class="cur">S/</span>
-            <span class="big">{{ total().toFixed(2) }}</span>
-          </div>
-        </div>
-      </div>
-    </app-panel>
-
-    <app-dark-panel class="liquidacion">
-      <div class="liquidacion__inner">
-        <header class="liquidacion__head">
-          <span class="liquidacion__kicker">LIQUIDACIÓN</span>
-          <span class="liquidacion__plat">
-            <span class="liquidacion__dot"></span>
-            {{ etiquetaPlataforma() }} {{ comisionPct() }}%
-          </span>
-        </header>
-
-        <span class="liquidacion__label">Total que paga el cliente</span>
-        <div class="liquidacion__amount">
-          <span class="cur">S/</span>
-          <span class="big">{{ total().toFixed(2) }}</span>
-        </div>
-
-        <span class="liquidacion__sep"></span>
-
-        <div class="comisiones">
-          @for (fila of comisiones(); track fila.etiqueta) {
-            <div class="comision">
-              <div class="comision__info">
-                <span class="comision__name" [class.comision__name--muted]="!fila.activa">
-                  {{ fila.etiqueta }}
+            @for (pedido of lista(); track pedido.id) {
+              <button
+                type="button"
+                class="fila"
+                [class.is-active]="seleccionado()?.id === pedido.id"
+                (click)="seleccionar(pedido.id)"
+              >
+                <span class="fila__numero">{{ pedido.numero }}</span>
+                <span class="fila__cliente">
+                  <strong>{{ pedido.clienteNombre }}</strong>
+                  <small>{{ pedido.direccion }}</small>
                 </span>
-                <span class="comision__pct">{{ fila.pct }}% sobre el total</span>
+                <span class="fila__meta">{{ plataformaTexto(pedido.plataforma) }}</span>
+                <span class="fila__meta">{{ pedido.comisionPct }}%</span>
+                <span class="fila__estado">
+                  <app-chip [variant]="estadoTono(pedido.estado)">
+                    {{ estadoTexto(pedido.estado) }}
+                  </app-chip>
+                </span>
+                <span class="fila__total">{{ moneda(pedido.montoNeto) }}</span>
+              </button>
+            } @empty {
+              <div class="lista__empty">
+                <app-empty-state
+                  icon="package"
+                  title="Sin pedidos externos"
+                  description="No hay pedidos de plataformas externas con los filtros elegidos."
+                />
               </div>
-              @if (fila.activa) {
-                <span class="comision__monto">- {{ moneda(fila.monto) }}</span>
-              } @else {
-                <span class="comision__monto comision__monto--muted">{{ moneda(0) }}</span>
+            }
+          </div>
+
+          <app-paginador
+            [page]="pagina()"
+            [pages]="meta().pages"
+            [total]="meta().total"
+            [limit]="limite()"
+            (pageChange)="cambiarPagina($event)"
+            (limitChange)="cambiarLimite($event)"
+          />
+        </div>
+      </app-panel>
+
+      <app-dark-panel class="liquidacion">
+        <div class="liquidacion__inner">
+          @if (seleccionado(); as pedido) {
+            <header class="liquidacion__head">
+              <span class="liquidacion__kicker">PEDIDO {{ pedido.numero }}</span>
+              <span class="liquidacion__plat">
+                <span class="liquidacion__dot"></span>
+                {{ plataformaTexto(pedido.plataforma) }} {{ pedido.comisionPct }}%
+              </span>
+            </header>
+
+            <span class="liquidacion__label">Total que paga el cliente</span>
+            <div class="liquidacion__amount">
+              <span class="cur">S/</span>
+              <span class="big">{{ pedido.montoBruto.toFixed(2) }}</span>
+            </div>
+
+            <span class="liquidacion__sep"></span>
+
+            <div class="detalle">
+              <div class="detalle__row">
+                <span>Cliente</span>
+                <strong>{{ pedido.clienteNombre }}</strong>
+              </div>
+              <div class="detalle__row">
+                <span>Dirección</span>
+                <strong>{{ pedido.direccion }}</strong>
+              </div>
+              <div class="detalle__row">
+                <span>Estado</span>
+                <strong>{{ estadoTexto(pedido.estado) }}</strong>
+              </div>
+              <div class="detalle__row">
+                <span>Recibido</span>
+                <strong>{{ horaPedido(pedido) }}</strong>
+              </div>
+            </div>
+
+            <span class="liquidacion__sep"></span>
+
+            <span class="detalle__label">Ítems</span>
+            <div class="detalle__items">
+              @for (item of pedido.items; track item.id) {
+                <div class="detalle__item">
+                  <span>{{ item.cantidad }}× {{ item.nombre }}</span>
+                  <strong>{{ moneda(item.subtotal) }}</strong>
+                </div>
+              } @empty {
+                <span class="detalle__vacio">Sin ítems registrados.</span>
               }
             </div>
+
+            <span class="liquidacion__sep"></span>
+
+            <div class="comisiones">
+              <div class="comision">
+                <div class="comision__info">
+                  <span class="comision__name">Comisión {{ plataformaTexto(pedido.plataforma) }}</span>
+                  <span class="comision__pct">{{ pedido.comisionPct }}% sobre el total</span>
+                </div>
+                <span class="comision__monto">- {{ moneda(pedido.comision) }}</span>
+              </div>
+            </div>
+
+            <span class="liquidacion__label">Neto a depositar</span>
+            <div class="liquidacion__amount">
+              <span class="cur cur--brand">S/</span>
+              <span class="big big--neto">{{ pedido.montoNeto.toFixed(2) }}</span>
+            </div>
+
+            <span class="liquidacion__sep"></span>
+
+            <label class="campo campo--dark">
+              <span class="detalle__label">Motivo de cancelación (opcional)</span>
+              <textarea
+                class="input input--dark input--area"
+                [value]="motivo()"
+                (input)="onMotivo($event)"
+                placeholder="Solo si rechazas el pedido"
+              ></textarea>
+            </label>
+
+            <div class="liquidacion__grow"></div>
+
+            <button
+              type="button"
+              class="aceptar"
+              [disabled]="accionando() || pedido.estado !== 'borrador'"
+              (click)="aceptar()"
+            >
+              <app-icon name="check" [size]="16" />
+              Aceptar pedido
+            </button>
+            <button type="button" class="rechazar" [disabled]="accionando()" (click)="cancelar()">
+              <app-icon name="x" [size]="15" />
+              Cancelar pedido
+            </button>
+            <span class="liquidacion__pie">
+              {{ pedido.estado === 'borrador' ? 'Aceptar lo envía a cocina' : 'Pedido ya procesado' }}
+            </span>
+          } @else {
+            <div class="liquidacion__grow"></div>
+            <p class="detalle__vacio">Elige un pedido de la bandeja para ver la liquidación.</p>
+            <div class="liquidacion__grow"></div>
           }
         </div>
+      </app-dark-panel>
+    </div>
+  } @else {
+    <div class="board">
+      <app-panel class="pedido">
+        <div class="pedido__inner">
+          <header class="panel-head">
+            <div class="panel-title">
+              <span class="bar"></span>
+              <h2>Historial de liquidaciones</h2>
+            </div>
+            <span class="panel-meta">
+              {{ liquidacionesMeta().total }} registros · neto {{ moneda(totalLiquidado()) }}
+            </span>
+          </header>
 
-        <span class="liquidacion__sep"></span>
+          <div class="lista">
+            <div class="fila fila--head liq-grid">
+              <span>PLATAFORMA</span>
+              <span>FECHA</span>
+              <span>PEDIDOS</span>
+              <span class="right">BRUTO</span>
+              <span class="right">COMISIÓN</span>
+              <span class="right">NETO</span>
+            </div>
 
-        <span class="liquidacion__label">Neto a depositar</span>
-        <div class="liquidacion__amount">
-          <span class="cur cur--brand">S/</span>
-          <span class="big big--neto">{{ neto().toFixed(2) }}</span>
+            @for (fila of liquidaciones(); track fila.id ?? fila.fecha + fila.plataforma) {
+              <div class="fila liq-grid">
+                <span class="fila__meta">{{ plataformaTexto(fila.plataforma) }}</span>
+                <span class="fila__meta">{{ fila.fecha }}</span>
+                <span class="fila__meta">{{ fila.pedidos || '—' }}</span>
+                <span class="fila__total">{{ moneda(fila.montoBruto) }}</span>
+                <span class="fila__total">- {{ moneda(fila.comision) }}</span>
+                <span class="fila__total">{{ moneda(fila.montoNeto) }}</span>
+              </div>
+            } @empty {
+              <div class="lista__empty">
+                <app-empty-state
+                  icon="money"
+                  title="Sin liquidaciones"
+                  description="Registra una liquidación o ajusta el rango de fechas."
+                />
+              </div>
+            }
+          </div>
+
+          <app-paginador
+            [page]="liqPagina()"
+            [pages]="liquidacionesMeta().pages"
+            [total]="liquidacionesMeta().total"
+            [limit]="liqLimite()"
+            (pageChange)="cambiarLiqPagina($event)"
+            (limitChange)="cambiarLiqLimite($event)"
+          />
         </div>
+      </app-panel>
 
-        <div class="margen">
-          <span>Margen sobre venta</span>
-          <strong>{{ margen() }}%</strong>
+      <app-dark-panel class="liquidacion">
+        <div class="liquidacion__inner">
+          <header class="liquidacion__head">
+            <span class="liquidacion__kicker">REGISTRAR LIQUIDACIÓN</span>
+            <span class="liquidacion__plat">
+              <span class="liquidacion__dot"></span>
+              {{ comisionActual() }}% comisión
+            </span>
+          </header>
+
+          <label class="campo campo--dark">
+            <span class="detalle__label">Plataforma</span>
+            <select class="input input--dark" [value]="liqPlataforma()" (change)="onLiqPlataforma($event)">
+              <option value="rappi">Rappi</option>
+              <option value="llamafood">LlamaFood</option>
+            </select>
+          </label>
+
+          <label class="campo campo--dark">
+            <span class="detalle__label">Fecha</span>
+            <input class="input input--dark" type="date" [value]="liqFecha()" (change)="onLiqFecha($event)" />
+          </label>
+
+          <label class="campo campo--dark">
+            <span class="detalle__label">Monto bruto del depósito</span>
+            <input
+              class="input input--dark"
+              type="number"
+              min="0"
+              step="0.1"
+              placeholder="0.00"
+              [value]="liqMonto()"
+              (input)="onLiqMonto($event)"
+            />
+          </label>
+
+          <div class="detalle">
+            <div class="detalle__row">
+              <span>Comisión estimada</span>
+              <strong>- {{ moneda(comisionEstimada()) }}</strong>
+            </div>
+            <div class="detalle__row">
+              <span>Neto esperado</span>
+              <strong>{{ moneda(netoLiquidacion()) }}</strong>
+            </div>
+          </div>
+
+          <span class="liquidacion__sep"></span>
+
+          <p class="liquidacion__info">
+            <app-icon name="warning-circle" [size]="13" />
+            Si el esquema no tiene tabla de liquidaciones, el servidor devuelve el cálculo derivado.
+          </p>
+
+          <div class="liquidacion__grow"></div>
+
+          <button
+            type="button"
+            class="aceptar"
+            [disabled]="!puedeLiquidar()"
+            (click)="registrarLiquidacion()"
+          >
+            <app-icon name="check" [size]="16" />
+            {{ liquidando() ? 'Registrando…' : 'Registrar liquidación' }}
+          </button>
+          <span class="liquidacion__pie">Neto del periodo visible {{ moneda(totalLiquidado()) }}</span>
         </div>
-
-        <span class="liquidacion__sep"></span>
-
-        <p class="liquidacion__info">
-          <app-icon name="warning-circle" [size]="13" />
-          La app cobra al cliente y deposita el neto en 24 h. El local solo prepara y despacha.
-        </p>
-
-        <div class="liquidacion__grow"></div>
-
-        <button
-          type="button"
-          class="aceptar"
-          [disabled]="!puedeAceptar()"
-          (click)="aceptar()"
-        >
-          <app-icon name="check" [size]="16" />
-          Aceptar pedido
-        </button>
-        <button type="button" class="rechazar" (click)="rechazar()">
-          <app-icon name="x" [size]="15" />
-          Rechazar pedido
-        </button>
-        <span class="liquidacion__pie">Pedido {{ numeroPedido }} · {{ etiquetaPlataforma() }}</span>
-      </div>
-    </app-dark-panel>
-  </div>
+      </app-dark-panel>
+    </div>
+  }
 
   <div class="pie">
     <span class="pie__note">
@@ -210,8 +392,8 @@
   </div>
 
   @if (toast()) {
-    <div class="toast" role="status">
-      <app-icon name="check" [size]="15" />
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
       {{ toast() }}
     </div>
   }

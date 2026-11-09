@@ -4,7 +4,66 @@ import { round2 } from '../utils/format';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
 import { esFalloRed, mensajeError } from '../api/api.helpers';
-import type { CuadreDto } from '../api/api.types';
+import type { ApiList, CuadreDto, PageMeta } from '../api/api.types';
+
+export interface CuadreHistorialQuery {
+  page?: number;
+  limit?: number;
+  desde?: string;
+  hasta?: string;
+  sort?: string;
+}
+
+export interface CuadreHistorialFila {
+  id: number;
+  fecha: string;
+  estado: string;
+  fondoInicial: number;
+  totalVentas: number;
+  totalEgresos: number;
+  montoEsperado: number;
+  efectivoContado: number | null;
+  pagosDigitales: number;
+  totalReal: number | null;
+  diferencia: number | null;
+  observaciones: string;
+  cerradoPor: string;
+}
+
+const HISTORIAL_DEMO: readonly CuadreHistorialFila[] = [
+  { id: 1, fecha: '2026-10-14', estado: 'cerrada', fondoInicial: 200, totalVentas: 2450, totalEgresos: 225, montoEsperado: 2425, efectivoContado: 1425, pagosDigitales: 1000, totalReal: 2425, diferencia: 0, observaciones: '', cerradoPor: 'Cajero #3' },
+  { id: 2, fecha: '2026-10-13', estado: 'cerrada', fondoInicial: 200, totalVentas: 1980, totalEgresos: 140, montoEsperado: 2040, efectivoContado: 1040, pagosDigitales: 1005, totalReal: 2045, diferencia: 5, observaciones: 'Sobrante menor en efectivo', cerradoPor: 'Cajero #3' },
+  { id: 3, fecha: '2026-10-12', estado: 'cerrada', fondoInicial: 200, totalVentas: 2210, totalEgresos: 310, montoEsperado: 2100, efectivoContado: 1100, pagosDigitales: 990, totalReal: 2090, diferencia: -10, observaciones: 'Faltante revisado con administración', cerradoPor: 'Cajero #4' },
+  { id: 4, fecha: '2026-10-11', estado: 'cerrada', fondoInicial: 150, totalVentas: 1750, totalEgresos: 90, montoEsperado: 1810, efectivoContado: 810, pagosDigitales: 1000, totalReal: 1810, diferencia: 0, observaciones: '', cerradoPor: 'Cajero #3' },
+  { id: 5, fecha: '2026-10-10', estado: 'cerrada', fondoInicial: 200, totalVentas: 2680, totalEgresos: 420, montoEsperado: 2460, efectivoContado: 1460, pagosDigitales: 1000, totalReal: 2460, diferencia: 0, observaciones: '', cerradoPor: 'Cajero #4' },
+];
+
+const HISTORIAL_META_INICIAL: PageMeta = {
+  page: 1,
+  limit: 10,
+  total: USE_API ? 0 : HISTORIAL_DEMO.length,
+  pages: USE_API ? 0 : Math.ceil(HISTORIAL_DEMO.length / 10),
+};
+
+const mapaCuadre = (dto: CuadreDto): CuadreHistorialFila => ({
+  id: dto.id,
+  fecha: dto.fecha,
+  estado: dto.estado,
+  fondoInicial: Number(dto.fondo_inicial ?? 0),
+  totalVentas: Number(dto.resumen?.total_ventas ?? dto.total_ventas ?? 0),
+  totalEgresos: Number(dto.resumen?.total_egresos ?? dto.total_egresos ?? 0),
+  montoEsperado: Number(dto.resumen?.monto_esperado ?? dto.monto_esperado ?? 0),
+  efectivoContado:
+    dto.efectivo_contado === null || dto.efectivo_contado === undefined
+      ? null
+      : Number(dto.efectivo_contado),
+  pagosDigitales: Number(dto.pagos_digitales ?? 0),
+  totalReal: dto.total_real === null || dto.total_real === undefined ? null : Number(dto.total_real),
+  diferencia:
+    dto.diferencia === null || dto.diferencia === undefined ? null : Number(dto.diferencia),
+  observaciones: dto.observaciones ?? '',
+  cerradoPor: dto.usuario_cierre_id ? `Usuario #${dto.usuario_cierre_id}` : '—',
+});
 
 @Injectable({ providedIn: 'root' })
 export class CuadreService {
@@ -13,6 +72,13 @@ export class CuadreService {
   readonly cargando = signal<boolean>(false);
   readonly error = signal<string | null>(null);
   readonly cuadreId = signal<number | null>(null);
+
+  readonly historial = signal<CuadreHistorialFila[]>(
+    USE_API ? [] : HISTORIAL_DEMO.map((fila) => ({ ...fila })),
+  );
+  readonly historialMeta = signal<PageMeta>({ ...HISTORIAL_META_INICIAL });
+  readonly historialCargando = signal<boolean>(false);
+  readonly historialError = signal<string | null>(null);
 
   readonly abierta = signal<boolean>(false);
   readonly fondoInicial = signal<number>(200);
@@ -36,7 +102,8 @@ export class CuadreService {
 
   async cargar(): Promise<boolean> {
     if (!USE_API) {
-      return false;
+      this.error.set(null);
+      return true;
     }
     this.cargando.set(true);
     this.error.set(null);
@@ -125,6 +192,56 @@ export class CuadreService {
     this.pagosDigitales.set(pagosDigitales);
     this.abierta.set(false);
     return true;
+  }
+
+  async cargarHistorial(opciones: CuadreHistorialQuery = {}): Promise<boolean> {
+    const page = Math.max(1, opciones.page ?? 1);
+    const limit = opciones.limit ?? 10;
+
+    if (!USE_API) {
+      const filtradas = HISTORIAL_DEMO.filter(
+        (fila) =>
+          (!opciones.desde || fila.fecha >= opciones.desde) &&
+          (!opciones.hasta || fila.fecha <= opciones.hasta),
+      )
+        .map((fila) => ({ ...fila }))
+        .sort((a, b) => b.fecha.localeCompare(a.fecha));
+      const total = filtradas.length;
+      const pages = total === 0 ? 0 : Math.ceil(total / limit);
+      const inicio = (page - 1) * limit;
+      this.historial.set(filtradas.slice(inicio, inicio + limit));
+      this.historialMeta.set({ page, limit, total, pages });
+      this.historialError.set(null);
+      return true;
+    }
+
+    this.historialCargando.set(true);
+    this.historialError.set(null);
+    try {
+      const lista = await firstValueFrom(
+        this.api.get<ApiList<CuadreDto>>('/cuadre-caja/historial', {
+          page,
+          limit,
+          desde: opciones.desde || undefined,
+          hasta: opciones.hasta || undefined,
+          sort: opciones.sort ?? 'fecha:desc',
+        }),
+      );
+      const total = lista.meta.total ?? lista.data.length;
+      this.historial.set(lista.data.map(mapaCuadre));
+      this.historialMeta.set({
+        page: lista.meta.page ?? page,
+        limit: lista.meta.limit ?? limit,
+        total,
+        pages: lista.meta.pages ?? (limit > 0 ? Math.ceil(total / limit) : 0),
+      });
+      return true;
+    } catch (error) {
+      this.historialError.set(mensajeError(error));
+      return false;
+    } finally {
+      this.historialCargando.set(false);
+    }
   }
 
   private aplicar(dto: CuadreDto): void {

@@ -1,6 +1,6 @@
 <app-shell
   title="Reportes"
-  subtitle="7 reportes disponibles · datos al 14 de octubre 2026 · turno tarde"
+  [subtitle]="tipos().length + ' reportes disponibles · ' + rangoCorto()"
 >
   <div actions class="header-actions">
     <span class="rango-pill">
@@ -13,17 +13,28 @@
     </button>
   </div>
 
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
+  @if (cargando()) {
+    <div class="cargando-banner" role="status">Consultando el reporte…</div>
+  }
+
   <div class="board">
     <app-panel class="panel">
       <div class="panel__inner">
         <aside class="lista">
           <header class="lista__head">
             <span class="eyebrow">TIPO DE REPORTE</span>
-            <span class="lista__count">{{ tipos.length }}</span>
+            <span class="lista__count">{{ tipos().length }}</span>
           </header>
 
           <div class="lista__tiles" role="list">
-            @for (tipo of tipos; track tipo.id) {
+            @for (tipo of tipos(); track tipo.id) {
               <button
                 type="button"
                 class="tile"
@@ -67,7 +78,7 @@
               </div>
               <div class="kpi-delta">
                 <span class="delta-chip">{{ vista().variacion }}</span>
-                <span class="kpi-note">vs período anterior</span>
+                <span class="kpi-note">{{ notaVariacion() }}</span>
               </div>
             </div>
 
@@ -107,6 +118,13 @@
               </div>
             }
           </div>
+
+          @if (limitacion()) {
+            <p class="limitacion">
+              <app-icon name="warning-circle" [size]="12" />
+              {{ limitacion() }}
+            </p>
+          }
 
           <span class="hairline"></span>
 
@@ -210,8 +228,8 @@
   </div>
 
   @if (toast()) {
-    <div class="toast" role="status">
-      <app-icon name="check" [size]="15" />
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
       {{ toast() }}
     </div>
   }

@@ -6,58 +6,56 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import type { DeliveryExternoVista } from '../../core/api/api.mappers';
+import { USE_API } from '../../core/api/api.config';
 import {
   COMISION_PLATAFORMA,
   DeliveryService,
   type PlataformaExterna,
 } from '../../core/data/delivery.service';
-import type { PedidoDetalle } from '../../core/models';
-import { formatearMoneda, round2 } from '../../core/utils/format';
+import { formatearMoneda, hora, round2 } from '../../core/utils/format';
+import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-interface ComisionFila {
-  etiqueta: string;
-  pct: number;
-  monto: number;
-  activa: boolean;
-}
+type VistaExterno = 'pedidos' | 'liquidaciones';
+type PlataformaFiltro = 'todas' | PlataformaExterna;
 
-const ITEMS_PEDIDO: readonly PedidoDetalle[] = [
-  {
-    id: 1,
-    platilloId: 2,
-    nombre: '1/2 Pollo a la brasa',
-    cantidad: 1,
-    precioUnitario: 42,
-    subtotal: 42,
-    notas: 'Con papas y ensalada',
-    estadoPreparacion: 'en_preparacion',
-  },
-  {
-    id: 2,
-    platilloId: 5,
-    nombre: 'Papas fritas',
-    cantidad: 1,
-    precioUnitario: 12,
-    subtotal: 12,
-    notas: 'Porción grande',
-    estadoPreparacion: 'en_preparacion',
-  },
-  {
-    id: 3,
-    platilloId: 7,
-    nombre: 'Chicha morada 1 L',
-    cantidad: 1,
-    precioUnitario: 8.5,
-    subtotal: 8.5,
-    notas: 'Sin hielo',
-    estadoPreparacion: 'en_preparacion',
-  },
+const LIMITES = [10, 20, 50, 100];
+
+const ESTADOS: readonly { valor: string; texto: string }[] = [
+  { valor: 'todos', texto: 'Todos' },
+  { valor: 'borrador', texto: 'Borrador' },
+  { valor: 'en_cocina', texto: 'En cocina' },
+  { valor: 'servido', texto: 'Servido' },
+  { valor: 'cobrado', texto: 'Cobrado' },
+  { valor: 'cancelado', texto: 'Cancelado' },
 ];
+
+const PLATAFORMAS: readonly { valor: PlataformaFiltro; texto: string }[] = [
+  { valor: 'todas', texto: 'Todas' },
+  { valor: 'rappi', texto: 'Rappi' },
+  { valor: 'llamafood', texto: 'LlamaFood' },
+];
+
+const fechaLima = (fecha: Date): string =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(fecha);
+
+const HOY = fechaLima(new Date());
+const HACE_SIETE = fechaLima(new Date(Date.now() - 6 * 86400000));
+const DESDE_INICIAL = USE_API ? HACE_SIETE : '';
+const HASTA_INICIAL = USE_API ? HOY : '';
+const FECHA_LIQUIDACION = HOY;
 
 @Component({
   selector: 'app-delivery-externo-page',
@@ -65,8 +63,11 @@ const ITEMS_PEDIDO: readonly PedidoDetalle[] = [
   imports: [
     RouterLink,
     AppShellComponent,
+    ChipComponent,
     DarkPanelComponent,
+    EmptyStateComponent,
     IconComponent,
+    PaginadorComponent,
     PanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,88 +76,378 @@ const ITEMS_PEDIDO: readonly PedidoDetalle[] = [
 })
 export class DeliveryExternoPage {
   private readonly delivery = inject(DeliveryService);
+  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  private temporizador: number | null = null;
+  private toastTimer: number | null = null;
 
   readonly moneda = formatearMoneda;
-  readonly numeroPedido = '#D-208';
-  readonly clienteNombre = 'Lucía Ramírez';
-  readonly clienteTelefono = '+51 964 221 908';
-  readonly direccion = 'Av. Ferrocarril 512, El Tambo';
-  readonly referencia = 'Portón negro, segundo piso';
-  readonly observaciones = 'Sin ají, papas bien cocidas. Empaque para llevar sellado.';
+  readonly estados = ESTADOS;
+  readonly plataformas = PLATAFORMAS;
 
-  readonly items: readonly PedidoDetalle[] = ITEMS_PEDIDO;
+  readonly vista = signal<VistaExterno>('pedidos');
+  readonly plataforma = signal<PlataformaFiltro>('todas');
+  readonly estado = signal<string>('todos');
+  readonly desde = signal<string>(DESDE_INICIAL);
+  readonly hasta = signal<string>(HASTA_INICIAL);
+  readonly pagina = signal<number>(1);
+  readonly limite = signal<number>(20);
+  readonly seleccionId = signal<number | null>(null);
 
-  readonly plataforma = signal<PlataformaExterna>('rappi');
-  readonly toast = signal('');
+  readonly liqPagina = signal<number>(1);
+  readonly liqLimite = signal<number>(20);
+  readonly liqPlataforma = signal<PlataformaExterna>('rappi');
+  readonly liqFecha = signal<string>(FECHA_LIQUIDACION);
+  readonly liqMonto = signal<string>('');
+  readonly liquidando = signal<boolean>(false);
 
-  readonly etiquetaPlataforma = computed<string>(() =>
-    this.plataforma() === 'rappi' ? 'Rappi' : 'LlamaFood',
-  );
+  readonly motivo = signal<string>('');
+  readonly accionando = signal<boolean>(false);
 
-  readonly comisionPct = computed<number>(() => COMISION_PLATAFORMA[this.plataforma()]);
+  readonly toast = signal<string>('');
+  readonly toastError = signal<boolean>(false);
 
-  readonly total = computed<number>(() =>
-    round2(this.items.reduce((suma, item) => suma + item.subtotal, 0)),
-  );
+  readonly lista = this.delivery.externos;
+  readonly meta = this.delivery.externosMeta;
+  readonly cargando = this.delivery.externosCargando;
+  readonly error = this.delivery.externosError;
 
-  readonly comisiones = computed<ComisionFila[]>(() => {
-    const total = this.total();
-    return (['rappi', 'llamafood'] as const).map((plataforma) => {
-      const activa = this.plataforma() === plataforma;
-      const pct = COMISION_PLATAFORMA[plataforma];
-      return {
-        etiqueta: `Comisión ${plataforma === 'rappi' ? 'Rappi' : 'LlamaFood'}`,
-        pct,
-        monto: activa ? round2((total * pct) / 100) : 0,
-        activa,
-      };
-    });
+  readonly liquidaciones = this.delivery.liquidaciones;
+  readonly liquidacionesMeta = this.delivery.liquidacionesMeta;
+  readonly liquidacionesCargando = this.delivery.liquidacionesCargando;
+  readonly liquidacionesError = this.delivery.liquidacionesError;
+
+  readonly seleccionado = computed<DeliveryExternoVista | null>(() => {
+    const id = this.seleccionId();
+    const lista = this.lista();
+    return lista.find((pedido) => pedido.id === id) ?? lista[0] ?? null;
   });
 
-  readonly comision = computed<number>(
-    () => this.comisiones().find((fila) => fila.activa)?.monto ?? 0,
+  readonly subtitulo = computed<string>(() => {
+    if (this.vista() === 'liquidaciones') {
+      const meta = this.liquidacionesMeta();
+      return `Liquidaciones · ${meta.total} registros · página ${meta.page} de ${meta.pages || 1}`;
+    }
+    const meta = this.meta();
+    return `${meta.total} pedidos externos · página ${meta.page} de ${meta.pages || 1}`;
+  });
+
+  readonly comisionActual = computed<number>(() =>
+    this.liqPlataforma() === 'rappi'
+      ? COMISION_PLATAFORMA.rappi
+      : COMISION_PLATAFORMA.llamafood,
   );
 
-  readonly neto = computed<number>(() => round2(this.total() - this.comision()));
+  readonly comisionEstimada = computed<number>(() => {
+    const bruto = Number(this.liqMonto());
+    if (!Number.isFinite(bruto) || bruto <= 0) {
+      return 0;
+    }
+    return round2((bruto * this.comisionActual()) / 100);
+  });
 
-  readonly margen = computed<number>(() => 100 - this.comisionPct());
+  readonly netoLiquidacion = computed<number>(() => {
+    const bruto = Number(this.liqMonto());
+    if (!Number.isFinite(bruto) || bruto <= 0) {
+      return 0;
+    }
+    return round2(bruto - this.comisionEstimada());
+  });
 
-  readonly puedeAceptar = computed<boolean>(() => this.toast() === '');
+  readonly totalLiquidado = computed<number>(() =>
+    round2(this.liquidaciones().reduce((suma, fila) => suma + fila.montoNeto, 0)),
+  );
+
+  readonly puedeLiquidar = computed<boolean>(() => {
+    const bruto = Number(this.liqMonto());
+    return Number.isFinite(bruto) && bruto > 0 && !this.liquidando();
+  });
 
   constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    this.vista.set(params.get('vista') === 'liquidaciones' ? 'liquidaciones' : 'pedidos');
+    const plataforma = params.get('plataforma');
+    this.plataforma.set(
+      PLATAFORMAS.some((item) => item.valor === plataforma)
+        ? (plataforma as PlataformaFiltro)
+        : 'todas',
+    );
+    const estado = params.get('estado');
+    this.estado.set(ESTADOS.some((item) => item.valor === estado) ? (estado as string) : 'todos');
+    this.desde.set(params.get('desde') ?? DESDE_INICIAL);
+    this.hasta.set(params.get('hasta') ?? HASTA_INICIAL);
+    this.pagina.set(Math.max(1, Number(params.get('page')) || 1));
+    const limite = Number(params.get('limit'));
+    this.limite.set(LIMITES.includes(limite) ? limite : 20);
+    const seleccion = Number(params.get('pedido'));
+    if (Number.isFinite(seleccion) && seleccion > 0) {
+      this.seleccionId.set(seleccion);
+    }
+
+    if (this.vista() === 'liquidaciones') {
+      void this.cargarLiquidaciones();
+    } else {
+      void this.cargar();
+    }
+
     this.destroyRef.onDestroy(() => {
-      if (this.temporizador !== null) {
-        window.clearTimeout(this.temporizador);
+      if (this.toastTimer !== null) {
+        window.clearTimeout(this.toastTimer);
       }
     });
   }
 
-  aceptar(): void {
-    if (!this.puedeAceptar()) {
+  cambiarVista(vista: VistaExterno): void {
+    if (this.vista() === vista) {
       return;
     }
-    const pedido = this.delivery.crearExterno({
-      plataforma: this.plataforma(),
-      clienteNombre: this.clienteNombre,
-      direccionEntrega: this.direccion,
-      referenciaEntrega: this.referencia,
-      observaciones: this.observaciones,
-      items: [...this.items],
-    });
-    this.toast.set(`${pedido.numero} aceptado · ${this.etiquetaPlataforma()}`);
-    this.temporizador = window.setTimeout(() => {
-      void this.router.navigate(['/comandas']);
-    }, 950);
+    this.vista.set(vista);
+    if (vista === 'liquidaciones') {
+      this.liqPagina.set(1);
+      void this.cargarLiquidaciones();
+    } else {
+      void this.cargar();
+    }
+    this.sincronizarUrl();
   }
 
-  rechazar(): void {
-    this.toast.set(`${this.numeroPedido} rechazado · ${this.etiquetaPlataforma()}`);
-    this.temporizador = window.setTimeout(() => {
-      void this.router.navigate(['/dashboard']);
-    }, 950);
+  onPlataforma(event: Event): void {
+    this.plataforma.set((event.target as HTMLSelectElement).value as PlataformaFiltro);
+    this.pagina.set(1);
+    this.liqPagina.set(1);
+    if (this.vista() === 'liquidaciones') {
+      void this.cargarLiquidaciones();
+    } else {
+      void this.cargar();
+    }
+  }
+
+  onEstado(event: Event): void {
+    this.estado.set((event.target as HTMLSelectElement).value);
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  onDesde(event: Event): void {
+    this.desde.set((event.target as HTMLInputElement).value);
+    this.pagina.set(1);
+    this.liqPagina.set(1);
+    if (this.vista() === 'liquidaciones') {
+      void this.cargarLiquidaciones();
+    } else {
+      void this.cargar();
+    }
+  }
+
+  onHasta(event: Event): void {
+    this.hasta.set((event.target as HTMLInputElement).value);
+    this.pagina.set(1);
+    this.liqPagina.set(1);
+    if (this.vista() === 'liquidaciones') {
+      void this.cargarLiquidaciones();
+    } else {
+      void this.cargar();
+    }
+  }
+
+  cambiarPagina(page: number): void {
+    this.pagina.set(page);
+    void this.cargar();
+  }
+
+  cambiarLimite(limit: number): void {
+    this.limite.set(limit);
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  cambiarLiqPagina(page: number): void {
+    this.liqPagina.set(page);
+    void this.cargarLiquidaciones();
+  }
+
+  cambiarLiqLimite(limit: number): void {
+    this.liqLimite.set(limit);
+    this.liqPagina.set(1);
+    void this.cargarLiquidaciones();
+  }
+
+  seleccionar(id: number): void {
+    this.seleccionId.set(id);
+    this.motivo.set('');
+    this.sincronizarUrl();
+  }
+
+  reintentar(): void {
+    if (this.vista() === 'liquidaciones') {
+      void this.cargarLiquidaciones();
+    } else {
+      void this.cargar();
+    }
+  }
+
+  onMotivo(event: Event): void {
+    this.motivo.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  onLiqPlataforma(event: Event): void {
+    this.liqPlataforma.set((event.target as HTMLSelectElement).value as PlataformaExterna);
+  }
+
+  onLiqFecha(event: Event): void {
+    this.liqFecha.set((event.target as HTMLInputElement).value);
+  }
+
+  onLiqMonto(event: Event): void {
+    this.liqMonto.set((event.target as HTMLInputElement).value);
+  }
+
+  async aceptar(): Promise<void> {
+    const pedido = this.seleccionado();
+    if (!pedido || this.accionando()) {
+      return;
+    }
+    this.accionando.set(true);
+    const ok = await this.delivery.aceptarExterno(pedido.id);
+    this.accionando.set(false);
+    this.avisar(
+      ok ? `${pedido.numero} aceptado · enviado a cocina` : this.error() ?? 'No se pudo aceptar.',
+      !ok,
+    );
+    if (ok) {
+      await this.cargar();
+    }
+  }
+
+  async cancelar(): Promise<void> {
+    const pedido = this.seleccionado();
+    if (!pedido || this.accionando()) {
+      return;
+    }
+    this.accionando.set(true);
+    const ok = await this.delivery.cancelarExterno(pedido.id, this.motivo().trim() || undefined);
+    this.accionando.set(false);
+    this.avisar(
+      ok ? `${pedido.numero} cancelado` : this.error() ?? 'No se pudo cancelar.',
+      !ok,
+    );
+    if (ok) {
+      this.motivo.set('');
+      await this.cargar();
+    }
+  }
+
+  async registrarLiquidacion(): Promise<void> {
+    if (!this.puedeLiquidar()) {
+      this.avisar('Ingresa un monto bruto mayor a cero.', true);
+      return;
+    }
+    this.liquidando.set(true);
+    const ok = await this.delivery.crearLiquidacion(
+      this.liqPlataforma(),
+      this.liqFecha() || HOY,
+      Number(this.liqMonto()),
+    );
+    this.liquidando.set(false);
+    if (!ok) {
+      this.avisar(this.liquidacionesError() ?? 'No se pudo registrar la liquidación.', true);
+      return;
+    }
+    this.liqMonto.set('');
+    this.avisar('Liquidación registrada');
+    this.liqPagina.set(1);
+    await this.cargarLiquidaciones();
+  }
+
+  estadoTexto(estado: string): string {
+    return ESTADOS.find((item) => item.valor === estado)?.texto ?? estado.replace('_', ' ');
+  }
+
+  estadoTono(estado: string): ChipVariant {
+    switch (estado) {
+      case 'cobrado':
+        return 'success';
+      case 'servido':
+        return 'warning';
+      case 'en_cocina':
+        return 'info';
+      case 'cancelado':
+        return 'danger';
+      default:
+        return 'neutral';
+    }
+  }
+
+  plataformaTexto(plataforma: string): string {
+    return plataforma === 'llamafood' ? 'LlamaFood' : 'Rappi';
+  }
+
+  horaPedido(pedido: DeliveryExternoVista): string {
+    return hora(pedido.fecha);
+  }
+
+  private async cargar(): Promise<void> {
+    const ok = await this.delivery.cargarExternos({
+      page: this.pagina(),
+      limit: this.limite(),
+      plataforma: this.plataforma() === 'todas' ? undefined : this.plataforma(),
+      estado: this.estado() === 'todos' ? undefined : this.estado(),
+      desde: this.desde() || undefined,
+      hasta: this.hasta() || undefined,
+    });
+    if (ok) {
+      const meta = this.meta();
+      this.pagina.set(meta.page);
+      this.limite.set(meta.limit);
+      const seleccion = this.seleccionado();
+      this.seleccionId.set(seleccion ? seleccion.id : null);
+      this.sincronizarUrl();
+    }
+  }
+
+  private async cargarLiquidaciones(): Promise<void> {
+    const ok = await this.delivery.cargarLiquidaciones({
+      page: this.liqPagina(),
+      limit: this.liqLimite(),
+      plataforma: this.plataforma() === 'todas' ? undefined : this.plataforma(),
+      desde: this.desde() || undefined,
+      hasta: this.hasta() || undefined,
+    });
+    if (ok) {
+      const meta = this.liquidacionesMeta();
+      this.liqPagina.set(meta.page);
+      this.liqLimite.set(meta.limit);
+      this.sincronizarUrl();
+    }
+  }
+
+  private sincronizarUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        vista: this.vista(),
+        plataforma: this.plataforma() === 'todas' ? null : this.plataforma(),
+        estado: this.estado() === 'todos' ? null : this.estado(),
+        desde: this.desde() || null,
+        hasta: this.hasta() || null,
+        page: this.pagina() > 1 ? this.pagina() : null,
+        limit: this.limite() !== 20 ? this.limite() : null,
+        pedido: this.vista() === 'pedidos' ? this.seleccionId() : null,
+      },
+      replaceUrl: true,
+    });
+  }
+
+  private avisar(mensaje: string, error = false): void {
+    this.toast.set(mensaje);
+    this.toastError.set(error);
+    if (this.toastTimer !== null) {
+      window.clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = window.setTimeout(() => {
+      this.toast.set('');
+      this.toastTimer = null;
+    }, 3200);
   }
 }

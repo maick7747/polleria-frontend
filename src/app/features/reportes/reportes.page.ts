@@ -6,51 +6,33 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { ReportesService } from '../../core/data/reportes.service';
+import type { ReporteTipoId, ReporteVista } from '../../core/api/api.mappers';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-type ReporteId =
-  | 'ventas'
-  | 'costos'
-  | 'merma'
-  | 'devoluciones'
-  | 'inventario'
-  | 'activos'
-  | 'personal';
-
 type FormatoExportacion = 'PDF' | 'Excel';
 
 interface TipoReporte {
-  id: ReporteId;
+  id: ReporteTipoId;
   nombre: string;
   detalle: string;
   icono: IconName;
 }
 
-interface FilaReporte {
-  label: string;
-  monto: string;
-  pct: number;
-  tono: 'brand' | 'soft' | 'neutral';
-}
+const fechaLima = (fecha: Date): string =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(fecha);
 
-interface VistaReporte {
-  kpiLabel: string;
-  kpiValor: string;
-  prefijo: string;
-  variacion: string;
-  secundarioUno: { label: string; valor: string };
-  secundarioDos: { label: string; valor: string };
-  seccion: string;
-  seccionMeta: string;
-  filas: FilaReporte[];
-  pieIzquierda: string;
-  pieDerecha: string;
-  resumen: string;
-}
+const HOY = fechaLima(new Date());
+const HACE_SIETE = fechaLima(new Date(Date.now() - 6 * 86400000));
 
 const TIPOS: readonly TipoReporte[] = [
   {
@@ -97,7 +79,7 @@ const TIPOS: readonly TipoReporte[] = [
   },
 ];
 
-const VISTAS: Record<ReporteId, VistaReporte> = {
+const VISTAS: Record<ReporteTipoId, ReporteVista> = {
   ventas: {
     kpiLabel: 'Ventas netas',
     kpiValor: '28,450',
@@ -237,6 +219,21 @@ const VISTAS: Record<ReporteId, VistaReporte> = {
   },
 };
 
+const VISTA_VACIA: ReporteVista = {
+  kpiLabel: 'Sin datos',
+  kpiValor: '—',
+  prefijo: '',
+  variacion: '—',
+  secundarioUno: { label: '—', valor: '—' },
+  secundarioDos: { label: '—', valor: '—' },
+  seccion: 'Sin información',
+  seccionMeta: '',
+  filas: [],
+  pieIzquierda: 'No se pudo consultar el reporte.',
+  pieDerecha: 'Reintenta con el botón de arriba.',
+  resumen: 'Sin datos',
+};
+
 const MESES: readonly string[] = [
   'ene',
   'feb',
@@ -267,25 +264,57 @@ const MESES: readonly string[] = [
 })
 export class ReportesPage {
   private readonly reportes = inject(ReportesService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   private toastTimer: number | null = null;
 
-  readonly tipos = TIPOS;
+  readonly usaApi = this.reportes.usaApi;
 
-  readonly seleccion = signal<ReporteId>('ventas');
+  readonly seleccion = signal<ReporteTipoId>('ventas');
   readonly formato = signal<FormatoExportacion>('Excel');
-  readonly fechaDesde = signal<string>('2026-10-01');
-  readonly fechaHasta = signal<string>('2026-10-14');
+  readonly fechaDesde = signal<string>(HACE_SIETE);
+  readonly fechaHasta = signal<string>(HOY);
   readonly toast = signal<string>('');
+  readonly toastError = signal<boolean>(false);
+
+  readonly cargando = this.reportes.cargando;
+  readonly error = this.reportes.error;
+  readonly limitacion = this.reportes.limitacion;
+
+  readonly tipos = computed<readonly TipoReporte[]>(() => {
+    const cargados = this.reportes.tipos();
+    if (cargados.length === 0) {
+      return TIPOS;
+    }
+    return cargados.map(
+      (id) =>
+        TIPOS.find((tipo) => tipo.id === id) ?? {
+          id,
+          nombre: id,
+          detalle: 'Reporte del servidor',
+          icono: 'chart-bar',
+        },
+    );
+  });
 
   readonly tipoActual = computed<TipoReporte>(
     () => TIPOS.find((tipo) => tipo.id === this.seleccion()) ?? TIPOS[0],
   );
 
-  readonly vista = computed<VistaReporte>(() => VISTAS[this.seleccion()]);
+  readonly vista = computed<ReporteVista>(() => {
+    if (this.usaApi) {
+      return this.reportes.vista() ?? VISTA_VACIA;
+    }
+    return VISTAS[this.seleccion()];
+  });
 
   readonly generados = computed<number>(() => this.reportes.reportes().length);
+
+  readonly notaVariacion = computed<string>(() =>
+    this.usaApi ? 'calculado por el servidor' : 'vs período anterior',
+  );
 
   readonly rangoCorto = computed<string>(() => {
     const desde = this.fechaDesde();
@@ -311,6 +340,19 @@ export class ReportesPage {
   });
 
   constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    const tipo = params.get('tipo');
+    const tipoValido = TIPOS.find((item) => item.id === tipo)?.id;
+    if (tipoValido) {
+      this.seleccion.set(tipoValido);
+    }
+    this.fechaDesde.set(params.get('desde') ?? HACE_SIETE);
+    this.fechaHasta.set(params.get('hasta') ?? HOY);
+
+    if (this.usaApi) {
+      void this.inicializar();
+    }
+
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
@@ -318,38 +360,96 @@ export class ReportesPage {
     });
   }
 
-  seleccionar(id: ReporteId): void {
+  seleccionar(id: ReporteTipoId): void {
+    if (this.seleccion() === id) {
+      return;
+    }
     this.seleccion.set(id);
+    void this.consultar();
   }
 
   onDesde(event: Event): void {
     this.fechaDesde.set((event.target as HTMLInputElement).value);
+    if (this.usaApi) {
+      void this.consultar();
+    }
   }
 
   onHasta(event: Event): void {
     this.fechaHasta.set((event.target as HTMLInputElement).value);
+    if (this.usaApi) {
+      void this.consultar();
+    }
   }
 
   actualizar(): void {
-    this.avisar('Datos actualizados · 17:45 (simulado)');
+    if (!this.usaApi) {
+      this.avisar('Datos actualizados · datos demo');
+      return;
+    }
+    void this.consultar();
+  }
+
+  reintentar(): void {
+    void this.consultar();
   }
 
   exportar(formato: FormatoExportacion): void {
     this.formato.set(formato);
-    this.avisar(`Exportando ${this.tipoActual().nombre} · ${formato} (simulado)`);
   }
 
-  generar(): void {
+  async generar(): Promise<void> {
+    const resultado = await this.reportes.exportar(
+      this.seleccion(),
+      this.filtros(),
+      this.formato(),
+    );
     this.avisar(
-      `Generación simulada · ${this.tipoActual().nombre} · ${this.formato()} · ${this.rangoCorto()}`,
+      resultado.mensaje || `Solicitud de exportación ${this.formato()} enviada.`,
+      resultado.estado === 'error',
     );
   }
 
-  private avisar(mensaje: string): void {
+  private async inicializar(): Promise<void> {
+    await this.reportes.cargarTipos();
+    await this.consultar();
+  }
+
+  private async consultar(): Promise<void> {
+    const ok = await this.reportes.consultar(this.seleccion(), this.filtros());
+    if (ok) {
+      this.sincronizarUrl();
+    }
+  }
+
+  private filtros(): { desde?: string; hasta?: string } {
+    return {
+      desde: this.fechaDesde() || undefined,
+      hasta: this.fechaHasta() || undefined,
+    };
+  }
+
+  private sincronizarUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        tipo: this.seleccion(),
+        desde: this.fechaDesde() || null,
+        hasta: this.fechaHasta() || null,
+      },
+      replaceUrl: true,
+    });
+  }
+
+  private avisar(mensaje: string, error = false): void {
     this.toast.set(mensaje);
+    this.toastError.set(error);
     if (this.toastTimer !== null) {
       window.clearTimeout(this.toastTimer);
     }
-    this.toastTimer = window.setTimeout(() => this.toast.set(''), 2800);
+    this.toastTimer = window.setTimeout(() => {
+      this.toast.set('');
+      this.toastTimer = null;
+    }, 3200);
   }
 }

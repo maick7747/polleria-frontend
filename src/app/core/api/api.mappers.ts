@@ -48,13 +48,17 @@ import type {
 import type {
   ActivoAlertaDto,
   ActivoDto,
+  ClienteListaDto,
   CompraDto,
   CuentaDto,
+  DeliveryExternoPedidoDto,
+  DeliveryPropioPedidoDto,
   DetallePedidoDto,
   DevolucionDto,
   GastoDto,
   InsumoDto,
   KdsPedidoDto,
+  LiquidacionDeliveryDto,
   MantenimientoDto,
   MermaDto,
   MesaDto,
@@ -63,11 +67,14 @@ import type {
   PedidoDto,
   PermisoDto,
   PlatoDto,
+  ReporteAgrupadoDto,
+  ReporteTipoDto,
   RolDto,
   SugerenciaCompraDto,
   TipoMermaDto,
   UsuarioDto,
 } from './api.types';
+import { formatearMoneda } from '../utils/format';
 
 const METODOS: readonly MetodoPago[] = ['efectivo', 'tarjeta', 'yape', 'plin', 'transferencia'];
 
@@ -708,4 +715,498 @@ export function toMovimientoDetalle(dto: MovimientoDto): MovimientoDetalle {
     insumo: dto.insumo ?? undefined,
     usuario: dto.usuario ?? undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Fase 2 — Clientes
+// ---------------------------------------------------------------------------
+
+export interface ClienteResumen {
+  id: number;
+  nombre: string;
+  tipoDocumento?: string;
+  numeroDocumento?: string;
+  telefono?: string;
+  direccion?: string;
+  referencia?: string;
+  creadoEn?: string;
+}
+
+export function toClienteResumen(dto: ClienteListaDto): ClienteResumen {
+  return {
+    id: dto.id,
+    nombre: dto.nombre,
+    tipoDocumento: dto.tipo_documento ?? undefined,
+    numeroDocumento: dto.numero_documento ?? undefined,
+    telefono: dto.telefono ?? undefined,
+    direccion: dto.direccion ?? undefined,
+    referencia: dto.referencia ?? undefined,
+    creadoEn: dto.creado_en ?? undefined,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fase 2 — Delivery propio y externo
+// ---------------------------------------------------------------------------
+
+export function resumenItems(detalles: DetallePedidoDto[] | undefined): string {
+  const items = detalles ?? [];
+  if (items.length === 0) {
+    return 'Sin ítems';
+  }
+  return items
+    .map((item) => `${item.cantidad}× ${item.platillo_nombre ?? `Platillo ${item.platillo_id}`}`)
+    .join(' · ');
+}
+
+export interface DeliveryPropioVista {
+  id: number;
+  numero: string;
+  fecha: string;
+  canal: string;
+  estado: string;
+  estadoPago: string;
+  estadoEntrega: string | null;
+  clienteId: number | null;
+  clienteNombre: string;
+  repartidorId: number | null;
+  repartidorNombre: string | null;
+  direccion: string;
+  referencia: string;
+  observaciones: string;
+  minutos: number;
+  subtotal: number;
+  igv: number;
+  total: number;
+  costoDelivery: number;
+  metodoPago: string | null;
+  items: PedidoDetalle[];
+  detalleTexto: string;
+}
+
+export function toDeliveryPropio(dto: DeliveryPropioPedidoDto): DeliveryPropioVista {
+  return {
+    id: dto.id,
+    numero: dto.numero ?? `#${dto.id}`,
+    fecha: dto.fecha_pedido ?? '',
+    canal: dto.canal ?? 'delivery_propio',
+    estado: dto.estado ?? 'borrador',
+    estadoPago: dto.estado_pago ?? 'pendiente',
+    estadoEntrega: dto.estado_entrega ?? null,
+    clienteId: dto.cliente_id ?? null,
+    clienteNombre: dto.cliente_nombre?.trim() || 'Sin cliente',
+    repartidorId: dto.repartidor_id ?? null,
+    repartidorNombre: dto.repartidor_nombre ?? null,
+    direccion: dto.direccion_entrega?.trim() || 'Sin dirección',
+    referencia: dto.referencia_entrega?.trim() || '',
+    observaciones: dto.observaciones?.trim() || '',
+    minutos: Number(dto.minutos_desde_pedido ?? 0),
+    subtotal: Number(dto.subtotal ?? 0),
+    igv: Number(dto.igv ?? 0),
+    total: Number(dto.total ?? 0),
+    costoDelivery: Number(dto.costo_delivery ?? 0),
+    metodoPago: dto.metodo_pago ?? null,
+    items: (dto.detalles ?? []).map(toDetalle),
+    detalleTexto: resumenItems(dto.detalles),
+  };
+}
+
+export interface DeliveryExternoVista {
+  id: number;
+  numero: string;
+  fecha: string;
+  plataforma: string;
+  estado: string;
+  estadoPago: string;
+  clienteNombre: string;
+  direccion: string;
+  referencia: string;
+  observaciones: string;
+  minutos: number;
+  comisionPct: number;
+  montoBruto: number;
+  comision: number;
+  montoNeto: number;
+  total: number;
+  items: PedidoDetalle[];
+  detalleTexto: string;
+}
+
+export function toDeliveryExterno(dto: DeliveryExternoPedidoDto): DeliveryExternoVista {
+  const plataforma = dto.plataforma ?? dto.canal ?? 'rappi';
+  const bruto = Number(dto.monto_bruto ?? dto.total ?? 0);
+  const comision = Number(dto.comision ?? 0);
+  return {
+    id: dto.id,
+    numero: dto.numero ?? `#${dto.id}`,
+    fecha: dto.fecha_pedido ?? '',
+    plataforma,
+    estado: dto.estado ?? 'borrador',
+    estadoPago: dto.estado_pago ?? 'pendiente',
+    clienteNombre: dto.cliente_nombre?.trim() || 'Sin cliente',
+    direccion: dto.direccion_entrega?.trim() || 'Sin dirección',
+    referencia: dto.referencia_entrega?.trim() || '',
+    observaciones: dto.observaciones?.trim() || '',
+    minutos: 0,
+    comisionPct: Number(dto.comision_pct ?? 0),
+    montoBruto: bruto,
+    comision,
+    montoNeto: Number(dto.monto_neto ?? bruto - comision),
+    total: Number(dto.total ?? bruto),
+    items: (dto.detalles ?? []).map(toDetalle),
+    detalleTexto: resumenItems(dto.detalles),
+  };
+}
+
+export interface LiquidacionVista {
+  id: number | null;
+  plataforma: string;
+  fecha: string;
+  montoBruto: number;
+  comision: number;
+  montoNeto: number;
+  pedidos: number;
+  referencia: string;
+  origen: string;
+}
+
+export function toLiquidacion(dto: LiquidacionDeliveryDto): LiquidacionVista {
+  return {
+    id: dto.id,
+    plataforma: dto.plataforma,
+    fecha: dto.fecha ?? '',
+    montoBruto: Number(dto.monto_bruto ?? 0),
+    comision: Number(dto.comision ?? 0),
+    montoNeto: Number(dto.monto_neto ?? 0),
+    pedidos: Number(dto.pedidos ?? 0),
+    referencia: dto.referencia ?? '',
+    origen: dto.origen ?? '',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Fase 2 — Reportes (vista lista para renderizar con el diseño actual)
+// ---------------------------------------------------------------------------
+
+export type ReporteTipoId =
+  | 'ventas'
+  | 'costos'
+  | 'merma'
+  | 'devoluciones'
+  | 'inventario'
+  | 'activos'
+  | 'personal';
+
+const TIPOS_REPORTE: readonly ReporteTipoId[] = [
+  'ventas',
+  'costos',
+  'merma',
+  'devoluciones',
+  'inventario',
+  'activos',
+  'personal',
+];
+
+export interface ReporteFilaVista {
+  label: string;
+  monto: string;
+  pct: number;
+  tono: 'brand' | 'soft' | 'neutral';
+}
+
+export interface ReporteVista {
+  kpiLabel: string;
+  kpiValor: string;
+  prefijo: string;
+  variacion: string;
+  secundarioUno: { label: string; valor: string };
+  secundarioDos: { label: string; valor: string };
+  seccion: string;
+  seccionMeta: string;
+  filas: ReporteFilaVista[];
+  pieIzquierda: string;
+  pieDerecha: string;
+  resumen: string;
+}
+
+type FilaCruda = Record<string, unknown>;
+
+const numeroSeguro = (valor: unknown): number => {
+  const numero = typeof valor === 'number' ? valor : Number(valor);
+  return Number.isFinite(numero) ? numero : 0;
+};
+
+const montoTexto = (valor: number): string =>
+  valor.toLocaleString('es-PE', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const CLAVES_ETIQUETA = [
+  'nombre',
+  'etiqueta',
+  'label',
+  'canal',
+  'metodo',
+  'dia',
+  'fecha',
+  'clave',
+  'tipo',
+  'categoria',
+  'estado',
+  'resolucion',
+  'clasificacion',
+  'platillo',
+  'proveedor',
+  'rol',
+  'plataforma',
+] as const;
+
+function etiquetaDe(fila: FilaCruda, indice: number): string {
+  for (const clave of CLAVES_ETIQUETA) {
+    const valor = fila[clave];
+    if (typeof valor === 'string' && valor.trim()) {
+      return valor;
+    }
+  }
+  return `Fila ${indice + 1}`;
+}
+
+function valorDe(fila: FilaCruda, claves: readonly string[]): number {
+  for (const clave of claves) {
+    const valor = fila[clave];
+    if (typeof valor === 'number' && Number.isFinite(valor)) {
+      return valor;
+    }
+    if (typeof valor === 'string' && valor.trim() && Number.isFinite(Number(valor))) {
+      return Number(valor);
+    }
+  }
+  return 0;
+}
+
+function filasVista(
+  lista: unknown,
+  claves: readonly string[],
+  formato: (valor: number) => string,
+  limite = 8,
+): ReporteFilaVista[] {
+  if (!Array.isArray(lista)) {
+    return [];
+  }
+  const filas = (lista as FilaCruda[]).slice(0, limite).map((fila, indice) => ({
+    label: etiquetaDe(fila, indice),
+    valor: valorDe(fila, claves),
+  }));
+  const maximo = filas.reduce((mayor, fila) => Math.max(mayor, fila.valor), 0);
+  return filas.map((fila, indice) => ({
+    label: fila.label,
+    monto: formato(fila.valor),
+    pct: maximo > 0 ? Math.max(4, Math.round((fila.valor / maximo) * 100)) : 0,
+    tono: indice === 0 ? 'brand' : indice < 3 ? 'soft' : 'neutral',
+  }));
+}
+
+const soloNumero = (valor: number): string => String(valor);
+
+function bloque(dto: Record<string, unknown>, clave: string): Record<string, unknown> {
+  const valor = dto[clave];
+  return typeof valor === 'object' && valor !== null ? (valor as Record<string, unknown>) : {};
+}
+
+function cantidadFilas(lista: unknown): number {
+  return Array.isArray(lista) ? lista.length : 0;
+}
+
+function limitacionDe(dto: Record<string, unknown>): string {
+  const meta = bloque(dto, 'meta');
+  const limitacion = meta['limitacion'];
+  return typeof limitacion === 'string' ? limitacion : '';
+}
+
+export function toTiposReporte(data: Array<string | ReporteTipoDto>): ReporteTipoId[] {
+  const ids: ReporteTipoId[] = [];
+  for (const item of data) {
+    const tipo = typeof item === 'string' ? item : item.tipo;
+    const normalizado = String(tipo || '').toLowerCase();
+    const encontrado = TIPOS_REPORTE.find((valor) => valor === normalizado);
+    if (encontrado && !ids.includes(encontrado)) {
+      ids.push(encontrado);
+    }
+  }
+  return ids.length > 0 ? ids : [...TIPOS_REPORTE];
+}
+
+export function toReporteVista(tipo: string, payload: unknown): ReporteVista {
+  const dto =
+    typeof payload === 'object' && payload !== null
+      ? (payload as Record<string, unknown>)
+      : {};
+
+  switch (tipo) {
+    case 'costos': {
+      const compras = bloque(dto, 'compras');
+      const gastos = bloque(dto, 'gastos');
+      const mermas = bloque(dto, 'mermas');
+      const totalCompras = numeroSeguro(compras['total']);
+      const totalGastos = numeroSeguro(gastos['total']);
+      const totalMermas = numeroSeguro(mermas['total']);
+      const total = numeroSeguro(dto['total_costos']);
+      const rubros = [
+        { label: 'Compras de insumos', valor: totalCompras },
+        { label: 'Gastos operativos', valor: totalGastos },
+        { label: 'Merma aprobada', valor: totalMermas },
+      ];
+      const maximo = rubros.reduce((mayor, fila) => Math.max(mayor, fila.valor), 0);
+      return {
+        kpiLabel: 'Costo operativo',
+        kpiValor: montoTexto(total),
+        prefijo: 'S/',
+        variacion: 'real',
+        secundarioUno: { label: 'Compras', valor: formatearMoneda(totalCompras) },
+        secundarioDos: { label: 'Gastos', valor: formatearMoneda(totalGastos) },
+        seccion: 'Costos por rubro',
+        seccionMeta: 'monto del período',
+        filas: rubros.map((fila) => ({
+          label: fila.label,
+          monto: formatearMoneda(fila.valor),
+          pct: maximo > 0 ? Math.max(4, Math.round((fila.valor / maximo) * 100)) : 0,
+          tono: fila === rubros[0] ? 'brand' : fila === rubros[1] ? 'soft' : 'neutral',
+        })),
+        pieIzquierda: `${numeroSeguro(compras['registros'])} compras · ${numeroSeguro(
+          gastos['registros'],
+        )} gastos · ${numeroSeguro(mermas['registros'])} mermas`,
+        pieDerecha: `Merma S/ ${montoTexto(totalMermas)} · food cost incluido`,
+        resumen: `Compras + gastos + merma · S/ ${montoTexto(total)}`,
+      };
+    }
+    case 'merma': {
+      const total = numeroSeguro(dto['total_costo']);
+      const registros = numeroSeguro(dto['registros']);
+      const clasificaciones = cantidadFilas(dto['por_clasificacion']);
+      return {
+        kpiLabel: 'Costo de merma',
+        kpiValor: montoTexto(total),
+        prefijo: 'S/',
+        variacion: 'real',
+        secundarioUno: { label: 'Registros', valor: String(registros) },
+        secundarioDos: { label: 'Clasificaciones', valor: String(clasificaciones) },
+        seccion: 'Merma por tipo',
+        seccionMeta: 'costo estimado',
+        filas: filasVista(dto['por_tipo'], ['costo', 'total', 'monto'], formatearMoneda),
+        pieIzquierda: `${registros} registros aprobados · ${cantidadFilas(dto['por_tipo'])} tipos`,
+        pieDerecha: `Merma evitable e inevitable separadas en el detalle`,
+        resumen: `${registros} registros · S/ ${montoTexto(total)}`,
+      };
+    }
+    case 'devoluciones': {
+      const reembolsado = numeroSeguro(dto['monto_reembolsado']);
+      const registros = numeroSeguro(dto['registros']);
+      return {
+        kpiLabel: 'Monto reembolsado',
+        kpiValor: montoTexto(reembolsado),
+        prefijo: 'S/',
+        variacion: 'real',
+        secundarioUno: { label: 'Registros', valor: String(registros) },
+        secundarioDos: {
+          label: 'Resoluciones',
+          valor: String(cantidadFilas(dto['por_resolucion'])),
+        },
+        seccion: 'Devoluciones por estado',
+        seccionMeta: 'casos del período',
+        filas: filasVista(dto['por_estado'], ['registros'], (valor) => `${valor} casos`),
+        pieIzquierda: `${registros} casos · ${cantidadFilas(dto['por_resolucion'])} resoluciones`,
+        pieDerecha: `Reembolsado S/ ${montoTexto(reembolsado)}`,
+        resumen: `${registros} registros · S/ ${montoTexto(reembolsado)} reembolsado`,
+      };
+    }
+    case 'inventario': {
+      const totalInsumos = numeroSeguro(dto['total_insumos']);
+      const valorTotal = numeroSeguro(dto['valor_total']);
+      const bajoMinimo = numeroSeguro(dto['bajo_minimo']);
+      return {
+        kpiLabel: 'Insumos bajo mínimo',
+        kpiValor: String(bajoMinimo),
+        prefijo: '',
+        variacion: bajoMinimo > 0 ? 'alerta' : 'ok',
+        secundarioUno: { label: 'Valorizado', valor: formatearMoneda(valorTotal) },
+        secundarioDos: { label: 'Insumos', valor: String(totalInsumos) },
+        seccion: 'Inventario por categoría',
+        seccionMeta: 'valorización actual',
+        filas: filasVista(dto['por_categoria'], ['valor', 'total'], formatearMoneda),
+        pieIzquierda: `${totalInsumos} insumos activos · ${bajoMinimo} bajo mínimo`,
+        pieDerecha: `Valorizado S/ ${montoTexto(valorTotal)}`,
+        resumen: `${totalInsumos} insumos · ${bajoMinimo} alertas`,
+      };
+    }
+    case 'activos': {
+      const totalActivos = numeroSeguro(dto['total_activos']);
+      const valor = numeroSeguro(dto['valor_adquisicion']);
+      const reparacion = numeroSeguro(dto['en_reparacion']);
+      return {
+        kpiLabel: 'Activos registrados',
+        kpiValor: String(totalActivos),
+        prefijo: '',
+        variacion: `${reparacion} en reparación`,
+        secundarioUno: { label: 'Valor adquisición', valor: formatearMoneda(valor) },
+        secundarioDos: { label: 'En reparación', valor: String(reparacion) },
+        seccion: 'Activos por categoría',
+        seccionMeta: 'valor de adquisición',
+        filas: filasVista(dto['por_categoria'], ['valor', 'total'], formatearMoneda),
+        pieIzquierda: `${totalActivos} activos · ${reparacion} en reparación · ${numeroSeguro(
+          dto['dados_de_baja'],
+        )} de baja`,
+        pieDerecha: `Mantenimientos S/ ${montoTexto(numeroSeguro(dto['costo_mantenimientos']))}`,
+        resumen: `${totalActivos} activos · S/ ${montoTexto(valor)}`,
+      };
+    }
+    case 'personal': {
+      const totalUsuarios = numeroSeguro(dto['total_usuarios']);
+      return {
+        kpiLabel: 'Usuarios activos',
+        kpiValor: String(totalUsuarios),
+        prefijo: '',
+        variacion: 'multi-rol',
+        secundarioUno: { label: 'Roles', valor: String(cantidadFilas(dto['por_rol'])) },
+        secundarioDos: { label: 'Usuarios', valor: String(cantidadFilas(dto['usuarios'])) },
+        seccion: 'Usuarios por rol',
+        seccionMeta: 'asignaciones activas',
+        filas: filasVista(dto['por_rol'], ['usuarios', 'cantidad', 'total'], soloNumero),
+        pieIzquierda: `${totalUsuarios} usuarios activos · RBAC multi-rol`,
+        pieDerecha: `Permisos granulares por rol`,
+        resumen: `${totalUsuarios} usuarios · ${cantidadFilas(dto['por_rol'])} roles`,
+      };
+    }
+    default: {
+      const total = numeroSeguro(dto['total']);
+      const pagos = numeroSeguro(dto['cantidad_pagos']);
+      const tickets = numeroSeguro(dto['cantidad_tickets']);
+      return {
+        kpiLabel: 'Ventas netas',
+        kpiValor: montoTexto(total),
+        prefijo: 'S/',
+        variacion: 'real',
+        secundarioUno: { label: 'Pagos', valor: String(pagos) },
+        secundarioDos: {
+          label: 'Ticket promedio',
+          valor: formatearMoneda(numeroSeguro(dto['ticket_promedio'])),
+        },
+        seccion: 'Ventas por canal',
+        seccionMeta: 'monto cobrado',
+        filas: filasVista(dto['por_canal'], ['monto', 'total'], formatearMoneda),
+        pieIzquierda: `${tickets} tickets · ${pagos} pagos`,
+        pieDerecha: `Ticket promedio S/ ${montoTexto(numeroSeguro(dto['ticket_promedio']))}`,
+        resumen: `${pagos} pagos · ${tickets} tickets · S/ ${montoTexto(total)}`,
+      };
+    }
+  }
+}
+
+export function limitacionReporte(payload: unknown): string | null {
+  const dto =
+    typeof payload === 'object' && payload !== null
+      ? (payload as Record<string, unknown>)
+      : {};
+  const limitacion = limitacionDe(dto);
+  return limitacion.trim() || null;
 }

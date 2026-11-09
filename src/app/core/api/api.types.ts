@@ -594,3 +594,285 @@ export interface DevolucionDto {
   fecha_resolucion: string | null;
   merma_id: number | null;
 }
+
+// ---------------------------------------------------------------------------
+// Fase 2 — Reportes, clientes, delivery y cuadre histórico
+// ---------------------------------------------------------------------------
+
+export interface ReporteTipoDto {
+  tipo: string;
+  nombre?: string | null;
+  descripcion?: string | null;
+}
+
+export interface ReportesTiposDto {
+  data: Array<string | ReporteTipoDto>;
+  meta?: { total?: number };
+}
+
+export interface ReporteMetaDto {
+  rango?: { desde: string | null; hasta: string | null };
+  limite_filas?: number;
+  canal?: string | null;
+  limitacion?: string | null;
+  [clave: string]: unknown;
+}
+
+export interface ReporteAgrupadoDto {
+  clave?: string | number | null;
+  nombre?: string | null;
+  etiqueta?: string | null;
+  canal?: string | null;
+  metodo?: string | null;
+  dia?: string | null;
+  fecha?: string | null;
+  tipo?: string | null;
+  categoria?: string | null;
+  estado?: string | null;
+  resolucion?: string | null;
+  clasificacion?: string | null;
+  platillo?: string | null;
+  proveedor?: string | null;
+  rol?: string | null;
+  cantidad?: number;
+  registros?: number;
+  usuarios?: number;
+  insumos?: number;
+  activos?: number;
+  monto?: number;
+  total?: number;
+  costo?: number;
+  valor?: number;
+  reembolsado?: number;
+  [clave: string]: unknown;
+}
+
+export interface ReporteVentaDetalleDto {
+  fecha?: string;
+  canal?: string;
+  metodo?: string;
+  monto?: number;
+  sujeto?: string | null;
+}
+
+export interface ReporteVentasDto {
+  tipo?: string;
+  desde?: string | null;
+  hasta?: string | null;
+  total: number;
+  cantidad_pagos?: number;
+  cantidad_tickets?: number;
+  ticket_promedio?: number;
+  por_canal?: ReporteAgrupadoDto[];
+  por_metodo?: ReporteAgrupadoDto[];
+  por_dia?: ReporteAgrupadoDto[];
+  top_platillos?: ReporteAgrupadoDto[];
+  detalle?: ReporteVentaDetalleDto[];
+  meta?: ReporteMetaDto;
+}
+
+export interface ReporteCostosBloqueDto {
+  registros?: number;
+  total?: number;
+  por_proveedor?: ReporteAgrupadoDto[];
+  por_categoria?: ReporteAgrupadoDto[];
+  por_tipo?: ReporteAgrupadoDto[];
+}
+
+export interface ReporteCostosDto {
+  tipo?: string;
+  desde?: string | null;
+  hasta?: string | null;
+  compras?: ReporteCostosBloqueDto;
+  gastos?: ReporteCostosBloqueDto;
+  mermas?: ReporteCostosBloqueDto;
+  total_costos?: number;
+  meta?: ReporteMetaDto;
+}
+
+export interface ReporteMermaDto {
+  tipo?: string;
+  desde?: string | null;
+  hasta?: string | null;
+  total_costo?: number;
+  registros?: number;
+  por_tipo?: ReporteAgrupadoDto[];
+  por_clasificacion?: ReporteAgrupadoDto[];
+  meta?: ReporteMetaDto;
+}
+
+export interface ReporteDevolucionDetalleDto {
+  id?: number;
+  pedido_id?: number;
+  motivo?: string;
+  estado?: string;
+  resolucion?: string | null;
+  monto_reembolsado?: number;
+  fecha?: string;
+}
+
+export interface ReporteDevolucionesDto {
+  tipo?: string;
+  desde?: string | null;
+  hasta?: string | null;
+  registros?: number;
+  monto_reembolsado?: number;
+  por_estado?: ReporteAgrupadoDto[];
+  por_resolucion?: ReporteAgrupadoDto[];
+  detalle?: ReporteDevolucionDetalleDto[];
+  meta?: ReporteMetaDto;
+}
+
+export interface ReporteInventarioInsumoDto {
+  id?: number;
+  codigo?: string;
+  nombre?: string;
+  categoria?: string;
+  unidad_medida?: string;
+  stock_actual?: number;
+  stock_minimo?: number;
+  costo_promedio?: number;
+  valor?: number;
+  estado?: string;
+}
+
+export interface ReporteInventarioDto {
+  tipo?: string;
+  total_insumos?: number;
+  valor_total?: number;
+  bajo_minimo?: number;
+  por_categoria?: ReporteAgrupadoDto[];
+  insumos?: ReporteInventarioInsumoDto[];
+  meta?: ReporteMetaDto;
+}
+
+export interface ReporteActivoDto {
+  id?: number;
+  nombre?: string;
+  categoria?: string;
+  estado?: string;
+  cantidad?: number;
+  vida_util_meses?: number | null;
+  antiguedad_meses?: number;
+  vida_util_vencida?: boolean;
+  mantenimientos?: number;
+}
+
+export interface ReporteActivosDto {
+  tipo?: string;
+  total_activos?: number;
+  valor_adquisicion?: number;
+  en_reparacion?: number;
+  dados_de_baja?: number;
+  costo_mantenimientos?: number;
+  por_categoria?: ReporteAgrupadoDto[];
+  activos?: ReporteActivoDto[];
+  meta?: ReporteMetaDto;
+}
+
+export interface ReportePersonalUsuarioDto {
+  id?: number;
+  nombre?: string;
+  email?: string;
+  roles?: string[];
+  permisos?: number;
+  activo?: boolean;
+  ultimo_acceso?: string | null;
+}
+
+export interface ReportePersonalDto {
+  tipo?: string;
+  total_usuarios?: number;
+  por_rol?: ReporteAgrupadoDto[];
+  usuarios?: ReportePersonalUsuarioDto[];
+  meta?: ReporteMetaDto;
+}
+
+export type ReporteRespuestaDto =
+  | ReporteVentasDto
+  | ReporteCostosDto
+  | ReporteMermaDto
+  | ReporteDevolucionesDto
+  | ReporteInventarioDto
+  | ReporteActivosDto
+  | ReportePersonalDto;
+
+export interface ClienteListaDto {
+  id: number;
+  nombre: string;
+  tipo_documento?: string | null;
+  numero_documento?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  referencia?: string | null;
+  creado_en?: string | null;
+}
+
+export interface DeliveryPropioPedidoDto {
+  id: number;
+  numero?: string;
+  fecha_pedido?: string;
+  fecha_entrega?: string | null;
+  canal?: string;
+  tipo_consumo?: string;
+  estado?: string;
+  estado_pago?: string;
+  estado_entrega?: string | null;
+  cliente_id?: number | null;
+  cliente_nombre?: string | null;
+  repartidor_id?: number | null;
+  repartidor_nombre?: string | null;
+  direccion_entrega?: string | null;
+  referencia_entrega?: string | null;
+  observaciones?: string | null;
+  minutos_desde_pedido?: number | null;
+  subtotal?: number;
+  igv?: number;
+  total?: number;
+  costo_delivery?: number;
+  comision_plataforma?: number;
+  metodo_pago?: string | null;
+  detalles?: DetallePedidoDto[];
+}
+
+export interface EntregaResponseDto {
+  pedido: DeliveryPropioPedidoDto;
+  pago?: PagoDto;
+  vuelto?: number;
+}
+
+export interface DeliveryExternoPedidoDto {
+  id: number;
+  numero?: string;
+  fecha_pedido?: string;
+  plataforma?: string;
+  canal?: string;
+  estado?: string;
+  estado_pago?: string;
+  estado_entrega?: string | null;
+  cliente_id?: number | null;
+  cliente_nombre?: string | null;
+  direccion_entrega?: string | null;
+  referencia_entrega?: string | null;
+  observaciones?: string | null;
+  detalles?: DetallePedidoDto[];
+  comision_pct?: number;
+  monto_bruto?: number;
+  comision?: number;
+  monto_neto?: number;
+  total?: number;
+}
+
+export interface LiquidacionDeliveryDto {
+  id: number | null;
+  plataforma: string;
+  fecha: string;
+  monto_bruto: number;
+  comision: number;
+  monto_neto: number;
+  pedidos?: number;
+  referencia?: string | null;
+  origen?: string | null;
+  persistido?: boolean;
+  limitacion?: string | null;
+}

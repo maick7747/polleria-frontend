@@ -14,6 +14,26 @@
     </button>
   </div>
 
+  <nav class="tabs" aria-label="Secciones de cuadre de caja">
+    <button
+      type="button"
+      class="tab"
+      [class.is-active]="vista() === 'dia'"
+      (click)="cambiarVista('dia')"
+    >
+      Cuadre del día
+    </button>
+    <button
+      type="button"
+      class="tab"
+      [class.is-active]="vista() === 'historial'"
+      (click)="cambiarVista('historial')"
+    >
+      Historial
+    </button>
+  </nav>
+
+  @if (vista() === 'dia') {
   <div class="stepper">
     <div class="stepper__pasos">
       <a class="paso-done" routerLink="/cuadre-caja/apertura" title="Ir a apertura de caja">
@@ -239,6 +259,99 @@
       </div>
     </app-dark-panel>
   </div>
+  } @else {
+    <section class="historial">
+      <app-panel class="historial__panel">
+        <div class="historial__inner">
+          <header class="panel-head">
+            <div class="panel-title">
+              <span class="bar"></span>
+              <h2>Historial de cuadres</h2>
+            </div>
+            <span class="pill">Solo lectura</span>
+          </header>
+
+          <div class="filtros">
+            <label class="filtro-campo">
+              <span>Desde</span>
+              <input type="date" [value]="histDesde()" (change)="onHistDesde($event)" />
+            </label>
+            <label class="filtro-campo">
+              <span>Hasta</span>
+              <input type="date" [value]="histHasta()" (change)="onHistHasta($event)" />
+            </label>
+            @if (historialCargando()) {
+              <span class="cargando">Cargando…</span>
+            }
+          </div>
+
+          @if (historialError()) {
+            <div class="error-banner" role="alert">
+              <span>{{ historialError() }}</span>
+              <button type="button" (click)="reintentarHistorial()">Reintentar</button>
+            </div>
+          }
+
+          <div class="tabla">
+            <div class="tabla__head">
+              <span>FECHA</span>
+              <span>ESTADO</span>
+              <span class="right">FONDO</span>
+              <span class="right">VENTAS</span>
+              <span class="right">EGRESOS</span>
+              <span class="right">ESPERADO</span>
+              <span class="right">CONTADO</span>
+              <span class="right">DIFERENCIA</span>
+            </div>
+
+            @for (fila of historial(); track fila.id) {
+              <div class="tabla__row">
+                <span class="meta">{{ fila.fecha }}</span>
+                <span>
+                  <app-chip [variant]="fila.estado === 'cerrada' ? 'neutral' : 'success'">
+                    {{ fila.estado }}
+                  </app-chip>
+                </span>
+                <span class="right monto">{{ moneda(fila.fondoInicial) }}</span>
+                <span class="right monto">{{ moneda(fila.totalVentas) }}</span>
+                <span class="right monto">− {{ moneda(fila.totalEgresos) }}</span>
+                <span class="right monto">{{ moneda(fila.montoEsperado) }}</span>
+                <span class="right monto">
+                  {{ fila.totalReal === null ? '—' : moneda(fila.totalReal) }}
+                </span>
+                <span class="right">
+                  <app-chip [variant]="diferenciaTono(fila)">
+                    {{ fila.diferencia === null ? 'Sin cierre' : moneda(fila.diferencia) }}
+                  </app-chip>
+                </span>
+              </div>
+            } @empty {
+              <div class="tabla__empty">
+                <app-empty-state
+                  icon="cash-register"
+                  title="Sin cuadres"
+                  description="No hay cuadres de caja en el rango de fechas elegido."
+                />
+              </div>
+            }
+          </div>
+
+          <app-paginador
+            [page]="histPagina()"
+            [pages]="historialMeta().pages"
+            [total]="historialMeta().total"
+            [limit]="histLimite()"
+            (pageChange)="cambiarHistPagina($event)"
+            (limitChange)="cambiarHistLimite($event)"
+          />
+
+          <p class="historial__nota">
+            El historial se calcula con los montos guardados al cierre de cada turno.
+          </p>
+        </div>
+      </app-panel>
+    </section>
+  }
 
   <div class="pie">
     <span class="pie__item">

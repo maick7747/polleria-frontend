@@ -1,9 +1,6 @@
-<app-shell
-  title="Delivery propio · WhatsApp"
-  [subtitle]="numeroPedido + ' · recibido 17:38 · hace 12 min · repartidor por asignar'"
->
+<app-shell title="Delivery propio" [subtitle]="subtitulo()">
   <div actions class="header-actions">
-    <app-chip variant="success" [dot]="true">Caja abierta</app-chip>
+    <app-chip variant="success" [dot]="true">WhatsApp · teléfono</app-chip>
     <a class="ghost-link" routerLink="/dashboard">
       <app-icon name="arrow-left" [size]="14" />
       Volver al tablero
@@ -11,28 +8,151 @@
   </div>
 
   <div class="canales">
-    <div class="canales__chips" role="group" aria-label="Canal del pedido">
-      <button
-        type="button"
-        class="canal"
-        [class.is-active]="canal() === 'whatsapp'"
-        (click)="canal.set('whatsapp')"
-      >
-        <app-icon name="phone" [size]="14" />
-        WhatsApp
+    <div class="filtros">
+      <label class="filtro-campo">
+        <span>Estado</span>
+        <select [value]="estado()" (change)="onEstado($event)" aria-label="Filtrar por estado">
+          @for (item of estados; track item.valor) {
+            <option [value]="item.valor">{{ item.texto }}</option>
+          }
+        </select>
+      </label>
+      <label class="filtro-campo">
+        <span>Desde</span>
+        <input type="date" [value]="desde()" (change)="onDesde($event)" />
+      </label>
+      <label class="filtro-campo">
+        <span>Hasta</span>
+        <input type="date" [value]="hasta()" (change)="onHasta($event)" />
+      </label>
+      @if (cargando()) {
+        <span class="cargando">Cargando…</span>
+      }
+    </div>
+
+    <div class="canales__acciones">
+      <button type="button" class="ghost-link" (click)="reintentar()">
+        <app-icon name="arrow-clockwise" [size]="14" />
+        Actualizar
       </button>
-      <button
-        type="button"
-        class="canal"
-        [class.is-active]="canal() === 'telefono'"
-        (click)="canal.set('telefono')"
-      >
-        <app-icon name="phone" [size]="14" />
-        Teléfono
+      <button type="button" class="btn-primary" (click)="abrirAlta()">
+        <app-icon name="plus" [size]="14" />
+        Nuevo pedido
       </button>
     </div>
-    <span class="canales__meta">Canal propio · sin comisión de plataforma</span>
   </div>
+
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
+  @if (mostrarAlta()) {
+    <app-panel class="alta">
+      <form class="alta__form" (submit)="$event.preventDefault(); crearPedido()">
+        <header class="alta__head">
+          <div class="panel-title">
+            <span class="bar"></span>
+            <h2>Nuevo pedido de delivery propio</h2>
+          </div>
+          <button type="button" class="mini-btn" (click)="cerrarAlta()">
+            <app-icon name="x" [size]="13" />
+            Cerrar
+          </button>
+        </header>
+
+        <div class="alta__grid">
+          <label class="campo">
+            <span class="campo__label">Canal</span>
+            <select class="input" [value]="canal()" (change)="canal.set($any($event.target).value)">
+              <option value="whatsapp">WhatsApp</option>
+              <option value="telefono">Teléfono</option>
+            </select>
+          </label>
+
+          <label class="campo campo--wide">
+            <span class="campo__label">Cliente · nombre o documento</span>
+            <input
+              class="input"
+              type="search"
+              placeholder="Buscar cliente"
+              [value]="busquedaCliente()"
+              (input)="onClienteBuscar($event)"
+            />
+            @if (resultadosCliente().length > 0) {
+              <div class="sugerencias">
+                @for (cliente of resultadosCliente(); track cliente.id) {
+                  <button type="button" class="sugerencia" (click)="elegirCliente(cliente)">
+                    <strong>{{ cliente.nombre }}</strong>
+                    <span>{{ cliente.numeroDocumento || 'Sin documento' }} · {{ cliente.telefono || 'Sin teléfono' }}</span>
+                  </button>
+                }
+                @if (hayMasClientes()) {
+                  <button type="button" class="sugerencia sugerencia--mas" (click)="masClientes()">
+                    Ver más resultados
+                  </button>
+                }
+              </div>
+            }
+            @if (buscandoCliente()) {
+              <span class="campo__hint">Buscando clientes…</span>
+            }
+          </label>
+
+          <label class="campo">
+            <span class="campo__label">Teléfono</span>
+            <input class="input" type="tel" [value]="telefono()" (input)="onTelefono($event)" />
+          </label>
+
+          <label class="campo campo--wide">
+            <span class="campo__label">Dirección de entrega</span>
+            <input class="input" type="text" [value]="direccion()" (input)="onDireccion($event)" />
+          </label>
+
+          <label class="campo campo--wide">
+            <span class="campo__label">Referencia</span>
+            <input class="input" type="text" [value]="referencia()" (input)="onReferencia($event)" />
+          </label>
+
+          <label class="campo">
+            <span class="campo__label">Costo delivery</span>
+            <input
+              class="input"
+              type="number"
+              min="0"
+              step="0.5"
+              [value]="costoDelivery()"
+              (input)="onCosto($event)"
+            />
+          </label>
+
+          <label class="campo campo--full">
+            <span class="campo__label">Observaciones</span>
+            <textarea
+              class="input input--area"
+              [value]="observaciones()"
+              (input)="onObservaciones($event)"
+            ></textarea>
+          </label>
+        </div>
+
+        <div class="alta__foot">
+          <span class="campo__hint">
+            Se crea como borrador sin ítems; las líneas se agregan desde la comanda.
+          </span>
+          <div class="alta__actions">
+            <button type="button" class="mini-btn" (click)="cerrarAlta()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="!puedeCrear()">
+              <app-icon name="check" [size]="14" />
+              {{ guardando() ? 'Guardando…' : 'Crear pedido' }}
+            </button>
+          </div>
+        </div>
+      </form>
+    </app-panel>
+  }
 
   <div class="board">
     <app-panel class="pedido">
@@ -40,161 +160,215 @@
         <header class="panel-head">
           <div class="panel-title">
             <span class="bar"></span>
-            <h2>Pedido</h2>
+            <h2>Bandeja de pedidos</h2>
           </div>
-          <span class="panel-meta">{{ totalItems() }} ítems · 1 ronda</span>
+          <span class="panel-meta">{{ meta().total }} pedidos · {{ lista().length }} en pantalla</span>
         </header>
 
-        <div class="cliente">
-          <div class="cliente__main">
-            <div class="cliente__icon">
-              <app-icon name="phone" [size]="19" />
-            </div>
-            <div class="cliente__data">
-              <span class="cliente__nombre">{{ clienteNombre }}</span>
-              <div class="cliente__line">
-                <app-icon name="phone" [size]="11" />
-                <span>{{ clienteTelefono }}</span>
-                <span class="tag tag--success">WhatsApp</span>
-              </div>
-            </div>
-          </div>
-          <div class="cliente__entrega">
-            <span class="cliente__entrega-label">Entrega estimada</span>
-            <strong>{{ entregaEstimada }}</strong>
-          </div>
-        </div>
-
-        <div class="direccion">
-          <app-icon name="map-pin" [size]="14" />
-          <div class="direccion__data">
-            <span class="direccion__linea">{{ direccion }} · referencia: {{ referencia }}</span>
-            <span class="direccion__meta">{{ distrito }}</span>
-          </div>
-        </div>
-
-        <div class="items">
-          <div class="items__head">
-            <span>ÍTEMS DEL PEDIDO</span>
-            <span>PRECIO</span>
+        <div class="lista">
+          <div class="fila fila--head">
+            <span>PEDIDO</span>
+            <span>CLIENTE / DIRECCIÓN</span>
+            <span>REPARTIDOR</span>
+            <span>ESPERA</span>
+            <span>ESTADO</span>
+            <span class="right">TOTAL</span>
           </div>
 
-          @for (item of items(); track item.id) {
-            <div class="item">
-              <div class="item__main">
-                <div class="item__qty">
-                  <button
-                    type="button"
-                    class="item__btn"
-                    [attr.aria-label]="'Quitar una unidad de ' + item.nombre"
-                    (click)="cambiarCantidad(item.id, -1)"
-                  >
-                    −
-                  </button>
-                  <span class="item__num">{{ item.cantidad }}</span>
-                  <button
-                    type="button"
-                    class="item__btn"
-                    [attr.aria-label]="'Agregar una unidad de ' + item.nombre"
-                    (click)="cambiarCantidad(item.id, 1)"
-                  >
-                    +
-                  </button>
-                </div>
-                <div class="item__data">
-                  <span class="item__name">{{ item.nombre }}</span>
-                  <span class="item__notas">{{ item.notas }}</span>
-                </div>
-              </div>
-              <span class="item__price">{{ moneda(item.subtotal) }}</span>
+          @for (pedido of lista(); track pedido.id) {
+            <button
+              type="button"
+              class="fila"
+              [class.is-active]="seleccionado()?.id === pedido.id"
+              (click)="seleccionar(pedido.id)"
+            >
+              <span class="fila__numero">{{ pedido.numero }}</span>
+              <span class="fila__cliente">
+                <strong>{{ pedido.clienteNombre }}</strong>
+                <small>{{ pedido.direccion }}</small>
+              </span>
+              <span class="fila__meta">{{ pedido.repartidorNombre ?? 'Por asignar' }}</span>
+              <span class="fila__meta">{{ minutosTexto(pedido.minutos) }}</span>
+              <span class="fila__estado">
+                <app-chip [variant]="estadoTono(pedido)">
+                  {{ pedido.estadoEntrega ? estadoTexto(pedido.estadoEntrega) : estadoTexto(pedido.estado) }}
+                </app-chip>
+              </span>
+              <span class="fila__total">{{ moneda(pedido.total) }}</span>
+            </button>
+          } @empty {
+            <div class="lista__empty">
+              <app-empty-state
+                icon="motorcycle"
+                title="Sin pedidos"
+                description="No hay pedidos de delivery propio con los filtros elegidos."
+              />
             </div>
           }
         </div>
 
-        <label class="campo campo--grow">
-          <span class="campo__label">Observaciones</span>
-          <textarea
-            class="observaciones"
-            [value]="observaciones()"
-            (input)="onObservacion($event)"
-            aria-label="Observaciones del pedido"
-          ></textarea>
-        </label>
-
-        <div class="pedido__grow"></div>
-
-        <div class="pedido__actions">
-          <button type="button" class="mini-btn">
-            <app-icon name="receipt" [size]="13" />
-            Editar pedido
-          </button>
-          <button type="button" class="mini-btn">
-            <app-icon name="phone" [size]="13" />
-            Responder a María
-          </button>
-          <span class="pedido__hint">Descuenta stock al confirmar</span>
-        </div>
+        <app-paginador
+          [page]="pagina()"
+          [pages]="meta().pages"
+          [total]="meta().total"
+          [limit]="limite()"
+          (pageChange)="cambiarPagina($event)"
+          (limitChange)="cambiarLimite($event)"
+        />
       </div>
     </app-panel>
 
     <app-dark-panel class="resumen">
       <div class="resumen__inner">
-        <header class="resumen__head">
-          <h2 class="resumen__title">Resumen</h2>
-          <span class="resumen__badge">{{ numeroPedido }}</span>
-        </header>
+        @if (seleccionado(); as pedido) {
+          <header class="resumen__head">
+            <h2 class="resumen__title">Pedido {{ pedido.numero }}</h2>
+            <span class="resumen__badge">{{ horaPedido(pedido) }}</span>
+          </header>
 
-        <span class="resumen__sep"></span>
+          <span class="resumen__sep"></span>
 
-        <div class="resumen__rows">
-          <div>
-            <span>Subtotal</span>
-            <strong>{{ moneda(subtotal()) }}</strong>
+          <div class="detalle">
+            <div class="detalle__row">
+              <span>Cliente</span>
+              <strong>{{ pedido.clienteNombre }}</strong>
+            </div>
+            <div class="detalle__row">
+              <span>Dirección</span>
+              <strong>{{ pedido.direccion }}</strong>
+            </div>
+            @if (pedido.referencia) {
+              <div class="detalle__row">
+                <span>Referencia</span>
+                <strong>{{ pedido.referencia }}</strong>
+              </div>
+            }
+            <div class="detalle__row">
+              <span>Repartidor</span>
+              <strong>{{ pedido.repartidorNombre ?? 'Por asignar' }}</strong>
+            </div>
+            <div class="detalle__row">
+              <span>Canal</span>
+              <strong>{{ pedido.canal === 'whatsapp' ? 'WhatsApp' : 'Teléfono' }}</strong>
+            </div>
+            <div class="detalle__row">
+              <span>Espera</span>
+              <strong>{{ minutosTexto(pedido.minutos) }}</strong>
+            </div>
           </div>
-          <div>
-            <span>IGV (18%)</span>
-            <strong>{{ moneda(igv()) }}</strong>
-          </div>
-          <div>
-            <span class="resumen__with-icon">
-              <app-icon name="map-pin" [size]="12" />
-              Delivery
-            </span>
-            <strong>{{ moneda(deliveryCosto) }}</strong>
-          </div>
-        </div>
 
-        <span class="resumen__sep"></span>
+          <span class="resumen__sep"></span>
 
-        <div class="resumen__total">
-          <span class="resumen__label">Total a cobrar</span>
-          <div class="resumen__amount">
-            <span class="cur">S/</span>
-            <span class="big">{{ total().toFixed(2) }}</span>
+          <span class="detalle__label">Ítems</span>
+          <div class="detalle__items">
+            @for (item of pedido.items; track item.id) {
+              <div class="detalle__item">
+                <span>{{ item.cantidad }}× {{ item.nombre }}</span>
+                <strong>{{ moneda(item.subtotal) }}</strong>
+              </div>
+            } @empty {
+              <span class="detalle__vacio">Sin ítems registrados todavía.</span>
+            }
           </div>
-          <span class="resumen__meta">Un solo comprobante al entregar · sin split</span>
-        </div>
 
-        <div class="pagos">
-          <div class="pagos__head">
-            <span>Métodos de pago</span>
-            <span>Al entregar</span>
+          @if (pedido.observaciones) {
+            <p class="detalle__obs">{{ pedido.observaciones }}</p>
+          }
+
+          <span class="resumen__sep"></span>
+
+          <div class="resumen__rows">
+            <div>
+              <span>Subtotal</span>
+              <strong>{{ moneda(pedido.subtotal) }}</strong>
+            </div>
+            <div>
+              <span>Delivery</span>
+              <strong>{{ moneda(pedido.costoDelivery) }}</strong>
+            </div>
           </div>
+
+          <div class="resumen__total">
+            <span class="resumen__label">Total a cobrar</span>
+            <div class="resumen__amount">
+              <span class="cur">S/</span>
+              <span class="big">{{ pedido.total.toFixed(2) }}</span>
+            </div>
+          </div>
+
+          <span class="resumen__sep"></span>
+
+          <span class="detalle__label">Asignar repartidor</span>
+          <div class="accion-linea">
+            <input
+              class="input input--dark"
+              type="number"
+              min="1"
+              placeholder="ID de repartidor"
+              [value]="repartidorId()"
+              (input)="onRepartidorInput($event)"
+              list="repartidores-conocidos"
+            />
+            <datalist id="repartidores-conocidos">
+              @for (repartidor of repartidores(); track repartidor.id) {
+                <option [value]="repartidor.id">{{ repartidor.nombre }}</option>
+              }
+            </datalist>
+            <button type="button" class="mini-btn" (click)="asignar()" [disabled]="asignando()">
+              Asignar
+            </button>
+          </div>
+
+          <div class="accion-linea accion-linea--split">
+            <button type="button" class="btn-ghost-dark" (click)="marcarEnCamino()">
+              <app-icon name="motorcycle" [size]="14" />
+              En camino
+            </button>
+            <button type="button" class="btn-ghost-dark" (click)="marcarEntregado()">
+              <app-icon name="check" [size]="14" />
+              Entregado
+            </button>
+          </div>
+
+          <span class="resumen__sep"></span>
+
+          <span class="detalle__label">Cobro contraentrega</span>
           <div class="pagos__chips">
-            <span class="pago pago--active">Efectivo</span>
-            <span class="pago">Yape</span>
-            <span class="pago">Plin</span>
-            <span class="pago">Tarjeta</span>
+            @for (metodo of metodos; track metodo.valor) {
+              <button
+                type="button"
+                class="pago"
+                [class.pago--active]="metodoPago() === metodo.valor"
+                (click)="onMetodo(metodo.valor)"
+              >
+                {{ metodo.texto }}
+              </button>
+            }
           </div>
-        </div>
+          <div class="accion-linea">
+            <input
+              class="input input--dark"
+              type="number"
+              min="0"
+              step="0.1"
+              placeholder="Monto recibido"
+              [value]="montoRecibido()"
+              (input)="onMontoRecibido($event)"
+            />
+            <button type="button" class="enviar" [disabled]="!puedeCobrar()" (click)="cobrar()">
+              <app-icon name="cash-register" [size]="15" />
+              Cobrar
+            </button>
+          </div>
 
-        <div class="resumen__grow"></div>
-
-        <button type="button" class="enviar" [disabled]="!puedeEnviar()" (click)="enviar()">
-          <app-icon name="flame" [size]="16" />
-          Enviar a cocina
-        </button>
-        <span class="resumen__nota">Se cobra contraentrega · no se cobra ahora</span>
+          @if (pedido.estadoPago === 'pagado') {
+            <p class="detalle__vacio">Pedido ya cobrado · {{ moneda(pedido.total) }}</p>
+          }
+        } @else {
+          <div class="resumen__grow"></div>
+          <p class="detalle__vacio">Elige un pedido de la bandeja para ver el detalle.</p>
+          <div class="resumen__grow"></div>
+        }
       </div>
     </app-dark-panel>
   </div>
@@ -204,12 +378,12 @@
       <app-icon name="warning-circle" [size]="12" />
       El KDS avisa al mozo cuando el pedido está listo; umbral 30 min.
     </span>
-    <span class="pie__note">Delivery propio · S/ 5.00 fijo</span>
+    <span class="pie__note">Delivery propio · S/ {{ costoFijo.toFixed(2) }} fijo · cobro contraentrega</span>
   </div>
 
   @if (toast()) {
-    <div class="toast" role="status">
-      <app-icon name="check" [size]="15" />
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
       {{ toast() }}
     </div>
   }
