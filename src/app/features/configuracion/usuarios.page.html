@@ -17,6 +17,7 @@
         <input
           type="search"
           placeholder="Buscar usuario o correo"
+          aria-label="Buscar usuario o correo"
           [value]="busqueda()"
           (input)="onBusqueda($event)"
         />
@@ -26,16 +27,26 @@
         <button
           type="button"
           class="filter"
-          [class.is-active]="filtroRol() === item.id"
+          [class.is-active]="filtroActivo() === item.id"
           (click)="filtrar(item.id)"
         >
           <span class="filter__label">{{ item.label }}</span>
-          <span class="filter__count">{{ conteos()[item.id] }}</span>
         </button>
+      }
+
+      @if (cargando()) {
+        <span class="cargando">Cargando…</span>
       }
     </div>
     <span class="filters__meta">Un usuario puede tener varios roles a la vez</span>
   </div>
+
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="recargar()">Reintentar</button>
+    </div>
+  }
 
   <div class="board">
     <app-panel class="panel">
@@ -45,7 +56,7 @@
             <span class="bar"></span>
             <h2>Equipo</h2>
           </div>
-          <span class="team__meta">Sede El Tambo · últimos accesos de hoy</span>
+          <span class="team__meta">{{ meta().total }} usuarios · página {{ meta().page }} de {{ meta().pages || 1 }}</span>
         </header>
 
         <div class="team__cols">
@@ -57,11 +68,11 @@
         </div>
 
         <div class="team__body">
-          @for (usuario of visibles(); track usuario.id) {
+          @for (usuario of usuarios(); track usuario.id) {
             <button
               type="button"
               class="row"
-              [class.is-selected]="seleccionado()?.id === usuario.id"
+              [class.is-selected]="seleccionado()?.id === usuario.id && modo() === 'editar'"
               (click)="seleccionar(usuario)"
             >
               <span class="col-user row__user">
@@ -100,86 +111,139 @@
           }
         </div>
 
+        <app-paginador
+          [page]="pagina()"
+          [pages]="meta().pages"
+          [total]="meta().total"
+          [limit]="limite()"
+          (pageChange)="cambiarPagina($event)"
+          (limitChange)="cambiarLimite($event)"
+        />
+
         <footer class="team__foot">
           <span>Selecciona un usuario para revisar sus roles y permisos</span>
-          <span>{{ visibles().length }} de {{ usuarios().length }}</span>
+          <span>{{ usuarios().length }} de {{ meta().total }}</span>
         </footer>
       </div>
     </app-panel>
 
-    @if (seleccionado(); as actual) {
-      <app-dark-panel class="permisos">
-        <div class="perm">
-          <header class="perm__head">
-            <h2 class="perm__title">Permisos</h2>
-            <span class="perm__badge">{{ abreviar(actual.nombre) }}</span>
-          </header>
+    <app-dark-panel class="permisos">
+      <div class="perm">
+        <header class="perm__head">
+          <h2 class="perm__title">{{ modo() === 'nuevo' ? 'Nuevo usuario' : 'Permisos' }}</h2>
+          <span class="perm__badge">
+            {{ modo() === 'nuevo' ? 'ALTA' : abreviar(nombre() || '—') }}
+          </span>
+        </header>
 
-          <h3 class="perm__name">{{ actual.nombre }}</h3>
-          <p class="perm__mail">{{ actual.email }} · {{ detalle(actual) }}</p>
+        <label class="campo-dark">
+          <span>Nombre</span>
+          <input type="text" [value]="nombre()" (input)="onCampo($event, 'nombre')" />
+        </label>
 
-          <div class="perm__roles">
-            @for (rol of roles; track rol) {
-              <button
-                type="button"
-                [class]="'role ' + rolClase(rol) + (rolesDraft().includes(rol) ? ' is-on' : '')"
-                [attr.aria-pressed]="rolesDraft().includes(rol)"
-                (click)="toggleRol(rol)"
-              >
-                {{ rol }}
-              </button>
-            }
-          </div>
-
-          @if (errorRoles()) {
-            <p class="perm__error">Selecciona al menos un rol para guardar.</p>
-          }
-
-          <div class="dark-sep"></div>
-
-          <span class="perm__eyebrow">PERMISOS GRANULARES</span>
-
-          <div class="perm__list">
-            @for (permiso of permisos; track permiso.codigo) {
-              @let otorgado = permisosDraft().includes(permiso.codigo);
-              <div class="perm__row" [class.is-off]="!otorgado">
-                <span class="perm__grant">
-                  <app-icon
-                    [name]="otorgado ? 'check-circle' : 'x'"
-                    [size]="13"
-                    [class]="otorgado ? 'grant--on' : 'grant--off'"
-                  />
-                  <span class="perm__label">{{ permiso.descripcion }}</span>
-                </span>
-                <span class="perm__source">
-                  {{ otorgado ? origen(permiso.codigo) : 'requiere rol' }}
-                </span>
-              </div>
-            }
-          </div>
-
-          <div class="perm__grow"></div>
-
-          <div class="perm__info">
-            <app-icon name="warning-circle" [size]="12" />
-            <span>Un usuario puede tener varios roles: sus permisos son la suma de todos.</span>
-          </div>
-
-          <button type="button" class="btn-brand" (click)="guardar()">
-            <app-icon name="check" [size]="15" />
-            Guardar {{ hayCambios() ? 'cambios' : 'roles' }}
-          </button>
-
-          <p class="perm__foot">El cambio se aplica al iniciar la próxima sesión</p>
+        <div class="campo-dark__pair">
+          <label class="campo-dark">
+            <span>Correo</span>
+            <input
+              type="email"
+              [value]="email()"
+              [readOnly]="modo() === 'editar'"
+              (input)="onCampo($event, 'email')"
+            />
+          </label>
+          <label class="campo-dark">
+            <span>Usuario</span>
+            <input
+              type="text"
+              [value]="usuario()"
+              [readOnly]="modo() === 'editar'"
+              placeholder="usuario"
+              (input)="onCampo($event, 'usuario')"
+            />
+          </label>
         </div>
-      </app-dark-panel>
-    }
+
+        <div class="campo-dark__pair">
+          <label class="campo-dark">
+            <span>Teléfono</span>
+            <input type="text" [value]="telefono()" (input)="onCampo($event, 'telefono')" />
+          </label>
+          @if (modo() === 'nuevo') {
+            <label class="campo-dark">
+              <span>Clave</span>
+              <input type="password" [value]="clave()" (input)="onCampo($event, 'clave')" />
+            </label>
+          }
+        </div>
+
+        <label class="switch">
+          <input type="checkbox" [checked]="activo()" (change)="cambiarActivo($event)" />
+          <span>{{ activo() ? 'Usuario activo' : 'Usuario inactivo' }}</span>
+        </label>
+
+        <div class="perm__roles">
+          @for (rol of roles(); track rol.id) {
+            <button
+              type="button"
+              [class]="'role ' + rolClase(rol.nombre) + (rolesDraft().includes(rol.nombre) ? ' is-on' : '')"
+              [attr.aria-pressed]="rolesDraft().includes(rol.nombre)"
+              (click)="toggleRol(rol.nombre)"
+            >
+              {{ rol.nombre }}
+            </button>
+          }
+        </div>
+
+        @if (errorRoles()) {
+          <p class="perm__error">Selecciona al menos un rol para guardar.</p>
+        }
+
+        <div class="dark-sep"></div>
+
+        <span class="perm__eyebrow">PERMISOS GRANULARES</span>
+
+        <div class="perm__list">
+          @for (permiso of permisos(); track permiso.codigo) {
+            @let otorgado = permisosDraft().includes(permiso.codigo);
+            <div class="perm__row" [class.is-off]="!otorgado">
+              <span class="perm__grant">
+                <app-icon
+                  [name]="otorgado ? 'check-circle' : 'x'"
+                  [size]="13"
+                  [class]="otorgado ? 'grant--on' : 'grant--off'"
+                />
+                <span class="perm__label">{{ permiso.descripcion }}</span>
+              </span>
+              <span class="perm__source">
+                {{ otorgado ? origen(permiso.codigo) : 'requiere rol' }}
+              </span>
+            </div>
+          }
+        </div>
+
+        <div class="perm__grow"></div>
+
+        <div class="perm__info">
+          <app-icon name="warning-circle" [size]="12" />
+          <span>Un usuario puede tener varios roles: sus permisos son la suma de todos.</span>
+        </div>
+
+        <button type="button" class="btn-brand" [disabled]="!puedeGuardar()" (click)="guardar()">
+          <app-icon name="check" [size]="15" />
+          {{ modo() === 'nuevo' ? 'Crear usuario' : 'Guardar ' + (hayCambios() ? 'cambios' : 'roles') }}
+        </button>
+
+        <p class="perm__foot">
+          {{ modo() === 'nuevo' ? 'El usuario podrá iniciar sesión con la clave definida' : 'Los roles se aplican al iniciar la próxima sesión' }}
+        </p>
+      </div>
+    </app-dark-panel>
   </div>
 
   <div class="pie">
     <span class="pie__item">
       <app-icon name="users" [size]="12" />
-      Roles del sistema: Mozo, Cajero, Cocinero, Repartidor, Dueño/Admin y Admin
+      Roles del sistema: {{ roles().length }} · permisos: {{ permisos().length }}
     </span>
     <span class="pie__item">
       <app-icon name="check-circle" [size]="12" />

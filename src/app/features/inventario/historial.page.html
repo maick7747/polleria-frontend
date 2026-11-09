@@ -10,23 +10,15 @@
     </button>
   </div>
 
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="recargar()">Reintentar</button>
+    </div>
+  }
+
   <div class="filtros">
     <div class="filtros__left">
-      <div class="chips" role="group" aria-label="Filtrar por fecha">
-        @for (opcion of periodos; track opcion.valor) {
-          <button
-            type="button"
-            class="chip"
-            [class.is-active]="periodo() === opcion.valor"
-            (click)="cambiarPeriodo(opcion.valor)"
-          >
-            {{ opcion.label }}
-          </button>
-        }
-      </div>
-
-      <span class="divider"></span>
-
       <div class="chips" role="group" aria-label="Filtrar por tipo">
         @for (opcion of tipos; track opcion.valor) {
           <button
@@ -42,6 +34,18 @@
 
       <span class="divider"></span>
 
+      <label class="fecha">
+        <span>Desde</span>
+        <input type="date" [value]="desde()" (change)="onDesde($event)" />
+      </label>
+
+      <label class="fecha">
+        <span>Hasta</span>
+        <input type="date" [value]="hasta()" (change)="onHasta($event)" />
+      </label>
+
+      <span class="divider"></span>
+
       <label class="select">
         <app-icon name="package" [size]="12" />
         <select [value]="insumoId()" aria-label="Filtrar por insumo" (change)="onInsumo($event)">
@@ -54,7 +58,10 @@
     </div>
 
     <span class="filtros__meta">
-      {{ visibles().length }} movimientos · saldo calculado al instante
+      {{ meta().total }} movimientos · {{ periodoLabel() }}
+      @if (cargando()) {
+        · cargando…
+      }
     </span>
   </div>
 
@@ -106,9 +113,18 @@
           }
         </div>
 
+        <app-paginador
+          [page]="pagina()"
+          [pages]="meta().pages"
+          [total]="meta().total"
+          [limit]="limite()"
+          (pageChange)="cambiarPagina($event)"
+          (limitChange)="cambiarLimite($event)"
+        />
+
         <div class="panel__foot">
           <span>Ventas, compras, mermas y ajustes en orden cronológico</span>
-          <span>{{ visibles().length }} de {{ movimientos().length }} movimientos</span>
+          <span>{{ visibles().length }} de {{ meta().total }} movimientos</span>
         </div>
       </div>
     </app-panel>

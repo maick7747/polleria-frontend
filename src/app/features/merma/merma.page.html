@@ -10,6 +10,13 @@
     </a>
   </div>
 
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="recargar()">Reintentar</button>
+    </div>
+  }
+
   <div class="cuerpo">
     <app-panel class="panel">
       <div class="panel__inner">
@@ -27,14 +34,14 @@
         <div class="form">
           <span class="campo__label">Tipo de merma</span>
           <div class="chips" role="group" aria-label="Tipo de merma">
-            @for (t of tipos; track t) {
+            @for (t of tipos(); track t.id) {
               <button
                 type="button"
                 class="chip"
-                [class.is-active]="tipo() === t"
-                (click)="elegirTipo(t)"
+                [class.is-active]="tipoId() === t.id"
+                (click)="elegirTipo(t.id)"
               >
-                {{ t }}
+                {{ t.nombre }}
               </button>
             }
           </div>
@@ -42,9 +49,11 @@
           <div class="fila">
             <label class="campo">
               <span class="campo__label">Insumo afectado</span>
-              <select class="input" [value]="insumoId()" (change)="onInsumo($event)">
+              <select class="input" (change)="onInsumo($event)">
                 @for (insumo of insumos(); track insumo.id) {
-                  <option [value]="insumo.id">{{ insumo.nombre }}</option>
+                  <option [value]="insumo.id" [selected]="insumoId() === insumo.id">
+                    {{ insumo.nombre }}
+                  </option>
                 }
               </select>
             </label>
@@ -177,7 +186,12 @@
           <app-icon name="check" [size]="15" />
           Aprobar y descontar
         </button>
-        <button type="button" class="btn-ghost-dark" (click)="rechazar()">
+        <button
+          type="button"
+          class="btn-ghost-dark"
+          [disabled]="enviando()"
+          (click)="rechazar()"
+        >
           <app-icon name="x" [size]="15" />
           Rechazar registro
         </button>
@@ -188,7 +202,38 @@
   </div>
 
   <section class="recientes">
-    <app-section-header title="Mermas recientes" [meta]="recientesMeta()" />
+    <app-section-header title="Mermas registradas" [meta]="recientesMeta()" />
+
+    <div class="filtros">
+      <label class="filtro-campo">
+        <span>Estado</span>
+        <select [value]="estadoFiltro()" (change)="onEstado($event)">
+          @for (e of estados; track e.id) {
+            <option [value]="e.id">{{ e.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="filtro-campo">
+        <span>Tipo</span>
+        <select (change)="onTipoFiltro($event)">
+          <option value="0" [selected]="tipoFiltro() === 0">Todos</option>
+          @for (t of tipos(); track t.id) {
+            <option [value]="t.id" [selected]="tipoFiltro() === t.id">{{ t.nombre }}</option>
+          }
+        </select>
+      </label>
+      <label class="filtro-campo">
+        <span>Desde</span>
+        <input type="date" [value]="desde()" (change)="onDesde($event)" />
+      </label>
+      <label class="filtro-campo">
+        <span>Hasta</span>
+        <input type="date" [value]="hasta()" (change)="onHasta($event)" />
+      </label>
+      @if (cargando()) {
+        <span class="cargando">Cargando…</span>
+      }
+    </div>
 
     <div class="tabla">
       <div class="tabla__head">
@@ -206,7 +251,7 @@
           <span class="meta">{{ fechaCorta(m.fecha) }}</span>
           <span class="fuerte">{{ m.tipo }}</span>
           <span class="col-insumo">
-            {{ m.insumoNombre ?? '—' }} · {{ m.cantidad }} {{ unidadDe(m) }}
+            {{ m.insumoNombre ?? m.platilloNombre ?? '—' }} · {{ m.cantidad }} {{ unidadDe(m) }}
           </span>
           <span class="meta">{{ registradoPor(m) }}</span>
           <span>
@@ -220,6 +265,7 @@
                 class="accion"
                 title="Aprobar merma"
                 aria-label="Aprobar merma"
+                [disabled]="enviando()"
                 (click)="aprobarRegistro(m)"
               >
                 <app-icon name="check" [size]="13" />
@@ -229,6 +275,7 @@
                 class="accion accion--danger"
                 title="Rechazar merma"
                 aria-label="Rechazar merma"
+                [disabled]="enviando()"
                 (click)="rechazarRegistro(m)"
               >
                 <app-icon name="x" [size]="13" />
@@ -241,16 +288,25 @@
           <app-empty-state
             icon="trash"
             title="Sin mermas"
-            description="Aún no hay registros de merma en el turno."
+            description="No hay mermas que coincidan con los filtros seleccionados."
           />
         </div>
       }
     </div>
+
+    <app-paginador
+      [page]="pagina()"
+      [pages]="meta().pages"
+      [total]="meta().total"
+      [limit]="limite()"
+      (pageChange)="cambiarPagina($event)"
+      (limitChange)="cambiarLimite($event)"
+    />
   </section>
 
   <div class="pie">
     <span>Toda merma aprobada genera un movimiento de inventario y afecta el food cost</span>
-    <span>7 tipos de merma · umbral de cuadre S/ 0.00</span>
+    <span>{{ meta().total }} registros · umbral de cuadre S/ 0.00</span>
   </div>
 
   @if (toast()) {

@@ -275,6 +275,9 @@ export class ActivosAlertasPage {
   });
 
   constructor() {
+    void this.activos.cargar({ limit: 100 });
+    void this.activos.cargarAlertas();
+
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);

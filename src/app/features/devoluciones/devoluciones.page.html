@@ -10,6 +10,13 @@
     </a>
   </div>
 
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="recargar()">Reintentar</button>
+    </div>
+  }
+
   <div class="cuerpo">
     <app-panel class="panel">
       <div class="panel__inner">
@@ -26,9 +33,11 @@
           <div class="fila">
             <label class="campo">
               <span class="campo__label">Pedido</span>
-              <select class="input" [value]="pedidoId()" (change)="onPedido($event)">
+              <select class="input" (change)="onPedido($event)">
                 @for (p of pedidosDisponibles(); track p.id) {
-                  <option [value]="p.id">{{ p.numero }} · {{ textoCanalPedido(p) }}</option>
+                  <option [value]="p.id" [selected]="pedidoId() === p.id">
+                    {{ p.numero }} · {{ textoCanalPedido(p) }}
+                  </option>
                 }
               </select>
             </label>
@@ -180,7 +189,39 @@
   </div>
 
   <section class="recientes">
-    <app-section-header title="Devoluciones del turno" [meta]="recientesMeta()" />
+    <app-section-header title="Devoluciones registradas" [meta]="recientesMeta()" />
+
+    <div class="filtros">
+      <label class="filtro-campo">
+        <span>Estado</span>
+        <select [value]="estadoFiltro()" (change)="onEstado($event)">
+          @for (e of estados; track e.id) {
+            <option [value]="e.id">{{ e.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="filtro-campo">
+        <span>Desde</span>
+        <input type="date" [value]="desde()" (change)="onDesde($event)" />
+      </label>
+      <label class="filtro-campo">
+        <span>Hasta</span>
+        <input type="date" [value]="hasta()" (change)="onHasta($event)" />
+      </label>
+      <label class="buscador">
+        <app-icon name="magnifying-glass" [size]="14" />
+        <input
+          type="search"
+          placeholder="Buscar pedido o motivo"
+          aria-label="Buscar devolución"
+          [value]="busqueda()"
+          (input)="onBuscar($event)"
+        />
+      </label>
+      @if (cargando()) {
+        <span class="cargando">Cargando…</span>
+      }
+    </div>
 
     <div class="tabla">
       <div class="tabla__head">
@@ -190,6 +231,7 @@
         <span class="col-solucion">SOLUCIÓN</span>
         <span>ESTADO</span>
         <span class="right">MONTO</span>
+        <span></span>
       </div>
 
       @for (d of devolucionesTurno(); track d.id) {
@@ -202,17 +244,39 @@
             <app-chip [variant]="tonoEstado(d.estado)">{{ textoEstado(d.estado) }}</app-chip>
           </span>
           <span class="right monto">{{ moneda(d.montoReembolsado) }}</span>
+          <span class="acciones">
+            @if (d.estado === 'pendiente') {
+              <button
+                type="button"
+                class="accion"
+                title="Gestionar reembolso"
+                aria-label="Gestionar reembolso"
+                (click)="reembolsarFila(d)"
+              >
+                <app-icon name="money" [size]="13" />
+              </button>
+            }
+          </span>
         </div>
       } @empty {
         <div class="tabla__empty">
           <app-empty-state
             icon="arrow-left"
             title="Sin devoluciones"
-            description="No hay devoluciones registradas en el turno."
+            description="No hay devoluciones que coincidan con los filtros o la búsqueda."
           />
         </div>
       }
     </div>
+
+    <app-paginador
+      [page]="pagina()"
+      [pages]="meta().pages"
+      [total]="meta().total"
+      [limit]="limite()"
+      (pageChange)="cambiarPagina($event)"
+      (limitChange)="cambiarLimite($event)"
+    />
   </section>
 
   <div class="pie">

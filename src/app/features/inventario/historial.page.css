@@ -630,3 +630,56 @@
     gap: 6px;
   }
 }
+
+.fecha {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
+
+.fecha input {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--c-border);
+  border-radius: 9px;
+  background: var(--c-white);
+  color: var(--c-text);
+  font-family: var(--font-body);
+  font-size: 12px;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--c-danger-soft);
+  border-radius: 10px;
+  background: var(--c-danger-soft);
+  color: var(--c-brand-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.error-banner button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel app-paginador {
+  padding: 8px 22px;
+  border-top: 1px solid var(--c-sep);
+}

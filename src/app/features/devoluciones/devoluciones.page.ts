@@ -6,12 +6,16 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { DevolucionesService } from '../../core/data/devoluciones.service';
+import {
+  DevolucionesService,
+  type DevolucionesQuery,
+} from '../../core/data/devoluciones.service';
 import { MOCK_USUARIOS } from '../../core/data/mock-data';
 import { PedidosService } from '../../core/data/pedidos.service';
 import type {
+  Devolucion,
   EstadoDevolucion,
   Pedido,
   ResolucionDevolucion,
@@ -21,6 +25,7 @@ import { ChipComponent, type ChipVariant } from '../../shared/components/chip/ch
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
@@ -32,6 +37,17 @@ const MOTIVOS: readonly string[] = [
   'Demora excesiva',
   'Otro',
 ];
+
+type EstadoFiltro = 'todos' | EstadoDevolucion;
+
+const ESTADOS: readonly { id: EstadoFiltro; label: string }[] = [
+  { id: 'todos', label: 'Todas' },
+  { id: 'pendiente', label: 'Pendientes' },
+  { id: 'aceptada', label: 'Resueltas' },
+  { id: 'rechazada', label: 'Rechazadas' },
+];
+
+const LIMITES = [10, 20, 50, 100];
 
 interface SolucionVista {
   id: ResolucionDevolucion;
@@ -62,6 +78,10 @@ const SOLUCIONES: readonly SolucionVista[] = [
   },
 ];
 
+function esEstadoFiltro(valor: string | null): valor is Exclude<EstadoFiltro, 'todos'> {
+  return valor === 'pendiente' || valor === 'aceptada' || valor === 'rechazada';
+}
+
 @Component({
   selector: 'app-devoluciones-page',
   standalone: true,
@@ -72,6 +92,7 @@ const SOLUCIONES: readonly SolucionVista[] = [
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    PaginadorComponent,
     PanelComponent,
     SectionHeaderComponent,
   ],
@@ -81,6 +102,7 @@ const SOLUCIONES: readonly SolucionVista[] = [
 })
 export class DevolucionesPage {
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
   private readonly pedidos = inject(PedidosService);
   private readonly devoluciones = inject(DevolucionesService);
@@ -88,6 +110,7 @@ export class DevolucionesPage {
 
   readonly motivos = MOTIVOS;
   readonly soluciones = SOLUCIONES;
+  readonly estados = ESTADOS;
   readonly moneda = formatearMoneda;
 
   readonly pedidoId = signal<number>(this.pedidos.pedidos()[0]?.id ?? 0);
@@ -95,8 +118,20 @@ export class DevolucionesPage {
   readonly solucion = signal<ResolucionDevolucion>('re_preparar');
   readonly montoParcial = signal<string>('24.00');
 
+  readonly estadoFiltro = signal<EstadoFiltro>('todos');
+  readonly busqueda = signal<string>('');
+  readonly desde = signal<string>('');
+  readonly hasta = signal<string>('');
+  readonly pagina = signal<number>(1);
+  readonly limite = signal<number>(20);
+  readonly guardando = signal<boolean>(false);
+
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
+
+  readonly meta = this.devoluciones.meta;
+  readonly cargando = this.devoluciones.cargando;
+  readonly error = this.devoluciones.error;
 
   readonly pedidosDisponibles = computed<Pedido[]>(() =>
     this.pedidos.pedidos().filter((pedido) => pedido.estado !== 'cancelado'),
@@ -108,6 +143,7 @@ export class DevolucionesPage {
 
   readonly total = computed<number>(() => this.pedido()?.total ?? 0);
   readonly devolucionesTurno = this.devoluciones.devoluciones;
+  readonly pendientes = this.devoluciones.pendientes;
 
   readonly esDueno = computed<boolean>(() =>
     this.auth.hasAnyRole(['Dueño/Admin', 'Admin']),
@@ -137,7 +173,7 @@ export class DevolucionesPage {
   readonly descripcionSolucion = computed<string>(() => this.solucionVista().descripcion);
 
   readonly puedeConfirmar = computed<boolean>(() => {
-    if (!this.pedido()) {
+    if (this.guardando() || !this.pedido()) {
       return false;
     }
     if (this.solucion() === 'reembolso_parcial') {
@@ -170,7 +206,7 @@ export class DevolucionesPage {
   });
 
   readonly devolucionCodigo = computed<string>(() =>
-    String(14 + this.devolucionesTurno().length).padStart(3, '0'),
+    String(14 + this.meta().total).padStart(3, '0'),
   );
 
   readonly estadoCocinaTexto = computed<string>(() => {
@@ -209,14 +245,40 @@ export class DevolucionesPage {
       `Pedido ${this.pedido()?.numero ?? '—'} · ${this.canalTexto()} · ${this.platoAfectado()}`,
   );
 
-  readonly recientesMeta = computed<string>(() => {
-    const total = this.devolucionesTurno().length;
-    const pendientes = this.devoluciones.pendientes().length;
-    return `${total - pendientes} resueltas · ${pendientes} pendiente${pendientes === 1 ? '' : 's'}`;
-  });
+  readonly recientesMeta = computed<string>(
+    () =>
+      `${this.meta().total} registros · ${this.pendientes().length} pendiente${this.pendientes().length === 1 ? '' : 's'}`,
+  );
 
   private toastTimer: number | null = null;
   private navTimer: number | null = null;
+  private buscarTimer: number | null = null;
+
+  constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    const estado = params.get('estado');
+    this.estadoFiltro.set(esEstadoFiltro(estado) ? estado : 'todos');
+    this.busqueda.set(params.get('q') ?? '');
+    this.desde.set(params.get('desde') ?? '');
+    this.hasta.set(params.get('hasta') ?? '');
+    this.pagina.set(Math.max(1, Number(params.get('page')) || 1));
+    const limite = Number(params.get('limit'));
+    this.limite.set(LIMITES.includes(limite) ? limite : 20);
+
+    void this.inicializar();
+
+    this.destroyRef.onDestroy(() => {
+      if (this.toastTimer !== null) {
+        window.clearTimeout(this.toastTimer);
+      }
+      if (this.navTimer !== null) {
+        window.clearTimeout(this.navTimer);
+      }
+      if (this.buscarTimer !== null) {
+        window.clearTimeout(this.buscarTimer);
+      }
+    });
+  }
 
   onPedido(event: Event): void {
     this.pedidoId.set(Number((event.target as HTMLSelectElement).value));
@@ -234,7 +296,52 @@ export class DevolucionesPage {
     this.montoParcial.set((event.target as HTMLInputElement).value);
   }
 
-  confirmar(): void {
+  onEstado(event: Event): void {
+    const valor = (event.target as HTMLSelectElement).value;
+    this.estadoFiltro.set(esEstadoFiltro(valor) ? valor : 'todos');
+    this.pagina.set(1);
+    void this.cargarLista();
+  }
+
+  onDesde(event: Event): void {
+    this.desde.set((event.target as HTMLInputElement).value);
+    this.pagina.set(1);
+    void this.cargarLista();
+  }
+
+  onHasta(event: Event): void {
+    this.hasta.set((event.target as HTMLInputElement).value);
+    this.pagina.set(1);
+    void this.cargarLista();
+  }
+
+  onBuscar(event: Event): void {
+    this.busqueda.set((event.target as HTMLInputElement).value);
+    if (this.buscarTimer !== null) {
+      window.clearTimeout(this.buscarTimer);
+    }
+    this.buscarTimer = window.setTimeout(() => {
+      this.pagina.set(1);
+      void this.cargarLista();
+    }, 350);
+  }
+
+  cambiarPagina(page: number): void {
+    this.pagina.set(page);
+    void this.cargarLista();
+  }
+
+  cambiarLimite(limit: number): void {
+    this.limite.set(limit);
+    this.pagina.set(1);
+    void this.cargarLista();
+  }
+
+  recargar(): void {
+    void this.inicializar();
+  }
+
+  async confirmar(): Promise<void> {
     const pedido = this.pedido();
     if (!pedido) {
       this.avisar('Selecciona un pedido observado.', true);
@@ -249,14 +356,24 @@ export class DevolucionesPage {
       return;
     }
 
-    const devolucion = this.devoluciones.registrar({
+    this.guardando.set(true);
+    const devolucion = await this.devoluciones.registrar({
       pedidoId: pedido.id,
       pedidoNumero: pedido.numero,
       motivo: this.motivo(),
       detalle: `El cliente reporta "${this.motivo().toLowerCase()}" en el pedido ${pedido.numero}.`,
     });
+    if (!devolucion) {
+      this.guardando.set(false);
+      this.avisar(
+        this.devoluciones.error() ?? 'No se pudo registrar la devolución.',
+        true,
+      );
+      return;
+    }
 
     if (this.esReembolso()) {
+      this.guardando.set(false);
       void this.router.navigate(['/devoluciones/reembolso'], {
         queryParams: {
           devolucionId: devolucion.id,
@@ -269,15 +386,31 @@ export class DevolucionesPage {
       return;
     }
 
-    this.devoluciones.resolver(devolucion.id, this.solucion(), 0, this.usuarioId());
+    const ok = await this.devoluciones.resolver(devolucion.id, this.solucion());
+    this.guardando.set(false);
+    if (!ok) {
+      this.avisar(
+        this.devoluciones.error() ?? 'No se pudo resolver la devolución.',
+        true,
+      );
+      return;
+    }
+    this.sincronizarMeta();
     this.avisar(`Devolución registrada · ${this.tituloSolucion()}`);
     this.navTimer = window.setTimeout(() => {
       void this.router.navigate(['/comandas']);
     }, 1500);
-    this.destroyRef.onDestroy(() => {
-      if (this.navTimer !== null) {
-        window.clearTimeout(this.navTimer);
-      }
+  }
+
+  reembolsarFila(devolucion: Devolucion): void {
+    void this.router.navigate(['/devoluciones/reembolso'], {
+      queryParams: {
+        devolucionId: devolucion.id,
+        monto: devolucion.montoReembolsado || 0,
+        pedido: devolucion.pedidoNumero,
+        motivo: devolucion.motivo,
+        tipo: devolucion.resolucion ?? 'reembolso_total',
+      },
     });
   }
 
@@ -316,6 +449,62 @@ export class DevolucionesPage {
     return iso.length >= 16 ? iso.slice(11, 16) : '—';
   }
 
+  private async inicializar(): Promise<void> {
+    if (this.pedidos.pedidos().length === 0) {
+      await this.pedidos.cargar({ limit: 100 });
+    }
+    await this.cargarLista();
+    this.elegirPrimerPedido();
+  }
+
+  private elegirPrimerPedido(): void {
+    if (this.pedidoId() > 0) {
+      return;
+    }
+    const primero = this.pedidosDisponibles()[0];
+    if (primero) {
+      this.pedidoId.set(primero.id);
+    }
+  }
+
+  private async cargarLista(): Promise<void> {
+    const query: DevolucionesQuery = {
+      page: this.pagina(),
+      limit: this.limite(),
+      estado: this.estadoFiltro() === 'todos' ? undefined : this.estadoFiltro(),
+      desde: this.desde() || undefined,
+      hasta: this.hasta() || undefined,
+      q: this.busqueda(),
+      sort: 'fecha_reporte:desc',
+    };
+    const ok = await this.devoluciones.cargar(query);
+    if (ok) {
+      this.sincronizarMeta();
+    }
+  }
+
+  private sincronizarMeta(): void {
+    const meta = this.meta();
+    this.pagina.set(meta.page);
+    this.limite.set(meta.limit);
+    this.sincronizarUrl();
+  }
+
+  private sincronizarUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        page: this.pagina() > 1 ? this.pagina() : null,
+        limit: this.limite() !== 20 ? this.limite() : null,
+        q: this.busqueda().trim() || null,
+        estado: this.estadoFiltro() === 'todos' ? null : this.estadoFiltro(),
+        desde: this.desde() || null,
+        hasta: this.hasta() || null,
+      },
+      replaceUrl: true,
+    });
+  }
+
   private solucionVista(): SolucionVista {
     return (
       SOLUCIONES.find((solucion) => solucion.id === this.solucion()) ?? SOLUCIONES[0]
@@ -338,21 +527,15 @@ export class DevolucionesPage {
     return 'LlamaFood';
   }
 
-  private usuarioId(): number {
-    return this.auth.usuario()?.id ?? 1;
-  }
-
   private avisar(mensaje: string, error = false): void {
     this.toast.set(mensaje);
     this.toastError.set(error);
     if (this.toastTimer !== null) {
       window.clearTimeout(this.toastTimer);
     }
-    this.toastTimer = window.setTimeout(() => this.toast.set(''), 2800);
-    this.destroyRef.onDestroy(() => {
-      if (this.toastTimer !== null) {
-        window.clearTimeout(this.toastTimer);
-      }
-    });
+    this.toastTimer = window.setTimeout(() => {
+      this.toast.set('');
+      this.toastTimer = null;
+    }, 2800);
   }
 }

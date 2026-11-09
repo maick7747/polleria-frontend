@@ -7,7 +7,6 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../core/auth/auth.service';
 import { ActivosService } from '../../core/data/activos.service';
 import type { CategoriaActivo } from '../../core/models';
 import { formatearMoneda, round2 } from '../../core/utils/format';
@@ -86,7 +85,6 @@ const fechaLarga = (fecha: string): string => {
 })
 export class ActivosRegistrarPage {
   private readonly activos = inject(ActivosService);
-  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -208,7 +206,7 @@ export class ActivosRegistrarPage {
     this.observaciones.set((event.target as HTMLTextAreaElement).value);
   }
 
-  guardar(): void {
+  async guardar(): Promise<void> {
     this.mostrarErrores.set(true);
 
     if (!this.valido()) {
@@ -216,9 +214,7 @@ export class ActivosRegistrarPage {
       return;
     }
 
-    const usuarioId = this.auth.usuario()?.id ?? 1;
-
-    const activo = this.activos.registrar({
+    const activo = await this.activos.registrar({
       nombre: this.nombre().trim(),
       categoria: this.categoria(),
       cantidad: 1,
@@ -226,12 +222,15 @@ export class ActivosRegistrarPage {
       vidaUtilMeses: this.vidaNumero(),
       fechaAdquisicion: this.fechaAdquisicion(),
       estado: 'activo',
-      proximoMantenimiento: this.proximoMantenimiento() || undefined,
       proveedor: this.proveedor().trim() || undefined,
       garantiaMeses: this.garantiaNumero(),
       observaciones: this.observaciones().trim() || undefined,
-      usuarioId,
     });
+
+    if (!activo) {
+      this.avisar(this.activos.error() ?? 'No se pudo registrar el activo', true);
+      return;
+    }
 
     this.avisar(`Activo registrado · ${activo.nombre}`);
 

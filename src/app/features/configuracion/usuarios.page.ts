@@ -6,49 +6,36 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { ConfiguracionService } from '../../core/data/configuracion.service';
-import { MOCK_PERMISOS, PERMISOS_POR_ROL } from '../../core/data/mock-data';
-import type { RolNombre, Usuario } from '../../core/models';
+import {
+  ConfiguracionService,
+  type UsuarioVista,
+} from '../../core/data/configuracion.service';
+import type { RolNombre } from '../../core/models';
 import { abreviarNombre } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-type FiltroRol = 'todos' | RolNombre;
+type FiltroActivo = 'todos' | 'activos' | 'inactivos';
+type Modo = 'editar' | 'nuevo';
 
 interface FiltroVista {
-  id: FiltroRol;
+  id: FiltroActivo;
   label: string;
 }
 
-const ROLES: readonly RolNombre[] = [
-  'Mozo',
-  'Cajero',
-  'Cocinero',
-  'Repartidor',
-  'Dueño/Admin',
-  'Admin',
-];
-
 const FILTROS: readonly FiltroVista[] = [
   { id: 'todos', label: 'Todos' },
-  { id: 'Dueño/Admin', label: 'Dueño/Admin' },
-  { id: 'Mozo', label: 'Mozo' },
-  { id: 'Cajero', label: 'Cajero' },
-  { id: 'Cocinero', label: 'Cocina' },
+  { id: 'activos', label: 'Activos' },
+  { id: 'inactivos', label: 'Inactivos' },
 ];
 
-const ACCESOS: Readonly<Record<number, string>> = {
-  1: 'hace 9 min',
-  2: 'hace 4 min',
-  3: 'hace 26 min',
-  4: 'hace 12 min',
-  5: 'ayer',
-  6: 'hace 2 h',
-};
+const LIMITES = [10, 20, 50, 100];
 
 @Component({
   selector: 'app-usuarios-page',
@@ -58,6 +45,7 @@ const ACCESOS: Readonly<Record<number, string>> = {
     ChipComponent,
     DarkPanelComponent,
     IconComponent,
+    PaginadorComponent,
     PanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -67,57 +55,51 @@ const ACCESOS: Readonly<Record<number, string>> = {
 export class UsuariosPage {
   private readonly config = inject(ConfiguracionService);
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   private toastTimer: number | null = null;
+  private buscarTimer: number | null = null;
 
-  readonly roles = ROLES;
   readonly filtros = FILTROS;
-  readonly permisos = MOCK_PERMISOS;
   readonly abreviar = abreviarNombre;
 
   readonly busqueda = signal<string>('');
-  readonly filtroRol = signal<FiltroRol>('todos');
+  readonly filtroActivo = signal<FiltroActivo>('todos');
+  readonly pagina = signal<number>(1);
+  readonly limite = signal<number>(20);
   readonly seleccionadoId = signal<number | null>(null);
-  readonly rolesDraft = signal<RolNombre[]>([]);
+  readonly modo = signal<Modo>('editar');
+
+  readonly nombre = signal<string>('');
+  readonly email = signal<string>('');
+  readonly usuario = signal<string>('');
+  readonly telefono = signal<string>('');
+  readonly clave = signal<string>('');
+  readonly activo = signal<boolean>(true);
+  readonly rolesDraft = signal<string[]>([]);
+
   readonly errorRoles = signal<boolean>(false);
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
 
   readonly usuarios = this.config.usuarios;
+  readonly meta = this.config.meta;
+  readonly cargando = this.config.cargando;
+  readonly error = this.config.error;
+  readonly roles = this.config.rolesCatalogo;
+  readonly permisos = this.config.permisosCatalogo;
 
-  readonly seleccionado = computed<Usuario | null>(() => {
+  readonly seleccionado = computed<UsuarioVista | null>(() => {
     const id = this.seleccionadoId();
-    const lista = this.usuarios();
     if (id !== null) {
-      const encontrado = lista.find((usuario) => usuario.id === id);
+      const encontrado = this.usuarios().find((usuario) => usuario.id === id);
       if (encontrado) {
         return encontrado;
       }
     }
-    return lista[0] ?? null;
-  });
-
-  readonly conteos = computed<Record<string, number>>(() => {
-    const lista = this.usuarios();
-    const mapa: Record<string, number> = { todos: lista.length };
-    for (const rol of ROLES) {
-      mapa[rol] = lista.filter((usuario) => usuario.roles.includes(rol)).length;
-    }
-    return mapa;
-  });
-
-  readonly visibles = computed<Usuario[]>(() => {
-    const termino = this.busqueda().trim().toLowerCase();
-    const filtro = this.filtroRol();
-    return this.usuarios().filter((usuario) => {
-      const coincideRol = filtro === 'todos' || usuario.roles.includes(filtro);
-      const coincideTexto =
-        termino.length === 0 ||
-        usuario.nombre.toLowerCase().includes(termino) ||
-        usuario.email.toLowerCase().includes(termino);
-      return coincideRol && coincideTexto;
-    });
+    return this.usuarios()[0] ?? null;
   });
 
   readonly permisosDraft = computed<readonly string[]>(() =>
@@ -126,26 +108,51 @@ export class UsuariosPage {
 
   readonly hayCambios = computed<boolean>(() => {
     const actual = this.seleccionado();
-    if (!actual) {
+    if (!actual || this.modo() === 'nuevo') {
+      return true;
+    }
+    return (
+      [...this.rolesDraft()].sort().join('|') !== [...actual.roles].sort().join('|') ||
+      this.nombre() !== actual.nombre ||
+      this.telefono() !== actual.telefono ||
+      this.activo() !== actual.activo
+    );
+  });
+
+  readonly puedeGuardar = computed<boolean>(() => {
+    if (this.rolesDraft().length === 0) {
       return false;
     }
-    return [...this.rolesDraft()].sort().join('|') !== [...actual.roles].sort().join('|');
+    if (this.nombre().trim().length === 0 || this.email().trim().length === 0) {
+      return false;
+    }
+    return this.modo() === 'editar' || this.clave().trim().length > 0;
   });
 
   readonly subtitulo = computed<string>(
     () =>
-      `${this.usuarios().length} usuarios · ${ROLES.length} roles del sistema · RBAC con permisos granulares`,
+      `${this.meta().total} usuarios · ${this.roles().length} roles del sistema · RBAC con permisos granulares`,
   );
 
   constructor() {
-    const inicial = this.seleccionado();
-    if (inicial) {
-      this.rolesDraft.set([...inicial.roles]);
-    }
+    const params = this.route.snapshot.queryParamMap;
+    this.busqueda.set(params.get('q') ?? '');
+    const activoParam = params.get('activo');
+    this.filtroActivo.set(
+      activoParam === 'true' ? 'activos' : activoParam === 'false' ? 'inactivos' : 'todos',
+    );
+    this.pagina.set(Math.max(1, Number(params.get('page')) || 1));
+    const limite = Number(params.get('limit'));
+    this.limite.set(LIMITES.includes(limite) ? limite : 20);
+
+    void this.inicializar();
 
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
+      }
+      if (this.buscarTimer !== null) {
+        window.clearTimeout(this.buscarTimer);
       }
     });
   }
@@ -159,7 +166,7 @@ export class UsuariosPage {
       .join('');
   }
 
-  detalle(usuario: Usuario): string {
+  detalle(usuario: UsuarioVista): string {
     if (usuario.roles.includes('Dueño/Admin')) {
       return 'Dueño del local';
     }
@@ -178,19 +185,21 @@ export class UsuariosPage {
     return 'Turno tarde';
   }
 
-  acceso(usuario: Usuario): string {
+  acceso(usuario: UsuarioVista): string {
     if (usuario.ultimoAcceso) {
       const fecha = new Date(usuario.ultimoAcceso);
-      return `${fecha.getDate()}/${fecha.getMonth() + 1}`;
+      if (!Number.isNaN(fecha.getTime())) {
+        return `${fecha.getDate()}/${fecha.getMonth() + 1}`;
+      }
     }
-    return ACCESOS[usuario.id] ?? '—';
+    return '—';
   }
 
-  esSesion(usuario: Usuario): boolean {
+  esSesion(usuario: UsuarioVista): boolean {
     return this.auth.usuario()?.id === usuario.id;
   }
 
-  rolClase(rol: RolNombre): string {
+  rolClase(rol: string): string {
     switch (rol) {
       case 'Mozo':
         return 'role--mozo';
@@ -209,57 +218,223 @@ export class UsuariosPage {
 
   onBusqueda(event: Event): void {
     this.busqueda.set((event.target as HTMLInputElement).value);
+    if (this.buscarTimer !== null) {
+      window.clearTimeout(this.buscarTimer);
+    }
+    this.buscarTimer = window.setTimeout(() => {
+      this.pagina.set(1);
+      void this.cargar();
+    }, 350);
   }
 
-  filtrar(filtro: FiltroRol): void {
-    this.filtroRol.set(filtro);
+  filtrar(filtro: FiltroActivo): void {
+    if (this.filtroActivo() === filtro) {
+      return;
+    }
+    this.filtroActivo.set(filtro);
+    this.pagina.set(1);
+    void this.cargar();
   }
 
-  seleccionar(usuario: Usuario): void {
+  seleccionar(usuario: UsuarioVista): void {
     this.seleccionadoId.set(usuario.id);
-    this.rolesDraft.set([...usuario.roles]);
+    this.modo.set('editar');
+    this.cargarFormulario(usuario);
     this.errorRoles.set(false);
   }
 
-  toggleRol(rol: RolNombre): void {
-    this.rolesDraft.update((actuales) => {
-      if (actuales.includes(rol)) {
-        return actuales.filter((actual) => actual !== rol);
-      }
-      return [...actuales, rol];
-    });
+  cambiarPagina(page: number): void {
+    this.pagina.set(page);
+    void this.cargar();
+  }
+
+  cambiarLimite(limit: number): void {
+    this.limite.set(limit);
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  recargar(): void {
+    void this.inicializar();
+  }
+
+  nuevoUsuario(): void {
+    this.modo.set('nuevo');
+    this.seleccionadoId.set(null);
+    this.nombre.set('');
+    this.email.set('');
+    this.usuario.set('');
+    this.telefono.set('');
+    this.clave.set('');
+    this.activo.set(true);
+    this.rolesDraft.set([]);
+    this.errorRoles.set(false);
+  }
+
+  onCampo(
+    event: Event,
+    campo: 'nombre' | 'email' | 'usuario' | 'telefono' | 'clave',
+  ): void {
+    const valor = (event.target as HTMLInputElement).value;
+    switch (campo) {
+      case 'nombre':
+        this.nombre.set(valor);
+        return;
+      case 'email':
+        this.email.set(valor);
+        return;
+      case 'usuario':
+        this.usuario.set(valor);
+        return;
+      case 'telefono':
+        this.telefono.set(valor);
+        return;
+      default:
+        this.clave.set(valor);
+    }
+  }
+
+  cambiarActivo(event: Event): void {
+    this.activo.set((event.target as HTMLInputElement).checked);
+  }
+
+  toggleRol(rol: string): void {
+    this.rolesDraft.update((actuales) =>
+      actuales.includes(rol)
+        ? actuales.filter((actual) => actual !== rol)
+        : [...actuales, rol],
+    );
     if (this.rolesDraft().length > 0) {
       this.errorRoles.set(false);
     }
   }
 
   origen(codigo: string): string {
-    return (
-      this.rolesDraft().find((rol) =>
-        PERMISOS_POR_ROL[rol].includes(codigo),
-      ) ?? ''
-    );
+    const rol = this.roles().find((item) => item.permisos.includes(codigo));
+    return rol ? rol.nombre : '';
   }
 
-  nuevoUsuario(): void {
-    this.avisar('Alta de usuarios disponible en el próximo avance');
-  }
-
-  guardar(): void {
-    const actual = this.seleccionado();
-    if (!actual) {
-      this.avisar('Selecciona un usuario', true);
-      return;
-    }
+  async guardar(): Promise<void> {
     if (this.rolesDraft().length === 0) {
       this.errorRoles.set(true);
       this.avisar('El usuario debe tener al menos un rol', true);
       return;
     }
+    if (this.nombre().trim().length === 0 || this.email().trim().length === 0) {
+      this.avisar('Nombre y correo son obligatorios', true);
+      return;
+    }
 
-    this.config.asignarRoles(actual.id, this.rolesDraft());
-    this.errorRoles.set(false);
-    this.avisar(`Roles actualizados · ${actual.nombre}`);
+    if (this.modo() === 'nuevo') {
+      if (this.clave().trim().length === 0) {
+        this.avisar('Define una clave para el nuevo usuario', true);
+        return;
+      }
+      const creado = await this.config.crearUsuario({
+        nombre: this.nombre().trim(),
+        email: this.email().trim(),
+        usuario: this.usuario().trim() || undefined,
+        telefono: this.telefono().trim() || undefined,
+        clave: this.clave().trim(),
+        activo: this.activo(),
+        roles: this.rolesDraft() as RolNombre[],
+      });
+      if (!creado) {
+        this.avisar(this.config.error() ?? 'No se pudo crear el usuario', true);
+        return;
+      }
+      this.modo.set('editar');
+      this.seleccionadoId.set(creado.id);
+      this.cargarFormulario(creado);
+      this.avisar(`Usuario creado · ${creado.nombre}`);
+      return;
+    }
+
+    const actual = this.seleccionado();
+    if (!actual) {
+      this.avisar('Selecciona un usuario', true);
+      return;
+    }
+
+    const actualizado = await this.config.actualizarUsuario(actual.id, {
+      nombre: this.nombre().trim(),
+      telefono: this.telefono().trim(),
+      activo: this.activo(),
+    });
+    if (!actualizado) {
+      this.avisar(this.config.error() ?? 'No se pudo actualizar el usuario', true);
+      return;
+    }
+
+    const okRoles = await this.config.asignarRoles(
+      actual.id,
+      this.rolesDraft() as RolNombre[],
+    );
+    if (!okRoles) {
+      this.avisar(this.config.error() ?? 'No se pudieron actualizar los roles', true);
+      return;
+    }
+
+    this.avisar(`Usuario actualizado · ${actualizado.nombre}`);
+    await this.cargar();
+  }
+
+  private async inicializar(): Promise<void> {
+    await Promise.all([this.cargar(), this.config.cargarCatalogos()]);
+    if (this.modo() === 'editar') {
+      const seleccionado = this.seleccionado();
+      if (seleccionado) {
+        this.cargarFormulario(seleccionado);
+      }
+    }
+  }
+
+  private async cargar(): Promise<void> {
+    const filtro = this.filtroActivo();
+    const ok = await this.config.cargar({
+      page: this.pagina(),
+      limit: this.limite(),
+      q: this.busqueda(),
+      activo: filtro === 'todos' ? undefined : filtro === 'activos',
+      sort: 'id:asc',
+    });
+    if (!ok) {
+      return;
+    }
+    this.pagina.set(this.config.meta().page);
+    this.limite.set(this.config.meta().limit);
+    this.sincronizarUrl();
+    if (this.modo() === 'editar') {
+      const seleccionado = this.seleccionado();
+      if (seleccionado) {
+        this.seleccionadoId.set(seleccionado.id);
+        this.cargarFormulario(seleccionado);
+      }
+    }
+  }
+
+  private cargarFormulario(usuario: UsuarioVista): void {
+    this.nombre.set(usuario.nombre);
+    this.email.set(usuario.email);
+    this.usuario.set(usuario.usuario ?? '');
+    this.telefono.set(usuario.telefono);
+    this.clave.set('');
+    this.activo.set(usuario.activo);
+    this.rolesDraft.set([...usuario.roles]);
+  }
+
+  private sincronizarUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        page: this.pagina() > 1 ? this.pagina() : null,
+        limit: this.limite() !== 20 ? this.limite() : null,
+        q: this.busqueda().trim() || null,
+        activo:
+          this.filtroActivo() === 'todos' ? null : this.filtroActivo() === 'activos',
+      },
+      replaceUrl: true,
+    });
   }
 
   private avisar(mensaje: string, error = false): void {
@@ -268,6 +443,9 @@ export class UsuariosPage {
     if (this.toastTimer !== null) {
       window.clearTimeout(this.toastTimer);
     }
-    this.toastTimer = window.setTimeout(() => this.toast.set(''), 2800);
+    this.toastTimer = window.setTimeout(() => {
+      this.toast.set('');
+      this.toastTimer = null;
+    }, 2800);
   }
 }

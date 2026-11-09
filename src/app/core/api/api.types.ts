@@ -258,6 +258,18 @@ export interface MovimientoDto {
   usuario_id: number;
   observacion: string | null;
   fecha: string;
+  insumo?: string | null;
+  usuario?: string | null;
+}
+
+export interface MovimientoQueryDto {
+  page?: number;
+  limit?: number;
+  tipo?: string;
+  insumo_id?: number;
+  desde?: string;
+  hasta?: string;
+  sort?: string;
 }
 
 export interface AjusteResponseDto {
@@ -444,4 +456,141 @@ export interface PlatoDto {
   activo: boolean;
   categoria?: string | null;
   ingredientes?: IngredientePlatoDto[] | null;
+}
+
+export interface ActivoMantenimientoRefDto {
+  id: number;
+  tipo: string;
+  fecha: string;
+  estado: string;
+}
+
+export interface ActivoDto {
+  id: number;
+  nombre: string;
+  categoria: string;
+  cantidad: number;
+  costo_adquisicion: number;
+  vida_util_meses: number | null;
+  fecha_adquisicion: string;
+  estado: string;
+  fecha_baja?: string | null;
+  motivo_baja?: string | null;
+  usuario_id?: number;
+  proveedor?: string | null;
+  garantia_meses?: number | null;
+  observaciones?: string | null;
+  proximo_mantenimiento?: string | null;
+  antiguedad_meses?: number;
+  meses_uso?: number;
+  edad_meses?: number;
+  vida_util_vencida?: boolean;
+  mantenimientos?: number;
+  ultimo_mantenimiento?: ActivoMantenimientoRefDto | string | null;
+}
+
+export interface ActivoAlertaDto {
+  activo_id: number;
+  activo: string;
+  mantenimiento_id?: number;
+  tipo: string;
+  severidad: string;
+  mensaje: string;
+}
+
+export interface MantenimientoDto {
+  id: number;
+  activo_id: number;
+  tipo: string;
+  fecha: string;
+  programada_para?: string | null;
+  descripcion: string;
+  costo_reparacion: number;
+  costo_reposicion: number;
+  decision?: string | null;
+  estado: string;
+  usuario_id?: number;
+  fecha_autorizacion?: string | null;
+}
+
+export interface UsuarioRolDto {
+  id?: number;
+  nombre: string;
+}
+
+export interface UsuarioDto {
+  id: number;
+  nombre: string;
+  email: string;
+  usuario: string;
+  telefono: string | null;
+  activo: boolean;
+  roles: Array<string | UsuarioRolDto>;
+  permisos: string[];
+  ultimo_acceso: string | null;
+  creado_en: string;
+}
+
+export interface RolDto {
+  id: number;
+  nombre: string;
+  descripcion?: string | null;
+  activo?: boolean;
+  permisos?: string[];
+}
+
+export interface PermisoDto {
+  id: number;
+  codigo: string;
+  descripcion: string;
+  modulo?: string | null;
+  activo?: boolean;
+}
+
+export interface TipoMermaDto {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+}
+
+export interface MermaDto {
+  id: number;
+  tipo_merma_id: number | null;
+  tipo_merma: string | null;
+  insumo_id: number | null;
+  insumo: string | null;
+  platillo_id: number | null;
+  platillo: string | null;
+  cantidad: number;
+  costo_estimado: number;
+  clasificacion: string;
+  causa_raiz: string | null;
+  motivo: string;
+  fecha: string;
+  estado: string;
+  usuario_registro_id: number;
+  registrado_por: string | null;
+  usuario_aprueba_id: number | null;
+  fecha_resolucion: string | null;
+  observacion_resolucion: string | null;
+  origen: string | null;
+  creado_en: string | null;
+}
+
+export interface DevolucionDto {
+  id: number;
+  pedido_id: number;
+  pedido_numero: string | null;
+  pedido_detalle_id: number | null;
+  platillo_id: number | null;
+  platillo: string | null;
+  fecha_reporte: string;
+  motivo: string;
+  detalle: string | null;
+  monto_reembolsado: number;
+  estado: string;
+  resolucion: string | null;
+  decidido_por_id: number | null;
+  fecha_resolucion: string | null;
+  merma_id: number | null;
 }

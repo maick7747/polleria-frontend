@@ -4,10 +4,10 @@
       <app-icon name="bell-ringing" [size]="14" />
       Alertas
     </a>
-    <a class="btn-dark" routerLink="/activos/registrar">
+    <button type="button" class="btn-dark" (click)="abrirAlta()">
       <app-icon name="plus" [size]="14" />
       Registrar activo
-    </a>
+    </button>
   </div>
 
   @if (proximos().length > 0) {
@@ -25,9 +25,66 @@
           <app-icon name="arrow-right" [size]="12" />
           Ver alertas
         </a>
-        <span class="banner__meta">Última revisión 09 oct</span>
       </div>
     </section>
+  }
+
+  <div class="toolbar">
+    <div class="chips" role="group" aria-label="Filtrar activos por estado">
+      @for (item of filtrosEstado; track item.id) {
+        <button
+          type="button"
+          class="chip"
+          [class.is-active]="filtroEstado() === item.id"
+          (click)="cambiarFiltro(item.id)"
+        >
+          {{ item.label }}
+        </button>
+      }
+    </div>
+
+    <div class="toolbar__right">
+      <label class="select">
+        <span>Categoría</span>
+        <select [value]="categoriaFiltro()" (change)="onCategoriaFiltro($event)">
+          <option value="todas">Todas</option>
+          @for (categoria of categorias; track categoria.id) {
+            <option [value]="categoria.id">{{ categoria.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="select">
+        <span>Ordenar</span>
+        <select [value]="orden()" (change)="onOrden($event)">
+          @for (opcion of ordenes; track opcion.id) {
+            <option [value]="opcion.id">{{ opcion.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="buscador">
+        <app-icon name="magnifying-glass" [size]="14" />
+        <input
+          type="search"
+          placeholder="Buscar activo"
+          aria-label="Buscar activo"
+          [value]="busqueda()"
+          (input)="onBuscar($event)"
+        />
+      </label>
+
+      @if (cargando()) {
+        <span class="cargando">Cargando…</span>
+      }
+    </div>
+  </div>
+
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span>{{ error() }}</span>
+      <button type="button" (click)="recargar()">Reintentar</button>
+    </div>
   }
 
   <div class="board">
@@ -47,7 +104,7 @@
               type="button"
               class="fila"
               [class.is-selected]="seleccionado()?.id === activo.id"
-              (click)="seleccionar(activo.id)"
+              (click)="seleccionar(activo)"
             >
               <span class="col-activo fila__activo">
                 <span class="fila__icon">
@@ -55,7 +112,9 @@
                 </span>
                 <span class="fila__text">
                   <span class="fila__name">{{ activo.nombre }}</span>
-                  <span class="fila__code">{{ codigo(activo) }} · {{ categoria(activo).label }}</span>
+                  <span class="fila__code">
+                    {{ codigo(activo) }} · {{ categoria(activo).label }} · {{ edadMeses(activo) }} meses de uso
+                  </span>
                 </span>
               </span>
 
@@ -78,19 +137,170 @@
               <span class="col-costo fila__costo">{{ moneda(activo.costoAdquisicion) }}</span>
             </button>
           } @empty {
-            <div class="tabla__empty">Sin activos registrados.</div>
+            <div class="tabla__empty">
+              <app-empty-state
+                icon="wrench"
+                title="Sin activos"
+                description="No hay activos que coincidan con el filtro o la búsqueda."
+              />
+            </div>
           }
         </div>
 
+        <app-paginador
+          [page]="pagina()"
+          [pages]="meta().pages"
+          [total]="meta().total"
+          [limit]="limite()"
+          (pageChange)="cambiarPagina($event)"
+          (limitChange)="cambiarLimite($event)"
+        />
+
         <footer class="tabla__foot">
           <span>Selecciona un activo para ver su ficha</span>
-          <span>{{ lista().length }} de {{ lista().length }}</span>
+          <span>{{ operativos() }} operativos · {{ enMantenimiento() }} en mantenimiento · {{ deBaja() }} fuera de servicio</span>
         </footer>
       </div>
     </app-panel>
 
-    @if (seleccionado(); as activo) {
-      <app-dark-panel class="detalle">
+    <app-dark-panel class="detalle">
+      @if (modo() === 'activo') {
+        <div class="detalle__inner">
+          <header class="detalle__head">
+            <h2 class="detalle__title">
+              {{ seleccionadoId() !== null ? 'Editar activo' : 'Nuevo activo' }}
+            </h2>
+            <button type="button" class="ico-btn" (click)="cancelar()" aria-label="Cerrar">
+              <app-icon name="x" [size]="14" />
+            </button>
+          </header>
+
+          <label class="campo-dark">
+            <span>Nombre</span>
+            <input
+              type="text"
+              [value]="fNombre()"
+              (input)="onCampo($event, 'nombre')"
+              placeholder="Ej. Horno a la brasa"
+            />
+          </label>
+
+          <span class="campo-dark__label">Categoría</span>
+          <div class="dchips">
+            @for (categoria of categorias; track categoria.id) {
+              <button
+                type="button"
+                class="dchip dchip--btn"
+                [class.is-on]="fCategoria() === categoria.id"
+                (click)="elegirCategoria(categoria.id)"
+              >
+                {{ categoria.label }}
+              </button>
+            }
+          </div>
+
+          <div class="campo-dark__pair">
+            <label class="campo-dark">
+              <span>Cantidad</span>
+              <input type="number" min="1" [value]="fCantidad()" (input)="onCampo($event, 'cantidad')" />
+            </label>
+            <label class="campo-dark">
+              <span>Costo (S/)</span>
+              <input type="number" min="0" step="0.1" [value]="fCosto()" (input)="onCampo($event, 'costo')" />
+            </label>
+          </div>
+
+          <div class="campo-dark__pair">
+            <label class="campo-dark">
+              <span>Vida útil (meses)</span>
+              <input type="number" min="1" [value]="fVidaUtil()" (input)="onCampo($event, 'vida')" />
+            </label>
+            <label class="campo-dark">
+              <span>Garantía (meses)</span>
+              <input type="number" min="0" [value]="fGarantia()" (input)="onCampo($event, 'garantia')" />
+            </label>
+          </div>
+
+          <label class="campo-dark">
+            <span>Fecha de adquisición</span>
+            <input type="date" [value]="fFecha()" (input)="onCampo($event, 'fecha')" />
+          </label>
+
+          <label class="campo-dark">
+            <span>Proveedor</span>
+            <input type="text" [value]="fProveedor()" (input)="onCampo($event, 'proveedor')" placeholder="Opcional" />
+          </label>
+
+          <label class="campo-dark">
+            <span>Observaciones</span>
+            <textarea rows="2" [value]="fObservaciones()" (input)="onCampo($event, 'observaciones')"></textarea>
+          </label>
+
+          <span class="campo-dark__label">Estado</span>
+          <div class="dchips">
+            <button type="button" class="dchip dchip--btn" [class.is-on]="fEstado() === 'activo'" (click)="elegirEstado('activo')">Operativo</button>
+            <button type="button" class="dchip dchip--btn" [class.is-on]="fEstado() === 'en_reparacion'" (click)="elegirEstado('en_reparacion')">En mantenimiento</button>
+            <button type="button" class="dchip dchip--btn" [class.is-on]="fEstado() === 'dado_de_baja'" (click)="elegirEstado('dado_de_baja')">Fuera de servicio</button>
+          </div>
+
+          <span class="detalle__grow"></span>
+
+          <button type="button" class="btn-brand" [disabled]="!formularioValido()" (click)="guardarActivo()">
+            <app-icon name="check" [size]="15" />
+            {{ seleccionadoId() !== null ? 'Guardar cambios' : 'Registrar activo' }}
+          </button>
+          <button type="button" class="btn-ghost-dark" (click)="cancelar()">Cancelar</button>
+        </div>
+      } @else if (modo() === 'mantenimiento') {
+        <div class="detalle__inner">
+          <header class="detalle__head">
+            <h2 class="detalle__title">Nuevo mantenimiento</h2>
+            <button type="button" class="ico-btn" (click)="cancelar()" aria-label="Cerrar">
+              <app-icon name="x" [size]="14" />
+            </button>
+          </header>
+
+          @if (seleccionado(); as activo) {
+            <span class="detalle__nombre">{{ activo.nombre }}</span>
+            <span class="detalle__meta">{{ codigo(activo) }} · {{ categoria(activo).label }}</span>
+          }
+
+          <span class="campo-dark__label">Tipo</span>
+          <div class="dchips">
+            <button type="button" class="dchip dchip--btn" [class.is-on]="mTipo() === 'preventivo'" (click)="elegirTipoMantenimiento('preventivo')">Preventivo</button>
+            <button type="button" class="dchip dchip--btn" [class.is-on]="mTipo() === 'correctivo'" (click)="elegirTipoMantenimiento('correctivo')">Correctivo</button>
+          </div>
+
+          <label class="campo-dark">
+            <span>Descripción</span>
+            <textarea rows="2" [value]="mDescripcion()" (input)="onMantenimientoCampo($event, 'descripcion')"></textarea>
+          </label>
+
+          <div class="campo-dark__pair">
+            <label class="campo-dark">
+              <span>Fecha</span>
+              <input type="date" [value]="mFecha()" (input)="onMantenimientoCampo($event, 'fecha')" />
+            </label>
+            <label class="campo-dark">
+              <span>Programado para</span>
+              <input type="date" [value]="mProgramada()" (input)="onMantenimientoCampo($event, 'programada')" />
+            </label>
+          </div>
+
+          <label class="campo-dark">
+            <span>Costo estimado (S/)</span>
+            <input type="number" min="0" step="0.1" [value]="mCosto()" (input)="onMantenimientoCampo($event, 'costo')" />
+          </label>
+
+          <span class="detalle__grow"></span>
+
+          <button type="button" class="btn-brand" [disabled]="!mantenimientoValido()" (click)="guardarMantenimiento()">
+            <app-icon name="wrench" [size]="15" />
+            Programar mantenimiento
+          </button>
+          <button type="button" class="btn-ghost-dark" (click)="cancelar()">Cancelar</button>
+        </div>
+      } @else if (seleccionado(); as activo) {
         <div class="detalle__inner">
           <header class="detalle__head">
             <h2 class="detalle__title">Activo seleccionado</h2>
@@ -113,7 +323,7 @@
                 Por vencer · {{ diasProximo(activo) }} días
               </span>
             } @else {
-              <span class="dchip">Preventivo</span>
+              <span class="dchip">{{ edadMeses(activo) }} meses de uso</span>
             }
           </div>
 
@@ -123,6 +333,10 @@
             <div>
               <span>Fecha de compra</span>
               <strong>{{ fechaDetalle(activo.fechaAdquisicion) }}</strong>
+            </div>
+            <div>
+              <span>Edad / uso</span>
+              <strong>{{ edadMeses(activo) }} meses</strong>
             </div>
             <div>
               <span>Vida útil</span>
@@ -159,33 +373,53 @@
             <strong>{{ moneda(activo.costoAdquisicion) }}</strong>
           </div>
 
-          <div class="detalle__grow"></div>
+          <span class="dark-sep"></span>
 
-          <button type="button" class="btn-brand" (click)="registrarMantenimiento()">
+          <span class="detalle__eyebrow">MANTENIMIENTOS</span>
+          <div class="mtos">
+            @for (mantenimiento of historial(); track mantenimiento.id) {
+              <div class="mto">
+                <div class="mto__info">
+                  <strong>{{ mantenimiento.descripcion }}</strong>
+                  <span>
+                    {{ fechaDetalle(mantenimiento.fecha) }} · {{ mantenimiento.tipo }} ·
+                    {{ mantenimiento.estado }}
+                    @if (mantenimiento.costoReparacion > 0) {
+                      · {{ moneda(mantenimiento.costoReparacion) }}
+                    }
+                  </span>
+                </div>
+                @if (mantenimiento.estado === 'programado') {
+                  <div class="mto__actions">
+                    <button type="button" (click)="autorizar(mantenimiento, 'reparar')">Reparar</button>
+                    <button type="button" class="is-danger" (click)="autorizar(mantenimiento, 'reemplazar')">Reemplazar</button>
+                  </div>
+                }
+              </div>
+            } @empty {
+              <div class="mtos__empty">Sin mantenimientos registrados.</div>
+            }
+          </div>
+
+          <span class="detalle__grow"></span>
+
+          <button type="button" class="btn-brand" (click)="abrirMantenimiento()">
             <app-icon name="wrench" [size]="15" />
             Registrar mantenimiento
           </button>
+          <button type="button" class="btn-ghost-dark" (click)="abrirEdicion()">
+            <app-icon name="note-pencil" [size]="14" />
+            Editar activo
+          </button>
           <span class="detalle__foot">El costo se registra como egreso del turno</span>
         </div>
-      </app-dark-panel>
-    }
-  </div>
-
-  <div class="pie">
-    <span class="pie__item">
-      <app-icon name="check-circle" [size]="12" />
-      {{ operativos() }} activos operativos · {{ enMantenimiento() }} en mantenimiento ·
-      {{ deBaja() }} fuera de servicio
-    </span>
-    <span class="pie__item">
-      <app-icon name="clock" [size]="12" />
-      Los mantenimientos vencidos generan alerta al dueño
-    </span>
+      }
+    </app-dark-panel>
   </div>
 
   @if (toast()) {
-    <div class="toast" role="status">
-      <app-icon name="check" [size]="15" />
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
       {{ toast() }}
     </div>
   }

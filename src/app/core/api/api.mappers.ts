@@ -1,27 +1,42 @@
 import type {
+  Activo,
   CanalPedido,
+  CategoriaActivo,
   CategoriaGasto,
   CategoriaInsumo,
   CategoriaPlatillo,
   ComprobanteTipo,
   Cuenta,
+  Devolucion,
+  EstadoActivo,
   EstadoCuenta,
+  EstadoDevolucion,
+  EstadoMantenimiento,
+  EstadoMerma,
   EstadoMesa,
   EstadoPago,
   EstadoPedido,
   EstadoPreparacion,
   Gasto,
   Insumo,
+  Mantenimiento,
+  Merma,
   Mesa,
   MetodoPago,
   MovimientoStock,
+  OrigenMerma,
   Pago,
   Pedido,
   PedidoDetalle,
+  Permiso,
   Plato,
+  ResolucionDevolucion,
+  RolNombre,
   Ronda,
   TipoConsumo,
+  TipoMantenimiento,
   UnidadMedida,
+  Usuario,
 } from '../models';
 import type {
   EntradaCompra,
@@ -31,18 +46,27 @@ import type {
   SugerenciaCompra,
 } from '../data/compras.service';
 import type {
+  ActivoAlertaDto,
+  ActivoDto,
   CompraDto,
   CuentaDto,
   DetallePedidoDto,
+  DevolucionDto,
   GastoDto,
   InsumoDto,
   KdsPedidoDto,
+  MantenimientoDto,
+  MermaDto,
   MesaDto,
   MovimientoDto,
   PagoDto,
   PedidoDto,
+  PermisoDto,
   PlatoDto,
+  RolDto,
   SugerenciaCompraDto,
+  TipoMermaDto,
+  UsuarioDto,
 } from './api.types';
 
 const METODOS: readonly MetodoPago[] = ['efectivo', 'tarjeta', 'yape', 'plin', 'transferencia'];
@@ -432,5 +456,256 @@ export function toPlato(dto: PlatoDto): Plato {
       unidadMedida: (ingrediente.unidad_medida ?? 'und') as UnidadMedida,
       costoUnitario: Number(ingrediente.costo_promedio ?? 0),
     })),
+  };
+}
+
+const ESTADOS_MERMA: readonly EstadoMerma[] = ['pendiente', 'aprobada', 'rechazada'];
+
+const ORIGENES_MERMA: readonly OrigenMerma[] = [
+  'registro_manual',
+  'devolucion',
+  'cancelacion',
+];
+
+export function toTipoMerma(dto: TipoMermaDto): {
+  id: number;
+  nombre: string;
+  descripcion: string;
+} {
+  return {
+    id: dto.id,
+    nombre: dto.nombre,
+    descripcion: dto.descripcion ?? '',
+  };
+}
+
+export function toMerma(dto: MermaDto): Merma {
+  return {
+    id: dto.id,
+    tipo: dto.tipo_merma ?? 'Sin tipo',
+    insumoId: dto.insumo_id ?? undefined,
+    insumoNombre: dto.insumo ?? undefined,
+    platilloId: dto.platillo_id ?? undefined,
+    platilloNombre: dto.platillo ?? undefined,
+    cantidad: Number(dto.cantidad ?? 0),
+    costoEstimado: Number(dto.costo_estimado ?? 0),
+    clasificacion: dto.clasificacion === 'inevitable' ? 'inevitable' : 'evitable',
+    causaRaiz: dto.causa_raiz ?? '',
+    motivo: dto.motivo,
+    fecha: (dto.fecha ?? '').slice(0, 10),
+    estado: ESTADOS_MERMA.find((valor) => valor === dto.estado) ?? 'pendiente',
+    origen: ORIGENES_MERMA.find((valor) => valor === dto.origen) ?? 'registro_manual',
+    usuarioRegistroId: dto.usuario_registro_id,
+    usuarioApruebaId: dto.usuario_aprueba_id ?? undefined,
+    observacionResolucion: dto.observacion_resolucion ?? undefined,
+  };
+}
+
+const ESTADOS_DEVOLUCION: readonly EstadoDevolucion[] = [
+  'pendiente',
+  'aceptada',
+  'rechazada',
+];
+
+const RESOLUCIONES_DEVOLUCION: readonly ResolucionDevolucion[] = [
+  're_preparar',
+  'corregir',
+  'reembolso_total',
+  'reembolso_parcial',
+];
+
+export function toDevolucion(dto: DevolucionDto): Devolucion {
+  return {
+    id: dto.id,
+    pedidoId: dto.pedido_id,
+    pedidoNumero: dto.pedido_numero ?? `Pedido ${dto.pedido_id}`,
+    pedidoDetalleId: dto.pedido_detalle_id ?? undefined,
+    fechaReporte: dto.fecha_reporte,
+    motivo: dto.motivo,
+    detalle: dto.detalle ?? '',
+    montoReembolsado: Number(dto.monto_reembolsado ?? 0),
+    estado: ESTADOS_DEVOLUCION.find((valor) => valor === dto.estado) ?? 'pendiente',
+    resolucion: RESOLUCIONES_DEVOLUCION.find((valor) => valor === dto.resolucion),
+    decididoPorId: dto.decidido_por_id ?? undefined,
+    fechaResolucion: dto.fecha_resolucion ?? undefined,
+    mermaId: dto.merma_id ?? undefined,
+  };
+}
+
+const CATEGORIAS_ACTIVO: readonly CategoriaActivo[] = [
+  'cocina',
+  'salon',
+  'delivery',
+  'oficina',
+  'limpieza',
+];
+
+const ESTADOS_ACTIVO: readonly EstadoActivo[] = ['activo', 'en_reparacion', 'dado_de_baja'];
+
+const TIPOS_MANTENIMIENTO: readonly TipoMantenimiento[] = ['preventivo', 'correctivo'];
+
+const ESTADOS_MANTENIMIENTO: readonly EstadoMantenimiento[] = [
+  'programado',
+  'en_proceso',
+  'completado',
+];
+
+const ROLES_SISTEMA: readonly RolNombre[] = [
+  'Mozo',
+  'Cajero',
+  'Cocinero',
+  'Repartidor',
+  'Dueño/Admin',
+  'Admin',
+];
+
+export interface ActivoVista extends Activo {
+  antiguedadMeses?: number;
+  vidaUtilVencida?: boolean;
+  totalMantenimientos?: number;
+}
+
+export interface AlertaActivo {
+  id: number;
+  activoId: number;
+  activo: string;
+  tipo: string;
+  severidad: string;
+  mensaje: string;
+  mantenimientoId?: number;
+}
+
+export interface MovimientoDetalle extends MovimientoStock {
+  insumo?: string;
+  usuario?: string;
+}
+
+export interface UsuarioVista extends Usuario {
+  usuario?: string;
+  creadoEn?: string;
+}
+
+export interface RolCatalogo {
+  id: number;
+  nombre: string;
+  descripcion: string;
+  activo: boolean;
+  permisos: string[];
+}
+
+function fechaDeUltimo(dto: ActivoDto): string | undefined {
+  const ultimo = dto.ultimo_mantenimiento;
+  if (!ultimo) {
+    return undefined;
+  }
+  if (typeof ultimo === 'string') {
+    return ultimo.slice(0, 10);
+  }
+  return typeof ultimo.fecha === 'string' ? ultimo.fecha.slice(0, 10) : undefined;
+}
+
+export function toActivo(dto: ActivoDto): ActivoVista {
+  const antiguedad = dto.antiguedad_meses ?? dto.meses_uso ?? dto.edad_meses;
+  return {
+    id: dto.id,
+    nombre: dto.nombre,
+    categoria: CATEGORIAS_ACTIVO.find((valor) => valor === dto.categoria) ?? 'cocina',
+    cantidad: Number(dto.cantidad ?? 1),
+    costoAdquisicion: Number(dto.costo_adquisicion ?? 0),
+    vidaUtilMeses: Number(dto.vida_util_meses ?? 0),
+    fechaAdquisicion: (dto.fecha_adquisicion ?? '').slice(0, 10),
+    estado: ESTADOS_ACTIVO.find((valor) => valor === dto.estado) ?? 'activo',
+    ultimoMantenimiento: fechaDeUltimo(dto),
+    proximoMantenimiento: dto.proximo_mantenimiento?.slice(0, 10) ?? undefined,
+    proveedor: dto.proveedor ?? undefined,
+    garantiaMeses: dto.garantia_meses ?? undefined,
+    observaciones: dto.observaciones ?? undefined,
+    fechaBaja: dto.fecha_baja ?? undefined,
+    motivoBaja: dto.motivo_baja ?? undefined,
+    usuarioId: dto.usuario_id ?? 0,
+    antiguedadMeses: antiguedad !== undefined ? Number(antiguedad) : undefined,
+    vidaUtilVencida: dto.vida_util_vencida,
+    totalMantenimientos: dto.mantenimientos,
+  };
+}
+
+export function toAlerta(dto: ActivoAlertaDto, id: number): AlertaActivo {
+  return {
+    id,
+    activoId: dto.activo_id,
+    activo: dto.activo,
+    tipo: dto.tipo,
+    severidad: dto.severidad,
+    mensaje: dto.mensaje,
+    mantenimientoId: dto.mantenimiento_id,
+  };
+}
+
+export function toMantenimiento(dto: MantenimientoDto): Mantenimiento {
+  return {
+    id: dto.id,
+    activoId: dto.activo_id,
+    tipo: TIPOS_MANTENIMIENTO.find((valor) => valor === dto.tipo) ?? 'preventivo',
+    fecha: (dto.fecha ?? '').slice(0, 10),
+    programadaPara: dto.programada_para?.slice(0, 10) ?? undefined,
+    descripcion: dto.descripcion,
+    costoReparacion: Number(dto.costo_reparacion ?? 0),
+    costoReposicion: Number(dto.costo_reposicion ?? 0),
+    decision:
+      dto.decision === 'reparar' || dto.decision === 'reemplazar' ? dto.decision : undefined,
+    estado: ESTADOS_MANTENIMIENTO.find((valor) => valor === dto.estado) ?? 'programado',
+    usuarioId: dto.usuario_id ?? 0,
+  };
+}
+
+function nombreRol(dto: string | { nombre?: string }): string {
+  return typeof dto === 'string' ? dto : (dto?.nombre ?? '');
+}
+
+export function toUsuario(dto: UsuarioDto): UsuarioVista {
+  const roles = (Array.isArray(dto.roles) ? dto.roles : [])
+    .map(nombreRol)
+    .filter((nombre): nombre is RolNombre =>
+      ROLES_SISTEMA.some((valor) => valor === nombre),
+    );
+  return {
+    id: dto.id,
+    nombre: dto.nombre,
+    email: dto.email,
+    telefono: dto.telefono ?? '',
+    activo: Boolean(dto.activo),
+    roles,
+    permisos: Array.isArray(dto.permisos) ? [...dto.permisos] : [],
+    ultimoAcceso: dto.ultimo_acceso ?? undefined,
+    usuario: dto.usuario,
+    creadoEn: dto.creado_en,
+  };
+}
+
+export function toRol(dto: RolDto): RolCatalogo {
+  return {
+    id: dto.id,
+    nombre: dto.nombre,
+    descripcion: dto.descripcion ?? '',
+    activo: dto.activo !== false,
+    permisos: Array.isArray(dto.permisos) ? [...dto.permisos] : [],
+  };
+}
+
+export function toPermiso(dto: PermisoDto): Permiso {
+  return {
+    id: dto.id,
+    codigo: dto.codigo,
+    descripcion: dto.descripcion,
+    modulo: dto.modulo ?? '',
+    activo: dto.activo !== false,
+  };
+}
+
+export function toMovimientoDetalle(dto: MovimientoDto): MovimientoDetalle {
+  return {
+    ...toMovimiento(dto),
+    insumo: dto.insumo ?? undefined,
+    usuario: dto.usuario ?? undefined,
   };
 }

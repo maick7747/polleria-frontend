@@ -1,4 +1,4 @@
-ï»¿<app-shell title="Registrar reembolso" [subtitle]="subtitulo()">
+<app-shell title="Registrar reembolso" [subtitle]="subtitulo()">
   <div actions class="header-actions">
     <a class="ghost-link" routerLink="/devoluciones">
       <app-icon name="arrow-left" [size]="14" />
@@ -22,24 +22,24 @@
           <div class="fila fila--info">
             <div class="campo">
               <span class="campo__label">Pedido</span>
-              <strong class="dato">{{ pedidoNumero }}</strong>
+              <strong class="dato">{{ pedidoNumero() }}</strong>
             </div>
             <div class="campo campo--sm">
               <span class="campo__label">Total del pedido</span>
-              <strong class="dato">{{ moneda(montoAprobado) }}</strong>
+              <strong class="dato">{{ moneda(montoAprobado()) }}</strong>
             </div>
             <div class="campo">
               <span class="campo__label">Motivo</span>
-              <strong class="dato">{{ motivo }}</strong>
+              <strong class="dato">{{ motivo() }}</strong>
             </div>
             <div class="campo campo--sm">
               <span class="campo__label">Autoriza</span>
-              <strong class="dato">DueÃ±o / Admin</strong>
+              <strong class="dato">Dueño / Admin</strong>
             </div>
           </div>
 
-          <span class="campo__label">MÃ©todo de devoluciÃ³n</span>
-          <div class="chips" role="group" aria-label="MÃ©todo de devoluciÃ³n">
+          <span class="campo__label">Método de devolución</span>
+          <div class="chips" role="group" aria-label="Método de devolución">
             @for (m of metodos; track m.id) {
               <button
                 type="button"
@@ -81,7 +81,7 @@
             </div>
             <div class="campo campo--sm">
               <span class="campo__label">Fecha</span>
-              <strong class="dato">{{ fechaTexto }}</strong>
+              <strong class="dato">{{ fechaTexto() }}</strong>
             </div>
             <div class="campo campo--sm">
               <span class="campo__label">Registrado por</span>
@@ -100,7 +100,7 @@
 
         <div class="nota">
           <app-icon name="warning-circle" [size]="13" />
-          El comprobante original se mantiene Â· el reembolso se registra como egreso de caja
+          El comprobante original se mantiene · el reembolso se registra como egreso de caja
         </div>
       </div>
     </app-panel>
@@ -123,7 +123,7 @@
         <span class="confirmar__sep"></span>
 
         <div class="confirmar__row">
-          <span>MÃ©todo</span>
+          <span>Método</span>
           <strong>{{ textoMetodo(metodo()) }}</strong>
         </div>
         <div class="confirmar__row">
@@ -136,7 +136,7 @@
         </div>
         <div class="confirmar__row">
           <span>Pedido</span>
-          <strong>{{ pedidoNumero }}</strong>
+          <strong>{{ pedidoNumero() }}</strong>
         </div>
         <div class="confirmar__row">
           <span>Referencia</span>
@@ -165,7 +165,7 @@
   </div>
 
   <section class="recientes">
-    <app-section-header title="Reembolsos del dÃ­a" [meta]="reembolsosMeta()" />
+    <app-section-header title="Reembolsos del día" [meta]="reembolsosMeta()" />
 
     <div class="tabla">
       <div class="tabla__head">
@@ -193,7 +193,7 @@
           <app-empty-state
             icon="money"
             title="Sin reembolsos"
-            description="No hay reembolsos registrados en el dÃ­a."
+            description="No hay reembolsos registrados en el día."
           />
         </div>
       }
@@ -201,8 +201,8 @@
   </section>
 
   <div class="pie">
-    <span>Todo reembolso exige aprobaciÃ³n del DueÃ±o/Admin y queda en el historial</span>
-    <span>Comprobante SUNAT simulado Â· mÃ©todo: efectivo, tarjeta, Yape, Plin</span>
+    <span>Todo reembolso exige aprobación del Dueño/Admin y queda en el historial</span>
+    <span>Comprobante SUNAT simulado · método: efectivo, tarjeta, Yape, Plin</span>
   </div>
 
   @if (toast()) {

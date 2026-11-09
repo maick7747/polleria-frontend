@@ -100,7 +100,7 @@ export class ActivosAutorizarPage {
       return 0;
     }
     const registrado = this.activos
-      .mantenimientos()
+      .historialMantenimientos()
       .find((item) => item.activoId === actual.id && item.costoReparacion > 0);
     return registrado ? registrado.costoReparacion : round2(actual.costoAdquisicion * 0.17);
   });
@@ -203,6 +203,14 @@ export class ActivosAutorizarPage {
   });
 
   constructor() {
+    void (async () => {
+      await this.activos.cargar({ limit: 100 });
+      const actual = this.activo();
+      if (actual) {
+        await this.activos.mantenimientos(actual.id);
+      }
+    })();
+
     this.destroyRef.onDestroy(() => {
       if (this.temporizador !== null) {
         window.clearTimeout(this.temporizador);

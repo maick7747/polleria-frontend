@@ -6,18 +6,18 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { InventarioService } from '../../core/data/inventario.service';
-import type { Insumo, MovimientoStock, TipoMovimiento } from '../../core/models';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { InventarioService, type MovimientoDetalle } from '../../core/data/inventario.service';
+import type { Insumo, TipoMovimiento } from '../../core/models';
 import { round2 } from '../../core/utils/format';
 import type { ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
+import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-type Periodo = 'hoy' | '7d' | '30d' | 'todos';
 type FiltroTipo = 'todos' | TipoMovimiento;
 
 interface TipoMeta {
@@ -29,7 +29,7 @@ interface TipoMeta {
 interface MovimientoVista {
   id: number;
   tipo: TipoMovimiento;
-  referenciaTipo: MovimientoStock['referenciaTipo'];
+  referenciaTipo: MovimientoDetalle['referenciaTipo'];
   tipoLabel: string;
   tono: ChipVariant;
   icono: IconName;
@@ -58,20 +58,13 @@ interface ResumenHistorial {
   minimo: number | null;
 }
 
-const TIPO_META: Readonly<Record<MovimientoStock['referenciaTipo'], TipoMeta>> = {
+const TIPO_META: Readonly<Record<MovimientoDetalle['referenciaTipo'], TipoMeta>> = {
   compra: { label: 'Compra', tono: 'success', icono: 'package' },
   pedido: { label: 'Venta', tono: 'neutral', icono: 'receipt' },
   merma: { label: 'Merma', tono: 'danger', icono: 'trash' },
   ajuste: { label: 'Ajuste', tono: 'warning', icono: 'filter' },
   devolucion: { label: 'Devolución', tono: 'info', icono: 'arrow-left' },
 };
-
-const PERIODOS: readonly { valor: Periodo; label: string }[] = [
-  { valor: 'hoy', label: 'Hoy' },
-  { valor: '7d', label: '7 días' },
-  { valor: '30d', label: '30 días' },
-  { valor: 'todos', label: 'Todos' },
-];
 
 const TIPOS: readonly { valor: FiltroTipo; label: string }[] = [
   { valor: 'todos', label: 'Todos' },
@@ -82,6 +75,16 @@ const TIPOS: readonly { valor: FiltroTipo; label: string }[] = [
   { valor: 'devolucion', label: 'Devoluciones' },
 ];
 
+const TIPOS_MOVIMIENTO: readonly TipoMovimiento[] = [
+  'entrada',
+  'salida',
+  'merma',
+  'ajuste',
+  'devolucion',
+];
+
+const LIMITES = [10, 20, 50, 100];
+
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 const dosDigitos = (valor: number): string => String(valor).padStart(2, '0');
@@ -91,53 +94,46 @@ const escaparCsv = (valor: string): string => `"${valor.replace(/"/g, '""')}"`;
 @Component({
   selector: 'app-inventario-historial-page',
   standalone: true,
-  imports: [RouterLink, AppShellComponent, DarkPanelComponent, EmptyStateComponent, IconComponent, PanelComponent],
+  imports: [
+    RouterLink,
+    AppShellComponent,
+    DarkPanelComponent,
+    EmptyStateComponent,
+    IconComponent,
+    PaginadorComponent,
+    PanelComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './historial.page.html',
   styleUrl: './historial.page.css',
 })
 export class InventarioHistorialPage {
   private readonly inventario = inject(InventarioService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private toastTimer: number | null = null;
 
-  readonly periodo = signal<Periodo>('7d');
   readonly tipo = signal<FiltroTipo>('todos');
   readonly insumoId = signal<number>(0);
+  readonly desde = signal<string>('');
+  readonly hasta = signal<string>('');
+  readonly pagina = signal<number>(1);
+  readonly limite = signal<number>(20);
   readonly seleccionId = signal<number | null>(null);
   readonly toast = signal<string>('');
 
-  readonly periodos = PERIODOS;
   readonly tipos = TIPOS;
-  readonly listaInsumos = this.inventario.insumos;
+  readonly listaInsumos = this.inventario.catalogoInsumos;
+  readonly meta = this.inventario.movimientosMeta;
+  readonly cargando = this.inventario.cargando;
+  readonly error = this.inventario.error;
 
-  readonly ancla = computed<Date>(() => {
-    const fechas = this.inventario
-      .movimientos()
-      .map((movimiento) => Date.parse(movimiento.fecha))
-      .filter((valor) => Number.isFinite(valor));
-    return new Date(fechas.length > 0 ? Math.max(...fechas) : Date.now());
-  });
+  readonly movimientos = computed<MovimientoVista[]>(() =>
+    this.inventario.movimientos().map((movimiento) => this.fila(movimiento)),
+  );
 
-  readonly movimientos = computed<MovimientoVista[]>(() => {
-    const ancla = this.ancla();
-    return [...this.inventario.movimientos()]
-      .sort((a, b) => Date.parse(b.fecha) - Date.parse(a.fecha))
-      .map((movimiento) => this.fila(movimiento, ancla));
-  });
-
-  readonly visibles = computed<MovimientoVista[]>(() => {
-    const periodo = this.periodo();
-    const tipo = this.tipo();
-    const insumoId = this.insumoId();
-    const ancla = this.ancla();
-    return this.movimientos().filter((fila) => {
-      const coincideTipo = tipo === 'todos' || fila.tipo === tipo;
-      const coincideInsumo = insumoId === 0 || fila.insumoId === insumoId;
-      const coincideFecha = this.enPeriodo(fila, periodo, ancla);
-      return coincideTipo && coincideInsumo && coincideFecha;
-    });
-  });
+  readonly visibles = computed<MovimientoVista[]>(() => this.movimientos());
 
   readonly resumen = computed<ResumenHistorial>(() => {
     const filas = this.visibles();
@@ -156,10 +152,9 @@ export class InventarioHistorialPage {
       entradas,
       salidas,
       saldo,
-      unidad: insumo?.unidadMedida ?? '',
+      unidad: insumo?.unidadMedida ?? filas[0]?.unidad ?? '',
       insumoNombre: insumo?.nombre ?? 'Todos los insumos',
-      movimientosHoy: filas.filter((fila) => this.mismoDia(new Date(fila.fechaISO), this.ancla()))
-        .length,
+      movimientosHoy: filas.filter((fila) => this.esHoy(new Date(fila.fechaISO))).length,
       estado: insumo ? this.estadoInsumo(insumo) : 'Todos',
       minimo: insumo ? insumo.stockMinimo : null,
     };
@@ -167,12 +162,17 @@ export class InventarioHistorialPage {
 
   readonly subtitulo = computed<string>(() => {
     const nombre = this.insumoFiltrado()?.nombre ?? 'todos los insumos';
-    return `${this.visibles().length} movimientos · ${nombre} · saldo calculado al instante`;
+    return `${this.meta().total} movimientos · ${nombre} · saldo calculado al instante`;
   });
 
-  readonly periodoLabel = computed<string>(
-    () => this.periodos.find((periodo) => periodo.valor === this.periodo())?.label ?? 'Todos',
-  );
+  readonly periodoLabel = computed<string>(() => {
+    const desde = this.desde();
+    const hasta = this.hasta();
+    if (!desde && !hasta) {
+      return 'Todo el historial';
+    }
+    return `${desde || 'inicio'} → ${hasta || 'hoy'}`;
+  });
 
   readonly saldoLabel = computed<string>(() =>
     this.insumoFiltrado() ? 'Saldo actual' : 'Saldo del último movimiento',
@@ -190,6 +190,22 @@ export class InventarioHistorialPage {
   });
 
   constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    const tipo = params.get('tipo');
+    this.tipo.set(
+      tipo === 'todos' || TIPOS_MOVIMIENTO.includes(tipo as TipoMovimiento)
+        ? (tipo as FiltroTipo)
+        : 'todos',
+    );
+    this.insumoId.set(Math.max(0, Number(params.get('insumo')) || 0));
+    this.desde.set(params.get('desde') ?? '');
+    this.hasta.set(params.get('hasta') ?? '');
+    this.pagina.set(Math.max(1, Number(params.get('page')) || 1));
+    const limite = Number(params.get('limit'));
+    this.limite.set(LIMITES.includes(limite) ? limite : 20);
+
+    void this.inicializar();
+
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
@@ -202,16 +218,46 @@ export class InventarioHistorialPage {
     return Number.isInteger(redondeado) ? String(redondeado) : redondeado.toFixed(2);
   }
 
-  cambiarPeriodo(periodo: Periodo): void {
-    this.periodo.set(periodo);
-  }
-
   cambiarTipo(tipo: FiltroTipo): void {
+    if (this.tipo() === tipo) {
+      return;
+    }
     this.tipo.set(tipo);
+    this.pagina.set(1);
+    void this.cargar();
   }
 
   onInsumo(event: Event): void {
     this.insumoId.set(Number((event.target as HTMLSelectElement).value));
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  onDesde(event: Event): void {
+    this.desde.set((event.target as HTMLInputElement).value);
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  onHasta(event: Event): void {
+    this.hasta.set((event.target as HTMLInputElement).value);
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  cambiarPagina(page: number): void {
+    this.pagina.set(page);
+    void this.cargar();
+  }
+
+  cambiarLimite(limit: number): void {
+    this.limite.set(limit);
+    this.pagina.set(1);
+    void this.cargar();
+  }
+
+  recargar(): void {
+    void this.inicializar();
   }
 
   seleccionar(id: number): void {
@@ -251,7 +297,44 @@ export class InventarioHistorialPage {
     this.mostrarToast(`${filas.length} movimientos exportados`);
   }
 
-  private fila(movimiento: MovimientoStock, ancla: Date): MovimientoVista {
+  private async inicializar(): Promise<void> {
+    await Promise.all([this.cargar(), this.inventario.cargarCatalogo()]);
+  }
+
+  private async cargar(): Promise<void> {
+    const ok = await this.inventario.cargarMovimientos({
+      page: this.pagina(),
+      limit: this.limite(),
+      tipo: this.tipo() === 'todos' ? undefined : this.tipo(),
+      insumoId: this.insumoId() || undefined,
+      desde: this.desde() || undefined,
+      hasta: this.hasta() || undefined,
+      sort: 'fecha:desc',
+    });
+    if (!ok) {
+      return;
+    }
+    this.pagina.set(this.inventario.movimientosMeta().page);
+    this.limite.set(this.inventario.movimientosMeta().limit);
+    this.sincronizarUrl();
+  }
+
+  private sincronizarUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        page: this.pagina() > 1 ? this.pagina() : null,
+        limit: this.limite() !== 20 ? this.limite() : null,
+        tipo: this.tipo() === 'todos' ? null : this.tipo(),
+        insumo: this.insumoId() || null,
+        desde: this.desde() || null,
+        hasta: this.hasta() || null,
+      },
+      replaceUrl: true,
+    });
+  }
+
+  private fila(movimiento: MovimientoDetalle): MovimientoVista {
     const insumo = this.inventario.porId(movimiento.insumoId);
     const meta = TIPO_META[movimiento.referenciaTipo];
     const signo = this.signo(movimiento);
@@ -265,12 +348,12 @@ export class InventarioHistorialPage {
       tono: meta.tono,
       icono: meta.icono,
       insumoId: movimiento.insumoId,
-      insumo: insumo?.nombre ?? 'Insumo',
+      insumo: movimiento.insumo ?? insumo?.nombre ?? 'Insumo',
       unidad: insumo?.unidadMedida ?? '',
-      detalle: movimiento.observacion,
+      detalle: movimiento.observacion || (movimiento.usuario ?? 'Sin observación'),
       referencia: `${meta.label} #${movimiento.referenciaId}`,
       fechaISO: movimiento.fecha,
-      fechaTexto: this.formatearFecha(movimiento.fecha, ancla),
+      fechaTexto: this.formatearFecha(movimiento.fecha),
       cantidad,
       cantidadTexto: `${cantidad < 0 ? '−' : '+'}${Math.abs(cantidad).toFixed(2)}`,
       saldo,
@@ -279,7 +362,7 @@ export class InventarioHistorialPage {
     };
   }
 
-  private signo(movimiento: MovimientoStock): number {
+  private signo(movimiento: MovimientoDetalle): number {
     if (movimiento.tipo === 'entrada' || movimiento.tipo === 'devolucion') {
       return 1;
     }
@@ -289,33 +372,25 @@ export class InventarioHistorialPage {
     return -1;
   }
 
-  private enPeriodo(fila: MovimientoVista, periodo: Periodo, ancla: Date): boolean {
-    if (periodo === 'todos') {
-      return true;
-    }
-    const fecha = new Date(fila.fechaISO);
-    if (periodo === 'hoy') {
-      return this.mismoDia(fecha, ancla);
-    }
-    const dias = periodo === '7d' ? 7 : 30;
-    const limite = new Date(ancla);
-    limite.setDate(limite.getDate() - (dias - 1));
-    limite.setHours(0, 0, 0, 0);
-    return fecha.getTime() >= limite.getTime();
-  }
-
-  private formatearFecha(iso: string, ancla: Date): string {
+  private formatearFecha(iso: string): string {
     const fecha = new Date(iso);
+    if (Number.isNaN(fecha.getTime())) {
+      return iso;
+    }
     const hora = `${dosDigitos(fecha.getHours())}:${dosDigitos(fecha.getMinutes())}`;
-    if (this.mismoDia(fecha, ancla)) {
+    if (this.esHoy(fecha)) {
       return `Hoy ${hora}`;
     }
-    const ayer = new Date(ancla);
+    const ayer = new Date();
     ayer.setDate(ayer.getDate() - 1);
     if (this.mismoDia(fecha, ayer)) {
       return `Ayer ${hora}`;
     }
     return `${dosDigitos(fecha.getDate())} ${MESES[fecha.getMonth()]} ${hora}`;
+  }
+
+  private esHoy(fecha: Date): boolean {
+    return this.mismoDia(fecha, new Date());
   }
 
   private mismoDia(a: Date, b: Date): boolean {
