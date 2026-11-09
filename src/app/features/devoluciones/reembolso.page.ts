@@ -77,6 +77,16 @@ export class ReembolsoPage {
   readonly monto = signal<string>(this.montoQuery.toFixed(2));
   readonly metodo = signal<MetodoPago>('efectivo');
   readonly estado = signal<string>('Por confirmar');
+  readonly estadoTono = computed<'warning' | 'success' | 'danger'>(() => {
+    const estado = this.estado().toLowerCase();
+    if (estado === 'confirmado' || estado === 'aprobado') {
+      return 'success';
+    }
+    if (estado === 'rechazado' || estado === 'rechazada') {
+      return 'danger';
+    }
+    return 'warning';
+  });
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
   readonly guardando = signal<boolean>(false);

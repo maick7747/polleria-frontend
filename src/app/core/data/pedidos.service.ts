@@ -12,6 +12,10 @@ import { round2 } from '../utils/format';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
 import { esFalloRed, mensajeError } from '../api/api.helpers';
+import {
+  leerResultadoCancelacion,
+  type ResultadoCancelacion,
+} from '../api/cancelacion.helpers';
 import type {
   ApiList,
   KdsEstadoLineaDto,
@@ -35,6 +39,11 @@ export interface PedidosQuery {
 export interface PedidosMeta extends PageMeta {
   prioritarios?: number;
   sla_min?: number;
+}
+
+export interface CancelacionPedido {
+  pedido: Pedido;
+  resultado: ResultadoCancelacion;
 }
 
 export interface NuevoPedido {
@@ -89,6 +98,56 @@ export class PedidosService {
 
   porId(id: number): Pedido | undefined {
     return this.pedidos().find((pedido) => pedido.id === id);
+  }
+
+  /**
+   * Carga un pedido puntual con sus `detalles` desde el backend.
+   * Lanza el `ApiError` (404/403/red) para que la pantalla lo muestre.
+   */
+  async obtenerPorId(id: number): Promise<Pedido | null> {
+    if (!USE_API) {
+      return this.porId(id) ?? null;
+    }
+    const dto = await firstValueFrom(this.api.get<PedidoDto>(`/pedidos/${id}`));
+    const pedido = toPedido(dto);
+    this.guardarEnLista(pedido);
+    return pedido;
+  }
+
+  /**
+   * `POST /api/pedidos/:id/cancelar`: cancela y revierte el stock real.
+   * Devuelve el pedido actualizado y los movimientos repuestos.
+   * Lanza el `ApiError` (409 si está cobrado/cancelado, 403, red).
+   */
+  async cancelarPedido(id: number, motivo?: string): Promise<CancelacionPedido | null> {
+    if (!USE_API) {
+      const pedido = this.porId(id);
+      if (!pedido) {
+        return null;
+      }
+      this.cambiarEstado(id, 'cancelado');
+      return {
+        pedido: { ...pedido, estado: 'cancelado' },
+        resultado: leerResultadoCancelacion({ movimientos_inventario: 0 }),
+      };
+    }
+
+    const respuesta = await firstValueFrom(
+      this.api.post<PedidoDto & Record<string, unknown>>(`/pedidos/${id}/cancelar`, {
+        motivo: motivo || undefined,
+      }),
+    );
+    const pedido = toPedido(respuesta);
+    this.guardarEnLista(pedido);
+    return { pedido, resultado: leerResultadoCancelacion(respuesta) };
+  }
+
+  private guardarEnLista(pedido: Pedido): void {
+    this.pedidos.update((lista) =>
+      lista.some((actual) => actual.id === pedido.id)
+        ? lista.map((actual) => (actual.id === pedido.id ? pedido : actual))
+        : [pedido, ...lista],
+    );
   }
 
   async cargar(opciones: PedidosQuery = {}): Promise<boolean> {

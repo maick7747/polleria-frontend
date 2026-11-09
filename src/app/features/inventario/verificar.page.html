@@ -21,8 +21,16 @@
         {{ selloTiempo }}
       </span>
     </div>
-    <span class="info__meta">Última verificación: hace 3 días</span>
+    <span class="info__meta">Última verificación: {{ ultimaVerificacion() }}</span>
   </div>
+
+  @if (error(); as mensaje) {
+    <div class="banner banner--error" role="alert">
+      <app-icon name="warning-circle" [size]="15" />
+      <span>{{ mensaje }}</span>
+      <button type="button" class="banner__btn" (click)="recargar()">Reintentar</button>
+    </div>
+  }
 
   <div class="board">
     <app-panel class="panel">
@@ -32,9 +40,19 @@
             <span class="panel__bar"></span>
             <h2>Conteo físico</h2>
           </div>
-          <span class="panel__meta">
-            {{ filas().length }} de 24 insumos · ajusta al guardar
-          </span>
+          <div class="panel__tools">
+            <input
+              type="search"
+              class="panel__search"
+              placeholder="Buscar insumo"
+              [value]="busqueda()"
+              aria-label="Buscar insumo"
+              (input)="onBuscar($event)"
+            />
+            <span class="panel__meta">
+              {{ filas().length }} de {{ totalInsumos() }} insumos
+            </span>
+          </div>
         </header>
 
         <div class="grid grid--head">
@@ -45,7 +63,15 @@
         </div>
 
         <div class="rows">
-          @for (fila of filas(); track fila.insumoId) {
+          @if (cargando() && filas().length === 0) {
+            <div class="estado">Cargando inventario…</div>
+          } @else if (filas().length === 0) {
+            <div class="estado">No hay insumos activos para verificar.</div>
+          } @else if (filasVisibles().length === 0) {
+            <div class="estado">Ningún insumo coincide con «{{ busqueda() }}».</div>
+          }
+
+          @for (fila of filasVisibles(); track fila.insumoId) {
             <div class="grid row" [class.row--alert]="diferencia(fila) < 0">
               <div class="insumo">
                 <span class="insumo__name">{{ fila.nombre }}</span>
@@ -87,7 +113,7 @@
         </div>
 
         <div class="panel__foot">
-          <span>El conteo reemplaza el stock del sistema al guardar</span>
+          <span>El ajuste reemplaza el stock del sistema al aplicarlo</span>
           <span>
             {{ resumen().conDiferencia }} con diferencia · {{ resumen().sinDiferencia }} sin
             diferencia
@@ -100,7 +126,9 @@
       <div class="cierre">
         <header class="cierre__head">
           <h2>Cerrar verificación</h2>
-          <span class="cierre__badge">Borrador</span>
+          <span class="cierre__badge">
+            {{ previsualizacion() ? 'Previsualizado' : 'Borrador' }}
+          </span>
         </header>
 
         <span class="cierre__divider"></span>
@@ -148,6 +176,52 @@
           <span class="cierre__hint">{{ textoValorizado() }}</span>
         </div>
 
+        @if (previsualizacion(); as preview) {
+          <div class="preview">
+            <div class="preview__head">
+              <span>Vista previa del servidor</span>
+              <strong>
+                {{ preview.resumen.con_diferencia }} / {{ preview.resumen.items }}
+              </strong>
+            </div>
+            <ul class="preview__list">
+              @for (diferencia of diferenciasPreview(); track diferencia.insumo_id) {
+                <li class="preview__item">
+                  <span class="preview__name">{{ diferencia.insumo }}</span>
+                  <span
+                    [class]="'preview__diff ' + (diferencia.diferencia < 0 ? 'is-danger' : 'is-warning')"
+                  >
+                    {{ diferencia.diferencia > 0 ? '+' : '' }}{{ cantidad(diferencia.diferencia) }}
+                    {{ diferencia.unidad_medida }}
+                  </span>
+                </li>
+              } @empty {
+                <li class="preview__item preview__item--ok">Sin diferencias detectadas</li>
+              }
+            </ul>
+            <span class="preview__note">No aplicado: solo previsualización.</span>
+          </div>
+        }
+
+        @if (movimientosCreados().length > 0) {
+          <div class="preview">
+            <div class="preview__head">
+              <span>Movimientos creados</span>
+              <strong>{{ movimientosCreados().length }}</strong>
+            </div>
+            <ul class="preview__list">
+              @for (movimiento of movimientosCreados(); track movimiento.id) {
+                <li class="preview__item">
+                  <span class="preview__name">{{ movimiento.nombre }}</span>
+                  <span class="preview__diff">
+                    {{ cantidad(movimiento.cantidad) }} → {{ cantidad(movimiento.stockResultante) }}
+                  </span>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
         <span class="cierre__grow"></span>
 
         <div class="cierre__warn">
@@ -157,11 +231,25 @@
           <p>El ajuste genera un movimiento y queda en el historial.</p>
         </div>
 
-        <button type="button" class="btn-primary" (click)="guardar()">
-          <app-icon name="check-circle" [size]="16" />
-          Guardar ajuste
+        <button
+          type="button"
+          class="btn-secondary"
+          [disabled]="procesando() || filas().length === 0"
+          (click)="previsualizar()"
+        >
+          <app-icon name="magnifying-glass" [size]="15" />
+          {{ procesando() ? 'Procesando…' : 'Previsualizar' }}
         </button>
-        <button type="button" class="btn-secondary" (click)="descartar()">
+        <button
+          type="button"
+          class="btn-primary"
+          [disabled]="procesando() || filas().length === 0"
+          (click)="aplicar()"
+        >
+          <app-icon name="check-circle" [size]="16" />
+          {{ procesando() ? 'Aplicando…' : 'Aplicar ajustes' }}
+        </button>
+        <button type="button" class="btn-secondary" [disabled]="procesando()" (click)="descartar()">
           <app-icon name="x" [size]="15" />
           Descartar conteo
         </button>
@@ -177,8 +265,12 @@
   </div>
 
   @if (toast()) {
-    <div class="toast" role="status">
-      <app-icon name="check-circle" [size]="15" />
+    <div class="toast" [class.toast--error]="toastTipo() === 'error'" role="status">
+      @if (toastTipo() === 'error') {
+        <app-icon name="warning-circle" [size]="15" />
+      } @else {
+        <app-icon name="check-circle" [size]="15" />
+      }
       {{ toast() }}
     </div>
   }

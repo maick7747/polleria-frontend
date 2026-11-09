@@ -121,15 +121,7 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'seguimiento-delivery',
-    title: "Seguimiento de Delivery · Fratelli's",
-    canActivate: [roleGuard],
-    data: { roles: roles('Repartidor', 'Cajero', 'Dueño/Admin') },
-    loadComponent: () =>
-      import('./features/delivery/seguimiento.page').then((m) => m.SeguimientoDeliveryPage),
-  },
-  {
-    path: 'cancelacion-delivery',
+    path: 'cancelacion-delivery/:pedidoId',
     title: "Cancelación de Delivery · Fratelli's",
     canActivate: [roleGuard],
     data: { roles: roles('Cajero', 'Dueño/Admin') },

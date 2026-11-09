@@ -1,8 +1,8 @@
 <app-shell title="Pulso del turno" [subtitle]="fecha()">
   <div actions class="header-actions">
-    <span class="live">
+    <span class="live" [class.live--stale]="!actualizadoReciente()">
       <span class="live__dot"></span>
-      En vivo · {{ pedidosActivos() }} pedidos abiertos
+      Actualizado {{ actualizado() }} · {{ pedidosActivos() }} pedidos abiertos
     </span>
     <app-button variant="dark" icon="cash-register" routerLink="/cerrar-cuenta">
       Cerrar caja
@@ -100,7 +100,7 @@
   <section class="tops">
     <app-section-header
       title="Más vendidos hoy"
-      [meta]="'actualizado ' + actualizado() + ' · ' + kpis().topPlatos.length + ' de ' + kpis().totalPlatosCarta + ' platos'"
+      [meta]="'actualizado ' + actualizado() + ' · ' + topsMeta()"
     />
     <div class="tops__grid">
       @for (plato of kpis().topPlatos; track plato.nombre; let i = $index) {

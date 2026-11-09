@@ -42,6 +42,7 @@ export class LoginPage {
 
   readonly error = signal<string>('');
   readonly cargando = signal<boolean>(false);
+  readonly usaApi = USE_API;
   readonly accesos: readonly AccesoDemo[] = USE_API ? ACCESOS_API : ACCESOS_MOCK;
 
   private readonly inicial = this.accesos[0];

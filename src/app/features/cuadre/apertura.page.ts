@@ -15,6 +15,10 @@ import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
 import { PanelComponent } from '../../shared/components/panel/panel';
+import {
+  StepperComponent,
+  type PasoStepper,
+} from '../../shared/components/stepper/stepper';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 interface Denominacion {
@@ -40,6 +44,7 @@ const DENOMINACIONES_INICIALES: readonly Denominacion[] = [
     DarkPanelComponent,
     IconComponent,
     PanelComponent,
+    StepperComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './apertura.page.html',
@@ -65,6 +70,50 @@ export class AperturaCajaPage {
   readonly subtitulo = `Cuadre de caja · ${this.fechaLarga} · ${this.turno}`;
 
   readonly abierta = this.cuadre.abierta;
+  readonly estado = this.cuadre.estado;
+  readonly cuadreId = this.cuadre.cuadreId;
+
+  // Stepper estado-dirigido: si el día ya tiene cuadre, la apertura está hecha
+  // y el avance depende de si la caja sigue abierta o ya cerró.
+  readonly pasos = computed<readonly PasoStepper[]>(() => {
+    if (this.cuadreId() === null) {
+      return [
+        { numero: 1, etiqueta: 'Apertura', estado: 'active', meta: 'sin abrir' },
+        { numero: 2, etiqueta: 'Operación', estado: 'pending', meta: 'pendiente' },
+        { numero: 3, etiqueta: 'Cierre', estado: 'pending', meta: 'pendiente' },
+      ];
+    }
+
+    const abierta = this.abierta();
+    const cerrada = this.estado() === 'cerrada';
+
+    return [
+      {
+        numero: 1,
+        etiqueta: 'Apertura',
+        estado: 'done',
+        meta: 'ya existe',
+        link: '/cuadre-caja',
+      },
+      {
+        numero: 2,
+        etiqueta: 'Operación',
+        estado: abierta ? 'active' : 'pending',
+        meta: abierta ? 'en curso' : 'pendiente',
+      },
+      {
+        numero: 3,
+        etiqueta: 'Cierre',
+        estado: cerrada ? 'done' : 'pending',
+        meta: cerrada ? 'cerrada' : 'pendiente',
+        link: '/cuadre-caja',
+      },
+    ];
+  });
+
+  readonly metaStepper = computed<string>(
+    () => `${this.fecha} · ${this.turno} · umbral de diferencia S/ 0.00`,
+  );
 
   readonly fondoInicial = signal<number>(200);
   readonly observaciones = signal(

@@ -175,8 +175,8 @@
             <strong>{{ moneda(valorRiesgo()) }}</strong>
           </div>
           <div class="alertas__row">
-            <span>Cobertura estimada</span>
-            <strong class="alertas__row--warning">2 días</strong>
+            <span>Cobertura mínima</span>
+            <strong class="alertas__row--warning" [title]="consumoError() ?? ''">{{ coberturaTexto() }}</strong>
           </div>
         </div>
 

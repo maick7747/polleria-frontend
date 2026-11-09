@@ -115,8 +115,12 @@
                 <div class="metric">
                   <span class="metric__label">Consumo 7 días</span>
                   <div class="metric__row">
-                    <strong>{{ cantidad(consumo7()) }}</strong>
-                    <span>{{ insumo.unidad }}</span>
+                    @if (consumoSinDatos()) {
+                      <strong>Sin datos de consumo</strong>
+                    } @else {
+                      <strong>{{ cantidad(consumo7()) }}</strong>
+                      <span>{{ insumo.unidad }}</span>
+                    }
                   </div>
                 </div>
                 <div class="metric metric--accent">
@@ -169,9 +173,13 @@
               <div class="hint">
                 <app-icon name="warning-circle" [size]="14" />
                 <p>
-                  Con {{ cantidad(nuevoMinimo()) }} {{ insumo.unidad }} cubres
-                  <strong>{{ cobertura() }} días</strong> de venta alta. El sistema sugiere
-                  {{ cantidad(sugerido()) }} {{ insumo.unidad }} según el consumo reciente.
+                  @if (consumoSinDatos()) {
+                    Cobertura estimada: <strong>—</strong> · sin datos de consumo reciente.
+                  } @else {
+                    Con {{ cantidad(nuevoMinimo()) }} {{ insumo.unidad }} cubres
+                    <strong>{{ coberturaTexto() }}</strong> de venta alta.
+                  }
+                  El sistema sugiere {{ cantidad(sugerido()) }} {{ insumo.unidad }} según el consumo reciente.
                 </p>
               </div>
 

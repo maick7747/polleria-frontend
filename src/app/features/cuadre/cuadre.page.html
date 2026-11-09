@@ -180,28 +180,7 @@
     </div>
   }
 
-  <div class="stepper">
-    <div class="stepper__pasos">
-      <a class="paso-done" routerLink="/cuadre-caja/apertura" title="Ir a apertura de caja">
-        <app-icon name="check" [size]="11" />
-      </a>
-      <a class="paso__label paso__label--link" routerLink="/cuadre-caja/apertura">Apertura</a>
-      <span class="paso__meta">{{ moneda(fondoInicial()) }}</span>
-      <span class="paso__linea"></span>
-      <span class="paso-done">
-        <app-icon name="check" [size]="11" />
-      </span>
-      <span class="paso__label">Operación</span>
-      <span class="paso__meta">{{ totalCobros() }} cobros</span>
-      <span class="paso__linea"></span>
-      <span class="paso paso--activo">3</span>
-      <span class="paso__label paso__label--activo">Cierre</span>
-      <span class="paso__meta">en curso</span>
-    </div>
-    <span class="stepper__meta">
-      {{ turno }} · 11:00 – 22:00 · umbral de diferencia S/ 0.00
-    </span>
-  </div>
+  <app-stepper [pasos]="pasos()" [meta]="metaStepper()" />
 
   @if (reabiertaTexto()) {
     <div class="reapertura-aviso" role="status">

@@ -2,23 +2,24 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { mensajeError } from '../../core/api/api.helpers';
-import { AuthService } from '../../core/auth/auth.service';
+import { ClientesService } from '../../core/data/clientes.service';
+import { CuadreService } from '../../core/data/cuadre.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MesasService } from '../../core/data/mesas.service';
 import type { DatosCliente, TipoDocumentoCliente } from '../../core/models';
+import { turnoActual } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-type EstadoValidacion = 'inicial' | 'validando' | 'valido' | 'error';
+type EstadoValidacion = 'inicial' | 'validando' | 'valido' | 'manual' | 'error';
 
 @Component({
   selector: 'app-datos-cliente-page',
@@ -40,12 +41,10 @@ export class DatosClientePage {
   private readonly router = inject(Router);
   private readonly mesas = inject(MesasService);
   private readonly cuentas = inject(CuentasService);
-  private readonly auth = inject(AuthService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly cuadre = inject(CuadreService);
+  private readonly clientes = inject(ClientesService);
 
   readonly mesaId = Number(this.route.snapshot.queryParamMap.get('mesaId'));
-  private readonly usuarioId = this.auth.usuario()?.id ?? 3;
-  private temporizador: number | null = null;
 
   readonly tipo = signal<TipoDocumentoCliente>('DNI');
   readonly numero = signal<string>('');
@@ -54,14 +53,21 @@ export class DatosClientePage {
   readonly correo = signal<string>('');
   readonly estado = signal<EstadoValidacion>('inicial');
   readonly fuente = signal<string>('');
-  readonly consultado = signal<string>('');
-  readonly coincidencia = signal<number>(0);
+  readonly modo = signal<string>('');
+  readonly motivo = signal<string>('');
+  readonly validez = signal<boolean | null>(null);
   readonly error = signal<string>('');
   readonly guardando = signal(false);
   readonly cargando = signal(true);
 
   readonly mesa = computed(() => this.mesas.porId(this.mesaId) ?? null);
   readonly cuenta = computed(() => this.cuentas.cuentaDeMesa(this.mesaId) ?? null);
+  readonly turno = turnoActual();
+  readonly cajaAbierta = computed(() => this.cuadre.estado() === 'abierta');
+  readonly cajaCerradaEstado = computed(() => {
+    const estado = this.cuadre.estado();
+    return estado === 'cerrada' || estado === 'sin_cuadre';
+  });
 
   readonly subtitulo = computed(() => {
     const numeroMesa = String(this.mesa()?.numero ?? 0).padStart(2, '0');
@@ -70,6 +76,42 @@ export class DatosClientePage {
   });
 
   readonly docHint = computed(() => (this.tipo() === 'DNI' ? '8 dígitos' : '11 dígitos'));
+
+  readonly modoEtiqueta = computed(() => {
+    switch (this.modo()) {
+      case 'mock':
+        return 'Simulado';
+      case 'sandbox':
+        return 'Sandbox';
+      case 'manual':
+        return 'Manual';
+      default:
+        return '—';
+    }
+  });
+
+  readonly fuenteEtiqueta = computed(() => {
+    switch (this.fuente()) {
+      case 'apiperu':
+        return 'ApiPerú';
+      case 'openruc':
+        return 'OpenRUC';
+      case 'mock':
+        return 'Mock local';
+      case 'ninguno':
+        return 'Sin fuente';
+      default:
+        return '—';
+    }
+  });
+
+  readonly resultadoEtiqueta = computed(() => {
+    const valido = this.validez();
+    if (valido === null) {
+      return '—';
+    }
+    return valido ? 'Válido' : 'No válido';
+  });
 
   readonly etiquetaComprobante = computed(() =>
     this.cuenta()?.comprobanteTipo === 'ticket' ? 'Ticket' : 'Boleta',
@@ -88,13 +130,8 @@ export class DatosClientePage {
   readonly totalCuentaNumero = computed(() => (this.cuenta()?.total ?? 0).toFixed(2));
 
   constructor() {
-    this.destroyRef.onDestroy(() => {
-      if (this.temporizador !== null) {
-        window.clearTimeout(this.temporizador);
-      }
-    });
-
     void this.inicializar();
+    void this.cuadre.cargar();
   }
 
   private async inicializar(): Promise<void> {
@@ -118,9 +155,9 @@ export class DatosClientePage {
       this.nombre.set(cliente.nombre);
       this.telefono.set(cliente.telefono ?? '');
       this.correo.set(cliente.correo ?? '');
-      this.estado.set('valido');
-      this.fuente.set(cliente.tipoDocumento === 'DNI' ? 'RENIEC' : 'SUNAT');
-      this.coincidencia.set(100);
+      // Los datos guardados no traen el resultado de la validación: no se
+      // inventa fuente ni coincidencia. El usuario puede volver a validar.
+      this.estado.set('inicial');
     }
   }
 
@@ -128,8 +165,7 @@ export class DatosClientePage {
     const digitos = (event.target as HTMLInputElement).value.replace(/\D/g, '');
     const maximo = this.tipo() === 'DNI' ? 8 : 11;
     this.numero.set(digitos.slice(0, maximo));
-    this.estado.set('inicial');
-    this.error.set('');
+    this.reiniciarValidacion();
   }
 
   onNombre(event: Event): void {
@@ -148,31 +184,62 @@ export class DatosClientePage {
   setTipo(tipo: TipoDocumentoCliente): void {
     this.tipo.set(tipo);
     this.numero.set(this.numero().slice(0, tipo === 'DNI' ? 8 : 11));
-    this.estado.set('inicial');
-    this.error.set('');
+    this.reiniciarValidacion();
   }
 
-  validar(): void {
+  async validar(): Promise<void> {
     const largo = this.tipo() === 'DNI' ? 8 : 11;
     if (this.numero().length !== largo) {
       this.estado.set('error');
       this.error.set(`El ${this.tipo()} debe tener ${largo} dígitos.`);
       return;
     }
+    if (this.estado() === 'validando') {
+      return;
+    }
+
     this.estado.set('validando');
     this.error.set('');
-    this.temporizador = window.setTimeout(() => {
-      const esDni = this.tipo() === 'DNI';
-      this.fuente.set(esDni ? 'RENIEC' : 'SUNAT');
-      this.consultado.set('17:41');
-      this.coincidencia.set(100);
-      this.estado.set('valido');
-      if (!this.nombre().trim()) {
-        this.nombre.set(
-          esDni ? 'Lucía Ramos Quispe' : "Inversiones Fratelli's S.A.C.",
-        );
+    this.motivo.set('');
+    try {
+      const resultado = await this.clientes.validarDocumento(
+        this.tipo(),
+        this.numero(),
+      );
+      this.validez.set(resultado.valido);
+      this.fuente.set(resultado.fuente);
+      this.modo.set(resultado.modo);
+      this.motivo.set(resultado.motivo ?? '');
+
+      if (resultado.valido) {
+        if (resultado.nombre) {
+          this.nombre.set(resultado.nombre);
+        }
+        this.estado.set('valido');
+        return;
       }
-    }, 650);
+
+      if (resultado.modo === 'manual') {
+        // El backend no pudo validar: se permite registrar el cliente a mano.
+        this.estado.set('manual');
+        return;
+      }
+
+      this.estado.set('error');
+      this.error.set(resultado.motivo ?? 'El documento no es válido.');
+    } catch (error) {
+      this.estado.set('error');
+      this.error.set(mensajeError(error));
+    }
+  }
+
+  private reiniciarValidacion(): void {
+    this.estado.set('inicial');
+    this.error.set('');
+    this.fuente.set('');
+    this.modo.set('');
+    this.motivo.set('');
+    this.validez.set(null);
   }
 
   async guardar(): Promise<void> {

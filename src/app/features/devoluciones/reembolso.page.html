@@ -15,7 +15,7 @@
             <h2>Datos del reembolso</h2>
             <span class="pill">DV-{{ codigo() }}</span>
           </div>
-          <app-chip variant="success">Aprobado</app-chip>
+          <app-chip [variant]="estadoTono()">{{ estado() }}</app-chip>
         </header>
 
         <div class="form">

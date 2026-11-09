@@ -1,6 +1,12 @@
 <app-shell title="Datos del cliente" [subtitle]="subtitulo()">
   <div actions class="header-actions">
-    <app-chip variant="success" [dot]="true">Caja abierta</app-chip>
+    @if (cajaAbierta()) {
+      <app-chip variant="success" [dot]="true">Caja abierta · {{ turno }}</app-chip>
+    } @else if (cajaCerradaEstado()) {
+      <app-chip variant="danger" [dot]="true">Caja cerrada</app-chip>
+    } @else {
+      <app-chip variant="neutral" [dot]="true">Caja · verificando</app-chip>
+    }
     <a class="ghost-link" [routerLink]="['/venta-local/pedido', mesaId]">
       <app-icon name="arrow-left" [size]="14" />
       Volver al pedido
@@ -12,7 +18,7 @@
       <app-icon name="user" [size]="14" />
       Identificación opcional · si se omite, igual se emite el comprobante
     </span>
-    <span class="strip__right">RENIEC y SUNAT en modo sandbox · sin validez tributaria</span>
+    <span class="strip__right">Validación de DNI/RUC según proveedor configurado · sin validez tributaria</span>
   </div>
 
   <div class="board">
@@ -144,25 +150,52 @@
             @if (estado() === 'valido') {
               <div class="estado__box estado__box--ok">
                 <app-icon name="check" [size]="16" />
-                <span>Válido · {{ fuente() }} (sandbox)</span>
+                <span>Válido · {{ fuenteEtiqueta() }} ({{ modoEtiqueta() }})</span>
               </div>
               <div class="estado__rows">
                 <div>
+                  <span>Resultado</span>
+                  <strong class="ok">{{ resultadoEtiqueta() }}</strong>
+                </div>
+                <div>
                   <span>Fuente</span>
-                  <strong>{{ fuente() }}</strong>
+                  <strong>{{ fuenteEtiqueta() }}</strong>
                 </div>
                 <div>
-                  <span>Consultado</span>
-                  <strong>{{ consultado() || '—' }}</strong>
+                  <span>Modo</span>
+                  <strong>{{ modoEtiqueta() }}</strong>
                 </div>
                 <div>
-                  <span>Coincidencia</span>
-                  <strong class="ok">{{ coincidencia() }}%</strong>
+                  <span>Motivo</span>
+                  <strong>{{ motivo() || '—' }}</strong>
+                </div>
+              </div>
+            } @else if (estado() === 'manual') {
+              <div class="estado__box estado__box--neutral">
+                <app-icon name="warning-circle" [size]="15" />
+                <span>No se pudo validar · se permite el registro manual</span>
+              </div>
+              <div class="estado__rows">
+                <div>
+                  <span>Resultado</span>
+                  <strong>{{ resultadoEtiqueta() }}</strong>
+                </div>
+                <div>
+                  <span>Fuente</span>
+                  <strong>{{ fuenteEtiqueta() }}</strong>
+                </div>
+                <div>
+                  <span>Modo</span>
+                  <strong>{{ modoEtiqueta() }}</strong>
+                </div>
+                <div>
+                  <span>Motivo</span>
+                  <strong>{{ motivo() || '—' }}</strong>
                 </div>
               </div>
             } @else if (estado() === 'validando') {
               <div class="estado__box estado__box--neutral">
-                Consultando {{ tipo() === 'DNI' ? 'RENIEC' : 'SUNAT' }}…
+                Consultando documento…
               </div>
             } @else if (estado() === 'error') {
               <div class="estado__box estado__box--error">
@@ -177,7 +210,8 @@
 
             <p class="estado__note">
               <app-icon name="warning-circle" [size]="11" />
-              Modo prueba: no se consumen consultas reales ni se envía el documento.
+              La validación usa el proveedor configurado en el backend. Si no responde,
+              el registro manual no se bloquea.
             </p>
             <div class="estado__grow"></div>
           </aside>

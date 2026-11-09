@@ -1,6 +1,14 @@
 <app-shell [title]="titulo()" [subtitle]="subtitulo()">
   <div actions class="header-actions">
-    <app-chip variant="success" [dot]="true">Caja abierta</app-chip>
+    @if (cajaAbierta()) {
+      <app-chip variant="success" [dot]="true">Caja abierta · {{ turno }}</app-chip>
+    } @else if (cajaCerradaEstado()) {
+      <a class="chip-caja-cerrada" routerLink="/cuadre-caja/apertura">
+        <app-chip variant="danger" [dot]="true">Caja cerrada</app-chip>
+      </a>
+    } @else {
+      <app-chip variant="neutral" [dot]="true">Caja · verificando</app-chip>
+    }
     <a class="ghost-link" routerLink="/venta-local">
       <app-icon name="arrow-left" [size]="14" />
       Volver a mesas

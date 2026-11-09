@@ -6,32 +6,31 @@
   inject,
   signal,
 } from '@angular/core';
+import { mensajeError } from '../../core/api/api.helpers';
 import { AuthService } from '../../core/auth/auth.service';
-import { ActivosService } from '../../core/data/activos.service';
-import { formatearMoneda, round2 } from '../../core/utils/format';
+import { ActivosService, type AlertaActivo } from '../../core/data/activos.service';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-type Severidad = 'critica' | 'alta' | 'media';
-type TipoAlerta = 'preventiva' | 'dano' | 'garantia';
+// El backend solo emite severidades `alta` y `media`. `alta` es el nivel más
+// grave disponible, por eso se muestra con el tono crítico de la vista.
+type Severidad = 'critica' | 'media';
+type TipoAlerta = 'dano' | 'vida_util' | 'mantenimiento_preventivo';
 type Filtro = 'todas' | Severidad;
 
-interface AlertaBase {
+interface AlertaVista {
+  key: string;
   id: number;
-  titulo: string;
-  detalle: string;
   activoId: number;
+  activo: string;
   tipo: TipoAlerta;
   severidad: Severidad;
-  fecha: string;
-  costo: number;
-}
-
-interface AlertaVista extends AlertaBase {
-  activo: string;
+  mensaje: string;
+  mantenimientoId?: number;
+  fecha: string | null;
   programada: boolean;
 }
 
@@ -49,80 +48,39 @@ interface SeveridadVista {
 
 const SEVERIDADES: Record<Severidad, SeveridadVista> = {
   critica: { label: 'Crítica', tono: 'danger', icono: 'warning-circle' },
-  alta: { label: 'Alta', tono: 'warning', icono: 'flame' },
-  media: { label: 'Media', tono: 'info', icono: 'clock' },
+  media: { label: 'Media', tono: 'warning', icono: 'clock' },
 };
 
 const TIPO_ICONO: Record<TipoAlerta, IconName> = {
-  preventiva: 'clock',
   dano: 'warning-circle',
-  garantia: 'check-circle',
+  vida_util: 'arrow-clockwise',
+  mantenimiento_preventivo: 'clock',
 };
 
-const ALERTAS_BASE: readonly AlertaBase[] = [
-  {
-    id: 1,
-    titulo: 'Compresor con ruido y vibración',
-    detalle: 'Reportada por el cocinero · enfría por debajo de 2 °C',
-    activoId: 2,
-    tipo: 'dano',
-    severidad: 'critica',
-    fecha: 'Hoy · 08:15',
-    costo: 380,
-  },
-  {
-    id: 2,
-    titulo: 'Fuga de gas refrigerante',
-    detalle: 'Detectada en la revisión de rutina · temperatura inestable',
-    activoId: 2,
-    tipo: 'dano',
-    severidad: 'critica',
-    fecha: '13 oct · 18:40',
-    costo: 480,
-  },
-  {
-    id: 3,
-    titulo: 'Extractor de grasa sin limpieza profunda',
-    detalle: '60 días desde el último servicio · riesgo de incendio',
-    activoId: 1,
-    tipo: 'preventiva',
-    severidad: 'alta',
-    fecha: '12 oct · 10:05',
-    costo: 180,
-  },
-  {
-    id: 4,
-    titulo: 'Garantía por vencer en 9 días',
-    detalle: 'Conviene revisar el equipo antes del vencimiento',
-    activoId: 4,
-    tipo: 'garantia',
-    severidad: 'alta',
-    fecha: '23 oct · 9 días',
-    costo: 0,
-  },
-  {
-    id: 5,
-    titulo: 'Cambio de aceite de freidora',
-    detalle: 'Mantenimiento preventivo · cada 120 horas de uso',
-    activoId: 4,
-    tipo: 'preventiva',
-    severidad: 'media',
-    fecha: '20 oct · 6 días',
-    costo: 120,
-  },
-  {
-    id: 6,
-    titulo: 'Calibración anual pendiente',
-    detalle: 'Certificado de calibración vence el 30 nov 2026',
-    activoId: 5,
-    tipo: 'preventiva',
-    severidad: 'media',
-    fecha: '30 nov · 47 días',
-    costo: 90,
-  },
-];
+const TIPO_LABEL: Record<TipoAlerta, string> = {
+  dano: 'Daño reportado',
+  vida_util: 'Vida útil superada',
+  mantenimiento_preventivo: 'Mantenimiento preventivo',
+};
 
-const HOY_ISO = '2026-10-14';
+const normalizarTipo = (tipo: string): TipoAlerta =>
+  tipo === 'dano' || tipo === 'vida_util' || tipo === 'mantenimiento_preventivo'
+    ? tipo
+    : 'mantenimiento_preventivo';
+
+const normalizarSeveridad = (severidad: string): Severidad =>
+  severidad === 'alta' || severidad === 'critica' ? 'critica' : 'media';
+
+const claveAlerta = (alerta: AlertaActivo): string =>
+  `${alerta.activoId}:${alerta.tipo}:${alerta.mantenimientoId ?? 0}`;
+
+const hoyLima = (): string =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 
 const sumarDias = (fecha: string, dias: number): string => {
   const partes = fecha.split('-');
@@ -178,21 +136,44 @@ export class ActivosAlertasPage {
 
   private toastTimer: number | null = null;
 
-  readonly moneda = formatearMoneda;
-
   readonly filtro = signal<Filtro>('todas');
   readonly busqueda = signal<string>('');
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
+  readonly cargando = signal<boolean>(false);
+  readonly error = signal<string | null>(null);
+  readonly programando = signal<boolean>(false);
 
-  readonly alertas = signal<AlertaVista[]>(
-    ALERTAS_BASE.map((base) => ({
-      ...base,
-      activo:
-        this.activos.activos().find((activo) => activo.id === base.activoId)?.nombre ??
-        'Activo sin registrar',
-      programada: false,
-    })),
+  private readonly programadas = signal<ReadonlySet<string>>(new Set());
+
+  readonly alertas = computed<AlertaVista[]>(() => {
+    const programadas = this.programadas();
+    return this.activos
+      .alertas()
+      .map((alerta) => {
+        const key = claveAlerta(alerta);
+        return {
+          key,
+          id: alerta.id,
+          activoId: alerta.activoId,
+          activo: alerta.activo,
+          tipo: normalizarTipo(alerta.tipo),
+          severidad: normalizarSeveridad(alerta.severidad),
+          mensaje: alerta.mensaje,
+          mantenimientoId: alerta.mantenimientoId,
+          fecha: null,
+          programada: programadas.has(key),
+        };
+      })
+      .sort(
+        (a, b) =>
+          this.peso(a.severidad) - this.peso(b.severidad) ||
+          a.activo.localeCompare(b.activo),
+      );
+  });
+
+  readonly mostrarFecha = computed<boolean>(() =>
+    this.alertas().some((alerta) => Boolean(alerta.fecha)),
   );
 
   readonly filtros = computed<FiltroVista[]>(() => {
@@ -203,11 +184,6 @@ export class ActivosAlertasPage {
         id: 'critica',
         label: 'Críticas',
         total: lista.filter((alerta) => alerta.severidad === 'critica').length,
-      },
-      {
-        id: 'alta',
-        label: 'Altas',
-        total: lista.filter((alerta) => alerta.severidad === 'alta').length,
       },
       {
         id: 'media',
@@ -224,7 +200,7 @@ export class ActivosAlertasPage {
       const coincideFiltro = activo === 'todas' || alerta.severidad === activo;
       const coincideBusqueda =
         termino.length === 0 ||
-        alerta.titulo.toLowerCase().includes(termino) ||
+        alerta.mensaje.toLowerCase().includes(termino) ||
         alerta.activo.toLowerCase().includes(termino);
       return coincideFiltro && coincideBusqueda;
     });
@@ -241,19 +217,11 @@ export class ActivosAlertasPage {
   );
 
   readonly preventivas = computed<number>(
-    () => this.alertas().filter((alerta) => alerta.tipo === 'preventiva').length,
+    () => this.alertas().filter((alerta) => alerta.tipo === 'mantenimiento_preventivo').length,
   );
 
-  readonly garantias = computed<number>(
-    () => this.alertas().filter((alerta) => alerta.tipo === 'garantia').length,
-  );
-
-  readonly costoEstimado = computed<number>(() =>
-    round2(
-      this.alertas()
-        .filter((alerta) => !alerta.programada)
-        .reduce((suma, alerta) => suma + alerta.costo, 0),
-    ),
+  readonly vidaUtil = computed<number>(
+    () => this.alertas().filter((alerta) => alerta.tipo === 'vida_util').length,
   );
 
   readonly detenidos = computed<number>(() => this.activos.enReparacion().length);
@@ -263,20 +231,20 @@ export class ActivosAlertasPage {
   readonly subtitulo = computed<string>(
     () =>
       `${this.alertas().length} alertas activas · ${this.criticas()} críticas · ${
-        this.garantias()
-      } garantía por vencer · ${this.activos.activos().length} activos registrados`,
+        this.vidaUtil()
+      } por vida útil · ${this.activos.activos().length} activos registrados`,
   );
 
   readonly notaCritica = computed<string>(() => {
     const primera = this.alertas().find(
       (alerta) => alerta.severidad === 'critica' && !alerta.programada,
     );
-    return primera ? `${primera.activo} · falla recurrente del mismo equipo` : 'Sin críticas pendientes';
+    return primera ? `${primera.activo} · ${primera.mensaje}` : 'Sin alertas críticas pendientes';
   });
 
   constructor() {
     void this.activos.cargar({ limit: 100 });
-    void this.activos.cargarAlertas();
+    void this.cargarAlertas();
 
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
@@ -293,6 +261,10 @@ export class ActivosAlertasPage {
     return TIPO_ICONO[alerta.tipo];
   }
 
+  tipoEtiqueta(alerta: AlertaVista): string {
+    return TIPO_LABEL[alerta.tipo];
+  }
+
   filtrar(filtro: Filtro): void {
     this.filtro.set(filtro);
   }
@@ -301,26 +273,56 @@ export class ActivosAlertasPage {
     this.busqueda.set((event.target as HTMLInputElement).value);
   }
 
-  programar(alerta: AlertaVista): void {
-    if (alerta.programada) {
-      return;
+  async cargarAlertas(): Promise<boolean> {
+    this.cargando.set(true);
+    this.error.set(null);
+    const ok = await this.activos.cargarAlertas();
+    if (!ok) {
+      this.error.set(this.activos.error() ?? 'No se pudieron cargar las alertas.');
     }
-    const fecha = sumarDias(HOY_ISO, 7);
-    const usuarioId = this.auth.usuario()?.id ?? 1;
-    this.activos.programarPreventivo(
-      alerta.activoId,
-      fecha,
-      `${alerta.titulo} · ${alerta.activo}`,
-      usuarioId,
-      alerta.tipo === 'dano' ? 'correctivo' : 'preventivo',
-    );
-    this.alertas.update((lista) =>
-      lista.map((actual) => (actual.id === alerta.id ? { ...actual, programada: true } : actual)),
-    );
-    this.avisar(`Mantenimiento programado · ${alerta.activo} · ${fechaLarga(fecha)}`);
+    this.cargando.set(false);
+    return ok;
   }
 
-  programarPrioritaria(): void {
+  reintentar(): void {
+    void this.cargarAlertas();
+  }
+
+  async programar(alerta: AlertaVista): Promise<void> {
+    if (alerta.programada || this.programando()) {
+      return;
+    }
+    this.programando.set(true);
+    try {
+      const fecha = sumarDias(hoyLima(), 7);
+      const usuarioId = this.auth.usuario()?.id ?? 1;
+      // Las alertas se atienden con un mantenimiento preventivo programado:
+      // es un tipo válido y evita el 422 de un correctivo sin `decision`.
+      const ok = await this.activos.programarPreventivo(
+        alerta.activoId,
+        fecha,
+        `${alerta.mensaje} · ${alerta.activo}`,
+        usuarioId,
+        'preventivo',
+      );
+      if (!ok) {
+        this.avisar(
+          this.activos.error() ?? 'No se pudo programar el mantenimiento.',
+          true,
+        );
+        return;
+      }
+      this.programadas.update((set) => new Set(set).add(alerta.key));
+      await this.cargarAlertas();
+      this.avisar(`Mantenimiento programado · ${alerta.activo} · ${fechaLarga(fecha)}`);
+    } catch (error) {
+      this.avisar(mensajeError(error), true);
+    } finally {
+      this.programando.set(false);
+    }
+  }
+
+  async programarPrioritaria(): Promise<void> {
     const pendiente = this.alertas()
       .filter((alerta) => !alerta.programada)
       .sort((a, b) => this.peso(a.severidad) - this.peso(b.severidad))[0];
@@ -329,18 +331,11 @@ export class ActivosAlertasPage {
       this.avisar('Todas las alertas ya están programadas', true);
       return;
     }
-    this.programar(pendiente);
+    await this.programar(pendiente);
   }
 
   private peso(severidad: Severidad): number {
-    switch (severidad) {
-      case 'critica':
-        return 0;
-      case 'alta':
-        return 1;
-      default:
-        return 2;
-    }
+    return severidad === 'critica' ? 0 : 1;
   }
 
   private avisar(mensaje: string, error = false): void {

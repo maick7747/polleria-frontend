@@ -9,6 +9,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import type { ClienteResumen, DeliveryPropioVista } from '../../core/api/api.mappers';
 import { USE_API } from '../../core/api/api.config';
+import { AuthService } from '../../core/auth/auth.service';
 import { ClientesService } from '../../core/data/clientes.service';
 import {
   COSTO_DELIVERY_PROPIO,
@@ -89,6 +90,7 @@ const HASTA_INICIAL = USE_API ? HOY : '';
 export class DeliveryPropioPage {
   private readonly delivery = inject(DeliveryService);
   private readonly clientesService = inject(ClientesService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -169,6 +171,18 @@ export class DeliveryPropioPage {
       pedido.estado !== 'cancelado' &&
       pedido.estadoPago !== 'pagado' &&
       Number(this.montoRecibido() || pedido.total) >= pedido.total - 0.009
+    );
+  });
+
+  readonly puedeCancelar = computed<boolean>(() => {
+    const pedido = this.seleccionado();
+    return (
+      pedido !== null &&
+      this.auth.hasAnyRole(['Cajero', 'Dueño/Admin'] as const) &&
+      pedido.estado !== 'cancelado' &&
+      pedido.estado !== 'cobrado' &&
+      pedido.estadoPago !== 'pagado' &&
+      pedido.estadoEntrega !== 'entregado'
     );
   });
 

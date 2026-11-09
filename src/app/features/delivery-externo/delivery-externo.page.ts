@@ -105,7 +105,6 @@ export class DeliveryExternoPage {
   readonly liqMonto = signal<string>('');
   readonly liquidando = signal<boolean>(false);
 
-  readonly motivo = signal<string>('');
   readonly accionando = signal<boolean>(false);
 
   readonly toast = signal<string>('');
@@ -120,6 +119,16 @@ export class DeliveryExternoPage {
   readonly liquidacionesMeta = this.delivery.liquidacionesMeta;
   readonly liquidacionesCargando = this.delivery.liquidacionesCargando;
   readonly liquidacionesError = this.delivery.liquidacionesError;
+
+  readonly puedeCancelar = computed<boolean>(() => {
+    const pedido = this.seleccionado();
+    return (
+      pedido !== null &&
+      pedido.estado !== 'cancelado' &&
+      pedido.estado !== 'cobrado' &&
+      pedido.estadoPago !== 'pagado'
+    );
+  });
 
   readonly seleccionado = computed<DeliveryExternoVista | null>(() => {
     const id = this.seleccionId();
@@ -284,7 +293,6 @@ export class DeliveryExternoPage {
 
   seleccionar(id: number): void {
     this.seleccionId.set(id);
-    this.motivo.set('');
     this.sincronizarUrl();
   }
 
@@ -294,10 +302,6 @@ export class DeliveryExternoPage {
     } else {
       void this.cargar();
     }
-  }
-
-  onMotivo(event: Event): void {
-    this.motivo.set((event.target as HTMLTextAreaElement).value);
   }
 
   onLiqPlataforma(event: Event): void {
@@ -325,24 +329,6 @@ export class DeliveryExternoPage {
       !ok,
     );
     if (ok) {
-      await this.cargar();
-    }
-  }
-
-  async cancelar(): Promise<void> {
-    const pedido = this.seleccionado();
-    if (!pedido || this.accionando()) {
-      return;
-    }
-    this.accionando.set(true);
-    const ok = await this.delivery.cancelarExterno(pedido.id, this.motivo().trim() || undefined);
-    this.accionando.set(false);
-    this.avisar(
-      ok ? `${pedido.numero} cancelado` : this.error() ?? 'No se pudo cancelar.',
-      !ok,
-    );
-    if (ok) {
-      this.motivo.set('');
       await this.cargar();
     }
   }

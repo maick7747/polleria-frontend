@@ -11,7 +11,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { CuadreService } from '../../core/data/cuadre.service';
 import { GastosService, type GastosQuery } from '../../core/data/gastos.service';
 import type { CategoriaGasto, Gasto } from '../../core/models';
-import { abreviarNombre, formatearMoneda, round2 } from '../../core/utils/format';
+import { descargarBlob } from '../../core/utils/descarga';
+import { abreviarNombre, formatearMoneda, round2, turnoActual } from '../../core/utils/format';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -80,6 +81,7 @@ export class GastosPage {
   readonly categorias = CATEGORIAS;
   readonly moneda = formatearMoneda;
   readonly saldoInicial = SALDO_INICIAL;
+  readonly turno = turnoActual();
 
   readonly categoria = signal<CategoriaGasto>('servicios_basicos');
   readonly monto = signal<string>('120.00');
@@ -129,7 +131,7 @@ export class GastosPage {
 
   readonly subtitulo = computed<string>(
     () =>
-      `Turno tarde · ${this.gastosHoy()} gastos hoy · ${formatearMoneda(
+      `${this.turno} · ${this.gastosHoy()} gastos hoy · ${formatearMoneda(
         this.gastos.totalHoy(),
       )} egresado de caja chica`,
   );
@@ -287,7 +289,48 @@ export class GastosPage {
   }
 
   exportar(): void {
-    this.avisar('Exportación simulada · gastos del turno');
+    const filas = this.lista();
+    if (filas.length === 0) {
+      this.avisar('No hay gastos cargados para exportar.', true);
+      return;
+    }
+
+    const encabezado = ['Fecha', 'Categoría', 'Descripción', 'Método', 'Monto', 'Usuario'];
+    const lineas = [
+      encabezado,
+      ...filas.map((gasto) => [
+        gasto.fecha.slice(0, 10),
+        this.etiquetaCategoria(gasto.categoria),
+        gasto.descripcion,
+        this.etiquetaMetodo(gasto.metodoPago),
+        gasto.monto.toFixed(2),
+        this.registradoPorGasto(gasto),
+      ]),
+    ];
+    const csv =
+      '\uFEFF' +
+      lineas
+        .map((fila) => fila.map((celda) => this.csvCelda(celda)).join(','))
+        .join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+
+    descargarBlob(blob, `gastos-${HOY}.csv`);
+    this.avisar(`Exportados ${filas.length} gastos a CSV`);
+  }
+
+  private etiquetaMetodo(metodo: Gasto['metodoPago']): string {
+    const etiquetas: Record<Gasto['metodoPago'], string> = {
+      efectivo: 'Efectivo',
+      tarjeta: 'Tarjeta',
+      yape: 'Yape',
+      plin: 'Plin',
+      transferencia: 'Transferencia',
+    };
+    return etiquetas[metodo];
+  }
+
+  private csvCelda(valor: string): string {
+    return `"${valor.replace(/"/g, '""')}"`;
   }
 
   etiquetaCategoria(categoria: CategoriaGasto): string {

@@ -159,12 +159,8 @@
         <span class="impacto__sep"></span>
 
         <div class="impacto__row">
-          <span>Food cost del turno</span>
-          <span class="impacto__delta">
-            {{ foodCostBase }}%
-            <app-icon name="arrow-right" [size]="11" />
-            <strong>{{ foodCost() }}%</strong>
-          </span>
+          <span>{{ foodCostEtiqueta() }}</span>
+          <strong>{{ foodCostTexto() }}</strong>
         </div>
         <div class="impacto__row">
           <span>Stock {{ insumo()?.nombre ?? '—' }}</span>

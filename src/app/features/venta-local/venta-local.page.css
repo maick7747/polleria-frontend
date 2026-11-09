@@ -24,6 +24,18 @@
   background: var(--c-success);
 }
 
+.caja--cerrada {
+  color: var(--c-danger);
+}
+
+.caja--cerrada .caja__dot {
+  background: var(--c-danger);
+}
+
+.caja--verificando .caja__dot {
+  background: var(--c-text-3);
+}
+
 .ghost-link {
   display: inline-flex;
   align-items: center;

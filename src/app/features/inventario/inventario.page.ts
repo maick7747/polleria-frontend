@@ -81,6 +81,7 @@ export class InventarioPage {
   readonly meta = this.inventario.meta;
   readonly cargando = this.inventario.cargando;
   readonly error = this.inventario.error;
+  readonly consumoError = this.inventario.consumoError;
 
   readonly filas = computed<FilaInventario[]>(() =>
     this.inventario.insumos().map((insumo) => this.fila(insumo)),
@@ -89,6 +90,39 @@ export class InventarioPage {
   readonly alertas = computed<FilaInventario[]>(() =>
     this.inventario.alertas().map((insumo) => this.fila(insumo)),
   );
+
+  /**
+   * Cobertura mínima real: mínimo de `stock / (consumo / 7)` entre los insumos
+   * con consumo > 0. `null` si no hay datos de consumo.
+   */
+  readonly coberturaMinima = computed<number | null>(() => {
+    const consumo = this.inventario.consumo();
+    if (consumo.size === 0) {
+      return null;
+    }
+    const vistos = new Set<number>();
+    let minima: number | null = null;
+    for (const insumo of [...this.inventario.insumos(), ...this.inventario.alertas()]) {
+      if (vistos.has(insumo.id)) {
+        continue;
+      }
+      vistos.add(insumo.id);
+      const total = consumo.get(insumo.id) ?? 0;
+      if (total <= 0) {
+        continue;
+      }
+      const dias = insumo.stockActual / (total / 7);
+      if (minima === null || dias < minima) {
+        minima = dias;
+      }
+    }
+    return minima === null ? null : Math.round(minima * 10) / 10;
+  });
+
+  readonly coberturaTexto = computed<string>(() => {
+    const valor = this.coberturaMinima();
+    return valor === null ? '—' : `${valor} días`;
+  });
 
   readonly visibles = computed<FilaInventario[]>(() => this.filas());
 
@@ -141,7 +175,8 @@ export class InventarioPage {
     }
     this.buscarTimer = window.setTimeout(() => {
       this.pagina.set(1);
-      void this.cargar();
+    void this.cargar();
+    void this.inventario.cargarConsumo(7);
     }, 350);
   }
 
@@ -158,6 +193,7 @@ export class InventarioPage {
 
   recargar(): void {
     void this.cargar();
+    void this.inventario.cargarConsumo(7);
   }
 
   cantidad(valor: number, unidad: string): string {

@@ -118,15 +118,28 @@ export class InventarioAjustarPage {
 
   readonly consumo7 = computed<number>(() => {
     const insumo = this.seleccionado();
-    return insumo ? redondear1(insumo.stock * 4) : 0;
-  });
-
-  readonly cobertura = computed<number>(() => {
-    const diario = this.consumo7() / 7;
-    if (diario <= 0) {
+    if (!insumo) {
       return 0;
     }
-    return Math.max(1, Math.round(this.nuevoMinimo() / diario));
+    return redondear1(this.inventario.consumoDe(insumo.id) ?? 0);
+  });
+
+  readonly consumoSinDatos = computed<boolean>(() => {
+    const insumo = this.seleccionado();
+    return insumo !== null && this.consumo7() <= 0;
+  });
+
+  readonly cobertura = computed<number | null>(() => {
+    const diario = this.consumo7() / 7;
+    if (diario <= 0) {
+      return null;
+    }
+    return redondear1(this.nuevoMinimo() / diario);
+  });
+
+  readonly coberturaTexto = computed<string>(() => {
+    const valor = this.cobertura();
+    return valor === null ? '—' : `${valor} días`;
   });
 
   readonly paso = computed<number>(() => {
@@ -222,7 +235,10 @@ export class InventarioAjustarPage {
   }
 
   private async inicializar(): Promise<void> {
-    await this.inventario.cargar({ limit: 100 });
+    await Promise.all([
+      this.inventario.cargar({ limit: 100 }),
+      this.inventario.cargarConsumo(7),
+    ]);
     const lista = this.inventario.insumos();
     const actual = lista.find((insumo) => insumo.id === this.insumoId());
     const inicial =

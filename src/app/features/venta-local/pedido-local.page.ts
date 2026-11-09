@@ -10,6 +10,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { esApiError, mensajeError } from '../../core/api/api.helpers';
 import { USE_API } from '../../core/api/api.config';
+import { CuadreService } from '../../core/data/cuadre.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { FichasService } from '../../core/data/fichas.service';
 import { InventarioService } from '../../core/data/inventario.service';
@@ -24,6 +25,7 @@ import {
   formatearMoneda,
   minutosEntre,
   round2,
+  turnoActual,
 } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -56,6 +58,7 @@ export class PedidoLocalPage {
   private readonly router = inject(Router);
   private readonly mesas = inject(MesasService);
   private readonly cuentas = inject(CuentasService);
+  private readonly cuadre = inject(CuadreService);
   private readonly fichas = inject(FichasService);
   private readonly inventario = inject(InventarioService);
   private readonly auth = inject(AuthService);
@@ -76,6 +79,12 @@ export class PedidoLocalPage {
   readonly observacion = signal<string>('');
   readonly toast = signal<string>('');
   readonly cajaCerrada = signal<string>('');
+  readonly turno = turnoActual();
+  readonly cajaAbierta = computed(() => this.cuadre.estado() === 'abierta');
+  readonly cajaCerradaEstado = computed(() => {
+    const estado = this.cuadre.estado();
+    return estado === 'cerrada' || estado === 'sin_cuadre';
+  });
   readonly enviando = signal(false);
   readonly moneda = formatearMoneda;
 
@@ -154,6 +163,7 @@ export class PedidoLocalPage {
   constructor() {
     this.restaurarBorrador();
     void this.inicializar();
+    void this.cuadre.cargar();
     this.destroyRef.onDestroy(() => {
       if (this.temporizador !== null) {
         window.clearTimeout(this.temporizador);

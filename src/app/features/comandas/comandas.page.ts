@@ -11,7 +11,13 @@ import { CuentasService } from '../../core/data/cuentas.service';
 import { PagosService } from '../../core/data/pagos.service';
 import { PedidosService } from '../../core/data/pedidos.service';
 import type { Pedido } from '../../core/models';
-import { formatearMoneda, formatearNumero, minutosEntre } from '../../core/utils/format';
+import { USE_API } from '../../core/api/api.config';
+import {
+  formatearMoneda,
+  formatearNumero,
+  horaActual,
+  minutosEntre,
+} from '../../core/utils/format';
 import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -70,7 +76,12 @@ export class ComandasPage {
   readonly busqueda = signal('');
   readonly seleccionadaId = signal<number | null>(null);
   readonly ahora = signal(Date.now());
-  readonly error = this.pedidos.error;
+  // Marca de la última carga que terminó OK; el reloj de `ahora` solo mueve
+  // los minutos transcurridos y no debe fingir datos frescos.
+  private readonly ultimaCarga = signal<number | null>(null);
+  // Solo una carga visible puede encender el banner: los refrescos silenciosos
+  // no deben parpadear un error transitorio cada 15 s.
+  readonly error = signal<string | null>(null);
 
   constructor() {
     const reloj = window.setInterval(() => this.ahora.set(Date.now()), 30000);
@@ -79,7 +90,7 @@ export class ComandasPage {
       destroyRef: this.destroyRef,
       alVolverVisible: false,
       tarea: async () => {
-        await this.pagos.cargar(undefined, true);
+        await this.cargar(true);
       },
     });
     document.addEventListener('visibilitychange', this.alCambiarVisibilidad);
@@ -96,12 +107,26 @@ export class ComandasPage {
     }
   };
 
-  private async cargar(): Promise<void> {
-    await Promise.all([
+  private async cargar(silencioso = false): Promise<boolean> {
+    const [kdsOk, cuentasOk, pagosOk] = await Promise.all([
       this.pedidos.cargarKds(),
-      this.cuentas.cargar(),
-      this.pagos.cargar(),
+      this.cuentas.cargar(silencioso),
+      this.pagos.cargar(undefined, silencioso),
     ]);
+    // El sello de hora solo avanza cuando la carga completa terminó bien (en
+    // modo demo las cargas devuelven `false`, pero los mocks son válidos).
+    const ok = kdsOk && cuentasOk && pagosOk;
+    if (ok || !USE_API) {
+      this.ultimaCarga.set(Date.now());
+    }
+    if (ok) {
+      this.error.set(null);
+    } else if (!silencioso) {
+      this.error.set(
+        this.pedidos.error() ?? this.cuentas.error() ?? this.pagos.error(),
+      );
+    }
+    return ok;
   }
 
   reintentar(): void {
@@ -206,11 +231,8 @@ export class ComandasPage {
 
   readonly subtitulo = computed<string>(() => {
     const listas = this.conteos().listas;
-    const hora = new Date(this.ahora()).toLocaleTimeString('es-PE', {
-      timeZone: 'America/Lima',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const sello = this.ultimaCarga();
+    const hora = sello === null ? '—' : horaActual(new Date(sello));
     return `Turno tarde · ${this.conteos().todas} abiertas · ${listas} ${
       listas === 1 ? 'lista' : 'listas'
     } · actualizado ${hora}`;

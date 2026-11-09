@@ -509,6 +509,7 @@
   font-family: var(--font-body);
   font-size: 13px;
   font-weight: 600;
+  text-decoration: none;
   transition: background var(--dur) var(--ease);
 }
 

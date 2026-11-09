@@ -330,6 +330,18 @@
             </button>
           </div>
 
+          @if (puedeCancelar()) {
+            <div class="accion-linea">
+              <a
+                class="btn-ghost-dark btn-ghost-dark--bloque"
+                [routerLink]="['/cancelacion-delivery', pedido.id]"
+              >
+                <app-icon name="x" [size]="14" />
+                Cancelar pedido
+              </a>
+            </div>
+          }
+
           <span class="resumen__sep"></span>
 
           <span class="detalle__label">Cobro contraentrega</span>

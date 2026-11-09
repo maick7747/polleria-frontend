@@ -24,6 +24,10 @@
   background: var(--c-success);
 }
 
+.live--stale .live__dot {
+  background: var(--c-text-3);
+}
+
 /* Hero */
 .hero {
   height: 250px;

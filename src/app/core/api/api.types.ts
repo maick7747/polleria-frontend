@@ -83,6 +83,21 @@ export interface ClienteDto {
   referencia?: string | null;
 }
 
+export type DocumentoValidacionModo = 'mock' | 'sandbox' | 'manual';
+export type DocumentoValidacionFuente = 'mock' | 'apiperu' | 'openruc' | 'ninguno';
+
+export interface DocumentoValidacionDto {
+  valido: boolean;
+  tipo_documento: 'DNI' | 'RUC';
+  numero_documento: string;
+  nombre: string | null;
+  motivo: string | null;
+  datos: Record<string, unknown> | null;
+  modo: DocumentoValidacionModo;
+  fuente: DocumentoValidacionFuente;
+  cache?: boolean;
+}
+
 export interface PedidoDto {
   id: number;
   numero: string;

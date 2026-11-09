@@ -21,19 +21,7 @@
     </div>
   }
 
-  <div class="stepper">
-    <div class="stepper__pasos">
-      <span class="paso paso--activo">1</span>
-      <span class="paso__label paso__label--activo">Apertura</span>
-      <span class="paso__linea"></span>
-      <span class="paso">2</span>
-      <span class="paso__label">Operación</span>
-      <span class="paso__linea"></span>
-      <span class="paso">3</span>
-      <span class="paso__label">Cierre</span>
-    </div>
-    <span class="stepper__meta">El cuadre es diario · umbral de diferencia S/ 0</span>
-  </div>
+  <app-stepper [pasos]="pasos()" [meta]="metaStepper()" />
 
   <div class="board">
     <app-panel class="turno-panel">

@@ -4,10 +4,6 @@
       <app-icon name="gear" [size]="11" />
       Solo Dueño/Admin
     </span>
-    <button type="button" class="ghost-link" (click)="auditoria()">
-      <app-icon name="arrow-clockwise" [size]="14" />
-      Auditoría
-    </button>
   </div>
 
   <div class="tabs">
@@ -38,6 +34,20 @@
     </div>
     <span class="tabs__meta">Los cambios aplican a todos los turnos desde el próximo pedido</span>
   </div>
+
+  @if (cargando()) {
+    <div class="cargando-banner" role="status">
+      <app-icon name="arrow-clockwise" [size]="14" />
+      Cargando configuración…
+    </div>
+  }
+
+  @if (errorCarga()) {
+    <div class="error-banner" role="alert">
+      <span>{{ errorCarga() }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
 
   <div class="board">
     <app-panel class="panel">
@@ -99,9 +109,7 @@
                   />
                   <span class="field__suffix">%</span>
                 </div>
-                <span class="switch is-on is-locked" title="Siempre activo">
-                  <span class="knob"></span>
-                </span>
+                <span class="row__state is-on" title="Siempre activo">Siempre activo</span>
               </div>
 
               <div class="row">
@@ -126,9 +134,7 @@
                   />
                   <span class="field__suffix">min</span>
                 </div>
-                <span class="switch is-on is-locked" title="Siempre activo">
-                  <span class="knob"></span>
-                </span>
+                <span class="row__state is-on" title="Siempre activo">Siempre activo</span>
               </div>
 
               <div class="row">
@@ -153,9 +159,7 @@
                   />
                   <span class="field__suffix">%</span>
                 </div>
-                <span class="switch is-on is-locked" title="Siempre activo">
-                  <span class="knob"></span>
-                </span>
+                <span class="row__state is-on" title="Siempre activo">Siempre activo</span>
               </div>
 
               <div class="row">
@@ -180,9 +184,7 @@
                   />
                   <span class="field__suffix">%</span>
                 </div>
-                <span class="switch is-on is-locked" title="Siempre activo">
-                  <span class="knob"></span>
-                </span>
+                <span class="row__state is-on" title="Siempre activo">Siempre activo</span>
               </div>
 
               <div class="row">
@@ -207,9 +209,7 @@
                     aria-label="Tarifa de delivery propio"
                   />
                 </div>
-                <span class="switch is-on is-locked" title="Siempre activo">
-                  <span class="knob"></span>
-                </span>
+                <span class="row__state is-on" title="Siempre activo">Siempre activo</span>
               </div>
 
               <div class="row">
@@ -346,7 +346,13 @@
         <header class="save__head">
           <h2 class="save__title">Guardar cambios</h2>
           <span class="save__badge" [class.is-dirty]="hayCambios()">
-            {{ hayCambios() ? 'Sin guardar' : 'Guardado' }}
+            {{
+              !haySnapshot()
+                ? 'Sin cargar'
+                : hayCambios()
+                  ? 'Sin guardar'
+                  : 'Guardado'
+            }}
           </span>
         </header>
 
@@ -358,7 +364,7 @@
           </span>
         </div>
 
-        @if (hayCambios()) {
+        @if (haySnapshot() && hayCambios()) {
           <div class="changes">
             @for (cambio of cambios(); track cambio.etiqueta) {
               <div class="change">
@@ -372,6 +378,8 @@
               </div>
             }
           </div>
+        } @else if (!haySnapshot()) {
+          <p class="save__clean">Los parámetros aún no se cargaron del servidor.</p>
         } @else {
           <p class="save__clean">Todo está guardado.</p>
         }
@@ -395,9 +403,14 @@
 
         <div class="save__grow"></div>
 
-        <button type="button" class="btn-brand" (click)="guardar()">
+        <button
+          type="button"
+          class="btn-brand"
+          [disabled]="guardando() || cargando() || !haySnapshot()"
+          (click)="guardar()"
+        >
           <app-icon name="check" [size]="15" />
-          Guardar cambios
+          {{ guardando() ? 'Guardando…' : 'Guardar cambios' }}
         </button>
 
         <button type="button" class="btn-outline" (click)="descartar()">

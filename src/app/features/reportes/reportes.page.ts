@@ -14,6 +14,7 @@ import {
 } from '../../core/data/reportes.service';
 import type { ReporteTipoId, ReporteVista } from '../../core/api/api.mappers';
 import { descargarBlob } from '../../core/utils/descarga';
+import { horaActual } from '../../core/utils/format';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { PanelComponent } from '../../shared/components/panel/panel';
@@ -283,6 +284,7 @@ export class ReportesPage {
   readonly errorDescarga = signal<string>('');
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
+  readonly actualizado = signal<string>('--:--');
 
   readonly cargando = this.reportes.cargando;
   readonly error = this.reportes.error;
@@ -446,6 +448,7 @@ export class ReportesPage {
     this.errorDescarga.set('');
     const ok = await this.reportes.consultar(this.seleccion(), this.filtros());
     if (ok) {
+      this.actualizado.set(horaActual());
       this.sincronizarUrl();
     }
   }

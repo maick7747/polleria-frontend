@@ -14,6 +14,7 @@ import {
   type EstadoSugerencia,
   type OrdenCompra,
 } from '../../core/data/compras.service';
+import { InventarioService } from '../../core/data/inventario.service';
 import { formatearMoneda, formatearNumero, turnoActual } from '../../core/utils/format';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -55,6 +56,7 @@ const LIMITES = [10, 20, 50, 100];
 })
 export class ComprasPage {
   private readonly compras = inject(ComprasService);
+  private readonly inventario = inject(InventarioService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -116,6 +118,39 @@ export class ComprasPage {
   });
 
   readonly filasOrdenes = computed<OrdenCompra[]>(() => this.ordenes());
+
+  /**
+   * Cobertura mínima de los insumos sugeridos: mínimo de
+   * `stock / (consumo / 7)`. `null` si no hay consumo conocido.
+   */
+  readonly coberturaSugerencia = computed<number | null>(() => {
+    const consumo = this.inventario.consumo();
+    let minima: number | null = null;
+    for (const fila of this.filasSugerencia()) {
+      const total = consumo.get(fila.insumoId) ?? 0;
+      if (total <= 0) {
+        continue;
+      }
+      const dias = fila.stock / (total / 7);
+      if (minima === null || dias < minima) {
+        minima = dias;
+      }
+    }
+    return minima === null ? null : Math.round(minima * 10) / 10;
+  });
+
+  /** Aviso con los nombres reales de la sugerencia (máx. 2). */
+  readonly alertaSugerencia = computed<string>(() => {
+    const nombres = this.filasSugerencia()
+      .filter((fila) => fila.estado !== 'ok')
+      .slice(0, 2)
+      .map((fila) => fila.nombre);
+    if (nombres.length === 0) {
+      return 'Sin insumos bajo mínimo';
+    }
+    const verbo = nombres.length === 1 ? 'queda' : 'quedan';
+    return `${nombres.join(' y ')} ${verbo} bajo mínimo si no entra la orden hoy.`;
+  });
 
   constructor() {
     const params = this.route.snapshot.queryParamMap;
@@ -316,6 +351,7 @@ export class ComprasPage {
       this.compras.cargarSugerencias(),
       this.compras.cargarProveedores(),
       this.compras.contarEntradas(),
+      this.inventario.cargarConsumo(7),
     ]);
     await this.cargarLista();
   }

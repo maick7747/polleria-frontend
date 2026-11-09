@@ -23,8 +23,7 @@
           <span
             class="filter__count"
             [class.is-danger]="item.id === 'critica'"
-            [class.is-warning]="item.id === 'alta'"
-            [class.is-info]="item.id === 'media'"
+            [class.is-warning]="item.id === 'media'"
           >
             {{ item.total }}
           </span>
@@ -43,6 +42,16 @@
     </label>
   </div>
 
+  @if (error()) {
+    <div class="alerta-error" role="alert">
+      <app-icon name="warning-circle" [size]="14" />
+      <span>{{ error() }}</span>
+      <button type="button" class="alerta-error__retry" [disabled]="cargando()" (click)="reintentar()">
+        {{ cargando() ? 'Reintentando…' : 'Reintentar' }}
+      </button>
+    </div>
+  }
+
   <div class="board">
     <app-panel class="panel">
       <div class="tray">
@@ -51,77 +60,87 @@
             <span class="bar"></span>
             <h2>Bandeja de alertas</h2>
           </div>
-          <span class="tray__meta">Ordenadas por severidad y fecha</span>
+          <span class="tray__meta">Ordenadas por severidad</span>
         </header>
 
         <div class="tray__cols">
           <span class="col-alerta">ALERTA</span>
           <span class="col-activo">ACTIVO</span>
           <span class="col-severidad">SEVERIDAD</span>
-          <span class="col-fecha">FECHA</span>
+          @if (mostrarFecha()) {
+            <span class="col-fecha">FECHA</span>
+          }
           <span class="col-accion">ACCIÓN</span>
         </div>
 
         <div class="tray__body">
-          @for (alerta of visibles(); track alerta.id) {
-            <div
-              class="fila"
-              [class.is-critical]="alerta.severidad === 'critica' && !alerta.programada"
-              [class.is-done]="alerta.programada"
-            >
-              <div class="col-alerta fila__alerta">
-                <app-icon
-                  [name]="icono(alerta)"
-                  [size]="16"
-                  [class]="'fila__icon fila__icon--' + alerta.severidad"
-                />
-                <div class="fila__text">
-                  <span class="fila__title">{{ alerta.titulo }}</span>
-                  <span class="fila__detail">{{ alerta.detalle }}</span>
-                </div>
-              </div>
-
-              <span class="col-activo fila__activo">{{ alerta.activo }}</span>
-
-              <span class="col-severidad">
-                <app-chip [variant]="severidad(alerta).tono">{{ severidad(alerta).label }}</app-chip>
-              </span>
-
-              <span
-                class="col-fecha fila__fecha"
-                [class.is-danger]="alerta.severidad === 'critica'"
-                [class.is-warning]="alerta.severidad === 'alta'"
+          @if (cargando()) {
+            <div class="tray__empty">Cargando alertas…</div>
+          } @else if (error()) {
+            <div class="tray__empty">No se pudieron cargar las alertas.</div>
+          } @else {
+            @for (alerta of visibles(); track alerta.key) {
+              <div
+                class="fila"
+                [class.is-critical]="alerta.severidad === 'critica' && !alerta.programada"
+                [class.is-done]="alerta.programada"
               >
-                {{ alerta.fecha }}
-              </span>
+                <div class="col-alerta fila__alerta">
+                  <app-icon
+                    [name]="icono(alerta)"
+                    [size]="16"
+                    [class]="'fila__icon fila__icon--' + alerta.severidad"
+                  />
+                  <div class="fila__text">
+                    <span class="fila__title">{{ alerta.mensaje }}</span>
+                    <span class="fila__detail">{{ tipoEtiqueta(alerta) }}</span>
+                  </div>
+                </div>
 
-              <span class="col-accion fila__accion">
-                @if (alerta.programada) {
-                  <span class="done">
-                    <app-icon name="check" [size]="11" />
-                    Programada
-                  </span>
-                } @else {
-                  <button
-                    type="button"
-                    class="action"
-                    [class.action--critical]="alerta.severidad === 'critica'"
-                    (click)="programar(alerta)"
+                <span class="col-activo fila__activo">{{ alerta.activo }}</span>
+
+                <span class="col-severidad">
+                  <app-chip [variant]="severidad(alerta).tono">{{ severidad(alerta).label }}</app-chip>
+                </span>
+
+                @if (mostrarFecha()) {
+                  <span
+                    class="col-fecha fila__fecha"
+                    [class.is-danger]="alerta.severidad === 'critica'"
                   >
-                    {{ alerta.severidad === 'critica' ? 'Atender' : 'Programar' }}
-                    <app-icon name="caret-right" [size]="10" />
-                  </button>
+                    {{ alerta.fecha ?? '—' }}
+                  </span>
                 }
-              </span>
-            </div>
-          } @empty {
-            <div class="tray__empty">No hay alertas que coincidan con el filtro.</div>
+
+                <span class="col-accion fila__accion">
+                  @if (alerta.programada) {
+                    <span class="done">
+                      <app-icon name="check" [size]="11" />
+                      Programada
+                    </span>
+                  } @else {
+                    <button
+                      type="button"
+                      class="action"
+                      [class.action--critical]="alerta.severidad === 'critica'"
+                      [disabled]="programando()"
+                      (click)="programar(alerta)"
+                    >
+                      {{ alerta.severidad === 'critica' ? 'Atender' : 'Programar' }}
+                      <app-icon name="caret-right" [size]="10" />
+                    </button>
+                  }
+                </span>
+              </div>
+            } @empty {
+              <div class="tray__empty">No hay alertas que coincidan con el filtro.</div>
+            }
           }
         </div>
 
         <footer class="tray__foot">
-          <span>Las alertas críticas notifican al dueño al instante</span>
-          <span>{{ visibles().length }} de {{ alertas().length }} · sincronizado 08:40</span>
+          <span>Una alerta crítica requiere atención inmediata</span>
+          <span>{{ visibles().length }} de {{ alertas().length }}</span>
         </footer>
       </div>
     </app-panel>
@@ -152,8 +171,8 @@
             <strong>{{ preventivas() }}</strong>
           </div>
           <div>
-            <span>Garantía por vencer</span>
-            <strong class="is-warning">{{ garantias() }}</strong>
+            <span>Vida útil superada</span>
+            <strong class="is-warning">{{ vidaUtil() }}</strong>
           </div>
           <div>
             <span>Activos detenidos</span>
@@ -163,16 +182,11 @@
 
         <div class="dark-sep"></div>
 
-        <div class="sum__cost">
-          <span>Costo estimado de atención</span>
-          <strong>{{ moneda(costoEstimado()) }}</strong>
-        </div>
-
         <div class="sum__grow"></div>
 
         <div class="sum__info">
           <app-icon name="warning-circle" [size]="12" />
-          <span>Programar antes del viernes evita detener la cocina en fin de semana.</span>
+          <span>Atender las alertas críticas evita detener la cocina en pleno servicio.</span>
         </div>
 
         <button type="button" class="btn-brand" (click)="programarPrioritaria()">
@@ -192,7 +206,7 @@
     </span>
     <span class="pie__item">
       <app-icon name="clock" [size]="12" />
-      Las preventivas se calculan desde el último servicio
+      Las preventivas se calculan desde el mantenimiento programado
     </span>
   </div>
 

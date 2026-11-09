@@ -2,7 +2,7 @@
   title="Compra de insumos"
   [subtitle]="
     'Sugerencia por stock bajo · ' +
-    (usaApi ? 'datos en vivo' : proveedoresSugerencia().length + ' proveedores') +
+    (usaApi ? 'datos del servidor' : proveedoresSugerencia().length + ' proveedores') +
     ' · ' + turno
   "
 >
@@ -154,7 +154,11 @@
             <span class="stats__grow"></span>
             <span class="coverage">
               <app-icon name="warning-circle" [size]="11" />
-              2 días de cobertura
+              @if (coberturaSugerencia() === null) {
+                sin datos de consumo
+              } @else {
+                {{ coberturaSugerencia() }} días de cobertura
+              }
             </span>
           </div>
 
@@ -413,7 +417,7 @@
           <span class="orden__warn-icon">
             <app-icon name="warning-circle" [size]="14" />
           </span>
-          <p>Pollo y papa quedan bajo mínimo si no entra la orden hoy.</p>
+          <p>{{ alertaSugerencia() }}</p>
         </div>
 
         <span class="orden__grow"></span>

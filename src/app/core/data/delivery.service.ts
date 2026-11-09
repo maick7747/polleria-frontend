@@ -5,6 +5,10 @@ import { round2 } from '../utils/format';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
 import { mensajeError } from '../api/api.helpers';
+import {
+  leerResultadoCancelacion,
+  type ResultadoCancelacion,
+} from '../api/cancelacion.helpers';
 import type {
   ApiList,
   DeliveryExternoPedidoDto,
@@ -684,10 +688,18 @@ export class DeliveryService {
     }
   }
 
-  async cancelarExterno(pedidoId: number, motivo?: string): Promise<boolean> {
+  /**
+   * `POST /api/delivery-externo/pedidos/:id/cancelar`: la plataforma cancela y
+   * el backend revierte el stock. Devuelve los movimientos repuestos o `null`
+   * si falló (el mensaje queda en `externosError`).
+   */
+  async cancelarExterno(
+    pedidoId: number,
+    motivo?: string,
+  ): Promise<ResultadoCancelacion | null> {
     if (!USE_API) {
       this.actualizarExternoLocal(pedidoId, { estado: 'cancelado' });
-      return true;
+      return leerResultadoCancelacion({ movimientos_inventario: 0 });
     }
 
     this.externosError.set(null);
@@ -699,10 +711,10 @@ export class DeliveryService {
         ),
       );
       this.reemplazarExterno(toDeliveryExterno(dto));
-      return true;
+      return leerResultadoCancelacion(dto);
     } catch (error) {
       this.externosError.set(mensajeError(error));
-      return false;
+      return null;
     }
   }
 

@@ -1,9 +1,21 @@
 ﻿<app-shell title="Nuevo pedido · Local" [subtitle]="fecha()">
   <div actions class="header-actions">
-    <span class="caja">
-      <span class="caja__dot"></span>
-      Caja abierta · {{ turno }}
-    </span>
+    @if (cajaAbierta()) {
+      <span class="caja">
+        <span class="caja__dot"></span>
+        Caja abierta · {{ turno }}
+      </span>
+    } @else if (cajaCerradaEstado()) {
+      <span class="caja caja--cerrada">
+        <span class="caja__dot"></span>
+        Caja cerrada
+      </span>
+    } @else {
+      <span class="caja caja--verificando">
+        <span class="caja__dot"></span>
+        Caja · verificando
+      </span>
+    }
     <a class="ghost-link" routerLink="/dashboard">
       <app-icon name="arrow-left" [size]="14" />
       Volver al pulso

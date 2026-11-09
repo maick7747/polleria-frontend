@@ -1,0 +1,62 @@
+<div class="stepper">
+  <div class="stepper__pasos">
+    @for (paso of pasos(); track $index; let i = $index, last = $last) {
+      @if (paso.estado === 'done') {
+        @if (paso.link) {
+          <a
+            class="paso-done"
+            [routerLink]="paso.link"
+            [attr.aria-label]="'Ir a ' + paso.etiqueta"
+            [attr.title]="'Ir a ' + paso.etiqueta"
+          >
+            <app-icon name="check" [size]="11" />
+          </a>
+        } @else {
+          <span class="paso-done" aria-hidden="true">
+            <app-icon name="check" [size]="11" />
+          </span>
+        }
+      } @else if (paso.link) {
+        <a
+          class="paso"
+          [class.paso--activo]="paso.estado === 'active'"
+          [routerLink]="paso.link"
+          [attr.aria-label]="'Ir a ' + paso.etiqueta"
+          [attr.title]="'Ir a ' + paso.etiqueta"
+        >
+          {{ paso.numero ?? i + 1 }}
+        </a>
+      } @else {
+        <span class="paso" [class.paso--activo]="paso.estado === 'active'">
+          {{ paso.numero ?? i + 1 }}
+        </span>
+      }
+
+      @if (paso.link) {
+        <a
+          class="paso__label paso__label--link"
+          [class.paso__label--activo]="paso.estado === 'active'"
+          [routerLink]="paso.link"
+        >
+          {{ paso.etiqueta }}
+        </a>
+      } @else {
+        <span class="paso__label" [class.paso__label--activo]="paso.estado === 'active'">
+          {{ paso.etiqueta }}
+        </span>
+      }
+
+      @if (paso.meta) {
+        <span class="paso__meta">{{ paso.meta }}</span>
+      }
+
+      @if (!last) {
+        <span class="paso__linea" aria-hidden="true"></span>
+      }
+    }
+  </div>
+
+  @if (meta()) {
+    <span class="stepper__meta">{{ meta() }}</span>
+  }
+</div>

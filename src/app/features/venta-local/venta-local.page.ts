@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { CuadreService } from '../../core/data/cuadre.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { MesasService } from '../../core/data/mesas.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
@@ -69,6 +70,7 @@ const TAMANO_FILA = 5;
 export class VentaLocalPage {
   private readonly mesas = inject(MesasService);
   private readonly cuentas = inject(CuentasService);
+  private readonly cuadre = inject(CuadreService);
   private readonly notificaciones = inject(NotificacionesService);
   private readonly realtime = inject(RealtimeService);
   private readonly router = inject(Router);
@@ -99,6 +101,11 @@ export class VentaLocalPage {
   readonly moneda = formatearMoneda;
   readonly turno = turnoActual();
   readonly hora = formatearHora;
+  readonly cajaAbierta = computed(() => this.cuadre.estado() === 'abierta');
+  readonly cajaCerradaEstado = computed(() => {
+    const estado = this.cuadre.estado();
+    return estado === 'cerrada' || estado === 'sin_cuadre';
+  });
 
   readonly tarjetas = computed<MesaVista[]>(() => {
     const ahora = this.ahora();
@@ -202,6 +209,7 @@ export class VentaLocalPage {
       }
     });
     void this.cargar();
+    void this.cuadre.cargar();
   }
 
   @HostListener('document:keydown.escape')

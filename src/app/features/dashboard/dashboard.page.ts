@@ -4,10 +4,11 @@ import {
   computed,
   DestroyRef,
   inject,
+  signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DashboardService } from '../../core/data/dashboard.service';
-import { formatearNumero } from '../../core/utils/format';
+import { formatearNumero, horaActual } from '../../core/utils/format';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 import { ButtonComponent } from '../../shared/components/button/button';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
@@ -52,6 +53,9 @@ export class DashboardPage {
   private readonly dashboard = inject(DashboardService);
   private readonly destroyRef = inject(DestroyRef);
   private temporizador: number | null = null;
+  // Late cada 30 s para reevaluar la frescura del "actualizado" sin depender
+  // de que lleguen datos nuevos.
+  private readonly reloj = signal(Date.now());
 
   readonly kpis = this.dashboard.kpis;
   readonly fecha = this.dashboard.fecha;
@@ -75,13 +79,21 @@ export class DashboardPage {
   readonly mermasHoy = this.dashboard.mermasHoy;
   readonly registrosMerma = this.dashboard.registrosMerma;
   readonly porcentajeMeta = this.dashboard.porcentajeMeta;
+  readonly topsMeta = computed<string>(() => {
+    const mostrados = this.kpis().topPlatos.length;
+    const carta = this.kpis().totalPlatosCarta;
+    return carta > 0 ? `${mostrados} de ${carta} platos` : `${mostrados} platos`;
+  });
 
   constructor() {
     void this.dashboard.cargarDatos();
 
     // Auto-refresco cada 30 s, solo con la pestaña visible. Al volver el foco
     // o la visibilidad se refresca de inmediato (ETag: un 304 no repinta).
-    this.temporizador = window.setInterval(() => this.refrescarSiVisible(), REFRESCO_MS);
+    this.temporizador = window.setInterval(() => {
+      this.reloj.set(Date.now());
+      this.refrescarSiVisible();
+    }, REFRESCO_MS);
     document.addEventListener('visibilitychange', this.alCambiarVisibilidad);
     window.addEventListener('focus', this.alRecuperarFoco);
 
@@ -96,12 +108,14 @@ export class DashboardPage {
 
   private readonly alCambiarVisibilidad = (): void => {
     if (document.visibilityState === 'visible') {
+      this.reloj.set(Date.now());
       void this.dashboard.refrescarSilencioso();
     }
   };
 
   private readonly alRecuperarFoco = (): void => {
     if (document.visibilityState === 'visible') {
+      this.reloj.set(Date.now());
       void this.dashboard.refrescarSilencioso();
     }
   };
@@ -116,6 +130,22 @@ export class DashboardPage {
   reintentar(): void {
     void this.dashboard.cargarDatos();
   }
+
+  // "En vivo" solo si la última respuesta con datos tiene ≤ 2 min; con polling
+  // de 30 s el indicador no debe prometer frescura que no tiene.
+  readonly actualizadoReciente = computed<boolean>(() => {
+    const referencia = this.reloj();
+    const marca = /^(\d{1,2}):(\d{2})$/.exec(this.actualizado());
+    if (!marca) {
+      return false;
+    }
+    const [hora, minuto] = horaActual(new Date(referencia)).split(':').map(Number);
+    const ahoraMin = hora * 60 + minuto;
+    const marcaMin = Number(marca[1]) * 60 + Number(marca[2]);
+    const bruto = ahoraMin - marcaMin;
+    const diferencia = bruto < -12 * 60 ? bruto + 24 * 60 : bruto;
+    return diferencia >= -1 && diferencia <= 2;
+  });
 
   readonly ventas = computed(() => formatearNumero(this.kpis().ventasHoy));
   readonly meta = computed(() => formatearNumero(this.kpis().metaVentas ?? 0));

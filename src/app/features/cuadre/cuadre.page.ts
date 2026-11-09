@@ -34,9 +34,14 @@ import { IconComponent, type IconName } from '../../shared/components/icon/icon'
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header';
+import {
+  StepperComponent,
+  type PasoStepper,
+} from '../../shared/components/stepper/stepper';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 type VistaCuadre = 'dia' | 'historial';
+type EstadoCaja = 'abierta' | 'cerrada' | 'sin_cuadre';
 
 const LIMITES = [10, 20, 50, 100];
 
@@ -81,6 +86,7 @@ const METODOS: readonly { metodo: MetodoPago; etiqueta: string; icono: IconName 
     PaginadorComponent,
     PanelComponent,
     SectionHeaderComponent,
+    StepperComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './cuadre.page.html',
@@ -113,6 +119,7 @@ export class CuadrePage {
   readonly motivoReapertura = this.cuadre.motivoReapertura;
   readonly cuadreId = this.cuadre.cuadreId;
   readonly fondoInicial = this.cuadre.fondoInicial;
+  readonly fechaCierre = this.cuadre.fechaCierre;
   readonly totalVentas = this.cuadre.totalVentas;
   readonly totalEgresos = this.cuadre.totalEgresos;
   readonly esperado = this.cuadre.montoEsperado;
@@ -180,6 +187,75 @@ export class CuadrePage {
   readonly cuadrado = computed<boolean>(() => this.diferenciaAbs() < 0.005);
 
   readonly totalCobros = computed<number>(() => this.pagos.pagos().length);
+
+  readonly cobrosTexto = computed<string>(
+    () => `${this.totalCobros()} ${this.totalCobros() === 1 ? 'cobro' : 'cobros'}`,
+  );
+
+  // Estado real de la caja del día: manda la señal `estado` del servicio y,
+  // como respaldo, `abierta`. Antes el stepper era decorativo y "Cierre en
+  // curso" se mostraba aunque la caja estuviera cerrada.
+  readonly estadoCaja = computed<EstadoCaja>(() => {
+    const estado = this.estado();
+    if (estado === 'cerrada') {
+      return 'cerrada';
+    }
+    if (estado === 'abierta' || this.abierta()) {
+      return 'abierta';
+    }
+    return 'sin_cuadre';
+  });
+
+  readonly metaStepper = computed<string>(() => {
+    const estado = this.estadoCaja();
+    const sufijo =
+      estado === 'cerrada'
+        ? 'Caja cerrada'
+        : estado === 'abierta'
+          ? 'Caja abierta'
+          : 'Sin caja abierta hoy';
+    return `${this.turno} · 11:00 – 22:00 · umbral de diferencia S/ 0.00 · ${sufijo}`;
+  });
+
+  readonly pasos = computed<readonly PasoStepper[]>(() => {
+    const estado = this.estadoCaja();
+    const sinCaja = estado === 'sin_cuadre';
+    const reabiertaEn = this.reabiertoEn();
+    const fechaCierre = this.fechaCierre();
+
+    const apertura: PasoStepper = {
+      numero: 1,
+      etiqueta: 'Apertura',
+      estado: sinCaja ? 'active' : 'done',
+      meta: sinCaja
+        ? 'sin abrir'
+        : `${this.aperturaHora()} · ${this.moneda(this.fondoInicial())}`,
+      link: '/cuadre-caja/apertura',
+    };
+
+    const operacion: PasoStepper = {
+      numero: 2,
+      etiqueta: 'Operación',
+      estado: estado === 'abierta' ? 'active' : estado === 'cerrada' ? 'done' : 'pending',
+      meta: sinCaja ? 'pendiente' : this.cobrosTexto(),
+    };
+
+    const cierre: PasoStepper = {
+      numero: 3,
+      etiqueta: 'Cierre',
+      estado: estado === 'cerrada' ? 'done' : 'pending',
+      meta:
+        estado === 'cerrada'
+          ? fechaCierre
+            ? `cerrada ${formatearHora(fechaCierre)}`
+            : 'cerrada'
+          : estado === 'abierta' && reabiertaEn
+            ? `reabierta ${formatearHora(reabiertaEn)}`
+            : 'pendiente',
+    };
+
+    return [apertura, operacion, cierre];
+  });
 
   readonly desglose = computed<DesglosePago[]>(() =>
     METODOS.map((metodo) => {
@@ -331,7 +407,10 @@ export class CuadrePage {
   }
 
   imprimir(): void {
-    this.avisar('Arqueo enviado a impresión · simulado');
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.print();
   }
 
   async descargarPdfDia(): Promise<void> {

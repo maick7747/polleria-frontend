@@ -59,14 +59,16 @@
         {{ cargando() ? 'Ingresando…' : 'Ingresar' }}
       </button>
 
-      <div class="demo">
-        <span>Accesos de prueba</span>
-        <div class="demo__list">
-          @for (acceso of accesos; track acceso.rol) {
-            <button type="button" (click)="usarAcceso(acceso)">{{ acceso.rol }}</button>
-          }
+      @if (!usaApi) {
+        <div class="demo">
+          <span>Accesos de prueba</span>
+          <div class="demo__list">
+            @for (acceso of accesos; track acceso.rol) {
+              <button type="button" (click)="usarAcceso(acceso)">{{ acceso.rol }}</button>
+            }
+          </div>
         </div>
-      </div>
+      }
     </form>
 
     <p class="foot">Solo personal autorizado · RBAC multi-rol</p>

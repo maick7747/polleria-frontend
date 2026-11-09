@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { esApiError, mensajeError } from '../../core/api/api.helpers';
+import { CuadreService } from '../../core/data/cuadre.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
 import { RealtimeService } from '../../core/data/realtime.service';
@@ -63,6 +64,7 @@ interface CuentaVista {
 })
 export class CerrarCuentaPage {
   private readonly cuentas = inject(CuentasService);
+  private readonly cuadre = inject(CuadreService);
   private readonly notificaciones = inject(NotificacionesService);
   private readonly realtime = inject(RealtimeService);
   private readonly router = inject(Router);
@@ -77,6 +79,11 @@ export class CerrarCuentaPage {
   readonly moneda = formatearMoneda;
   readonly turno = turnoActual();
   readonly hora = formatearHora;
+  readonly cajaAbierta = computed(() => this.cuadre.estado() === 'abierta');
+  readonly cajaCerradaEstado = computed(() => {
+    const estado = this.cuadre.estado();
+    return estado === 'cerrada' || estado === 'sin_cuadre';
+  });
   readonly filtro = signal<FiltroCuentas>('todas');
   readonly seleccionadaId = signal<number | null>(null);
   readonly liberando = signal(false);
@@ -150,6 +157,7 @@ export class CerrarCuentaPage {
       }
     });
     void this.cargar();
+    void this.cuadre.cargar();
   }
 
   private async cargar(): Promise<void> {

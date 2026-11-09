@@ -14,6 +14,7 @@ import { FichasService } from '../../core/data/fichas.service';
 import { PedidosService } from '../../core/data/pedidos.service';
 import { RealtimeService } from '../../core/data/realtime.service';
 import type { PedidoDetalle } from '../../core/models';
+import { turnoActual } from '../../core/utils/format';
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -185,13 +186,14 @@ export class CocinaPage {
 
   readonly subtitulo = computed<string>(() => {
     const lista = this.comandas();
+    const turno = turnoActual();
     if (lista.length === 0) {
-      return 'Turno tarde · sin comandas activas';
+      return `${turno} · sin comandas activas`;
     }
     const promedio = Math.round(
       lista.reduce((suma, comanda) => suma + comanda.minutos, 0) / lista.length,
     );
-    return `Turno tarde · ${lista.length} comandas activas · promedio ${promedio} min`;
+    return `${turno} · ${lista.length} comandas activas · promedio ${promedio} min`;
   });
 
   readonly ritmo = computed<RitmoItem[]>(() => {

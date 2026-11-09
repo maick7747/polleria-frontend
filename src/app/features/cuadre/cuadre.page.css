@@ -27,89 +27,6 @@
   background: #fafafc;
 }
 
-.stepper {
-  flex: 0 0 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.stepper__pasos {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.paso-done {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-pill);
-  background: var(--c-success-soft);
-  color: var(--c-success);
-}
-
-.paso {
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-pill);
-  background: var(--c-neutral-soft);
-  color: var(--c-text-3);
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.paso--activo {
-  background: var(--c-ink);
-  color: var(--c-white);
-  font-weight: 700;
-}
-
-.paso__label {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--c-text-2);
-  white-space: nowrap;
-}
-
-.paso__label--activo {
-  color: var(--c-text);
-}
-
-.paso__label--link:hover {
-  color: var(--c-brand);
-}
-
-.paso__meta {
-  font-size: 11px;
-  color: var(--c-text-3);
-  white-space: nowrap;
-}
-
-.paso__linea {
-  width: 44px;
-  height: 1px;
-  flex: 0 0 44px;
-  background: var(--c-hairline);
-}
-
-.stepper__meta {
-  font-size: 11.5px;
-  color: var(--c-text-3);
-  white-space: nowrap;
-}
-
 .board {
   flex: 1 1 auto;
   min-height: 560px;
@@ -653,9 +570,6 @@
   }
   .desglose__item {
     flex: 1 1 45%;
-  }
-  .stepper__meta {
-    display: none;
   }
 }
 

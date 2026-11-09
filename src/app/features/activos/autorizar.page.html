@@ -61,13 +61,14 @@
               <div class="cmp__col">
                 <span class="cmp__col-title">Reparar</span>
                 <span class="cmp__col-note">servicio técnico</span>
+                @if (recomendacion() === 'reparar') {
+                  <span class="tag tag--brand">Recomendado</span>
+                }
               </div>
               <div class="cmp__col">
                 <span class="cmp__col-title">Reemplazar</span>
                 @if (recomendacion() === 'reemplazar') {
                   <span class="tag tag--brand">Recomendado</span>
-                } @else {
-                  <span class="tag tag--ok">Recomendado</span>
                 }
               </div>
             </div>
@@ -199,7 +200,7 @@
           <div class="dec__rows">
             <div>
               <span>Presupuesto de mantenimiento</span>
-              <strong>{{ moneda(presupuesto) }}</strong>
+              <strong>No registrado</strong>
             </div>
             <div>
               <span>Costo de la decisión</span>
@@ -207,7 +208,7 @@
             </div>
             <div>
               <span>Saldo del fondo de activos</span>
-              <strong class="is-ok">{{ moneda(fondo) }}</strong>
+              <strong>No registrado</strong>
             </div>
           </div>
 
@@ -233,9 +234,14 @@
 
           <div class="dec__grow"></div>
 
-          <button type="button" class="btn-brand" (click)="autorizar()">
+          <button
+            type="button"
+            class="btn-brand"
+            [disabled]="procesando()"
+            (click)="autorizar()"
+          >
             <app-icon name="check" [size]="15" />
-            Autorizar {{ decision() }}
+            {{ procesando() ? 'Procesando…' : 'Autorizar ' + decision() }}
           </button>
 
           <button type="button" class="btn-outline" (click)="adjuntar()">

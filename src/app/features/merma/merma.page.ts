@@ -8,7 +8,6 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { CuadreService } from '../../core/data/cuadre.service';
 import { InventarioService } from '../../core/data/inventario.service';
 import { MermaService, type MermaQuery, type TipoMerma } from '../../core/data/merma.service';
 import { MOCK_USUARIOS } from '../../core/data/mock-data';
@@ -26,7 +25,6 @@ import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 type EstadoFiltro = 'todos' | EstadoMerma;
 
-const FOOD_COST_BASE = 28.4;
 const LIMITES = [10, 20, 50, 100];
 
 const ESTADOS: readonly { id: EstadoFiltro; label: string }[] = [
@@ -62,14 +60,12 @@ export class MermaPage {
   private readonly auth = inject(AuthService);
   private readonly inventario = inject(InventarioService);
   private readonly merma = inject(MermaService);
-  private readonly cuadre = inject(CuadreService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly estados = ESTADOS;
   readonly moneda = formatearMoneda;
-  readonly foodCostBase = FOOD_COST_BASE;
   readonly usaApi = this.merma.usaApi;
 
   readonly estadoFiltro = signal<EstadoFiltro>('todos');
@@ -120,12 +116,19 @@ export class MermaPage {
     Math.max(0, round2(this.stockActual() - this.cantidadNumero())),
   );
 
-  readonly foodCost = computed<number>(() => {
-    const ventas = this.cuadre.totalVentas();
-    if (ventas <= 0) {
-      return FOOD_COST_BASE;
-    }
-    return round2(FOOD_COST_BASE + (this.costo() / ventas) * 100);
+  /**
+   * Sin costo de ventas real en la fuente actual no se puede calcular el food
+   * cost del turno; se devuelve `null` para que la UI muestre «—».
+   */
+  readonly foodCost = computed<number | null>(() => null);
+
+  readonly foodCostEtiqueta = computed<string>(() =>
+    this.foodCost() === null ? 'Food cost (sin datos)' : 'Food cost del turno',
+  );
+
+  readonly foodCostTexto = computed<string>(() => {
+    const valor = this.foodCost();
+    return valor === null ? '—' : `${valor}%`;
   });
 
   readonly puedeAprobar = computed<boolean>(() => {

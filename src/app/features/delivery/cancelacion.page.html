@@ -1,204 +1,342 @@
 <app-shell [title]="nombrePedido()" [subtitle]="subtitulo()">
   <div actions class="header-actions">
-    <span class="state-chip state-chip--warning">
-      <app-icon name="flame" [size]="12" />
-      En cocina · 12 min
-    </span>
-    <a class="ghost-btn" routerLink="/delivery-externo">
+    @if (estado(); as estadoActual) {
+      <span class="state-chip" [class]="'state-chip--' + estadoTono(estadoActual)">
+        <app-icon [name]="estadoIcono(estadoActual)" [size]="12" />
+        {{ estadoTexto(estadoActual) }}
+      </span>
+    }
+    <a class="ghost-btn" [routerLink]="volverRuta()">
       <app-icon name="arrow-left" [size]="14" />
-      Volver al pedido
+      Volver
     </a>
   </div>
 
-  <div class="board">
-    <app-panel class="panel">
-      <div class="panel__inner">
-        <header class="pedido-head">
-          <span class="pedido-id">{{ numero }}</span>
-          <span class="tag tag--info">
-            <app-icon name="package" [size]="10" />
-            {{ plataforma }}
-          </span>
-          <span class="pedido-spacer"></span>
-          <span class="pedido-total">Total del pedido {{ moneda(total()) }}</span>
-        </header>
-
-        <span class="hairline"></span>
-
-        <h2 class="bloque-title">Resumen del pedido</h2>
-
-        <div class="datos">
-          <div class="dato">
-            <span class="dato__label">Cliente</span>
-            <strong class="dato__valor">{{ cliente }}</strong>
-          </div>
-          <div class="dato">
-            <span class="dato__label">Dirección</span>
-            <span class="dato__valor">{{ direccion }}</span>
-          </div>
-          <div class="dato">
-            <span class="dato__label">Referencia</span>
-            <span class="dato__valor dato__valor--muted">{{ referencia }}</span>
-          </div>
-          <div class="dato">
-            <span class="dato__label">Estado actual</span>
-            <span class="dato__valor dato__valor--warning">{{ estadoActual }}</span>
+  @if (cargando()) {
+    <div class="board">
+      <app-panel class="panel">
+        <div class="panel__inner panel__inner--estado">
+          <span class="cargando">Cargando pedido…</span>
+          <p class="panel__hint">Consultando el pedido y sus ítems al servidor.</p>
+        </div>
+      </app-panel>
+    </div>
+  } @else if (errorCarga()) {
+    <div class="board">
+      <app-panel class="panel">
+        <div class="panel__inner panel__inner--estado">
+          <div class="error-banner" role="alert">
+            <span>{{ errorCarga() }}</span>
+            <button type="button" (click)="reintentar()">Reintentar</button>
           </div>
         </div>
+      </app-panel>
+    </div>
+  } @else if (pedido(); as pedidoActual) {
+    <div class="board">
+      <app-panel class="panel">
+        <div class="panel__inner">
+          <header class="pedido-head">
+            <span class="pedido-id">{{ numero() }}</span>
+            <span class="tag tag--info">
+              <app-icon name="package" [size]="10" />
+              {{ canalTexto() }}
+            </span>
+            <span class="pedido-spacer"></span>
+            <span class="pedido-total">Recibido {{ horaPedido() }} · Total {{ moneda(total()) }}</span>
+          </header>
 
-        <span class="hairline"></span>
+          <span class="hairline"></span>
 
-        <div class="items-head">
-          <h2 class="bloque-title">Ítems afectados</h2>
-          <span>{{ totalAfectados() }} ítems · el pedido se anula completo</span>
-        </div>
+          <h2 class="bloque-title">Resumen del pedido</h2>
 
-        <div class="items">
-          @for (item of items; track item.nombre) {
-            <div class="item">
-              <app-icon name="flame" [size]="14" class="item__icon" />
-              <span class="item__name">{{ item.nombre }}</span>
-              <span class="item__qty">×{{ item.cantidad }}</span>
-              <span class="item__price">{{ moneda(item.precio * item.cantidad) }}</span>
+          <div class="datos">
+            <div class="dato">
+              <span class="dato__label">Cliente</span>
+              <strong class="dato__valor">{{ cliente() }}</strong>
             </div>
-          }
+            <div class="dato">
+              <span class="dato__label">{{ ubicacionEtiqueta() }}</span>
+              <span class="dato__valor">{{ ubicacionValor() }}</span>
+            </div>
+            @if (referencia()) {
+              <div class="dato">
+                <span class="dato__label">Referencia</span>
+                <span class="dato__valor dato__valor--muted">{{ referencia() }}</span>
+              </div>
+            }
+            <div class="dato">
+              <span class="dato__label">Estado actual</span>
+              <span class="dato__valor dato__valor--estado">{{ estadoTexto(pedidoActual.estado) }}</span>
+            </div>
+          </div>
+
+          <span class="hairline"></span>
+
+          <div class="items-head">
+            <h2 class="bloque-title">Ítems del pedido</h2>
+            <span>{{ totalItems() }} ítems · se anula el pedido completo</span>
+          </div>
+
+          <div class="items">
+            @for (item of items(); track item.id) {
+              <div class="item">
+                <span class="item__name">{{ item.nombre }}</span>
+                <span class="item__qty">{{ item.cantidad }} × {{ moneda(item.precioUnitario) }}</span>
+                <span class="item__price">{{ moneda(item.subtotal) }}</span>
+              </div>
+            } @empty {
+              <p class="items__vacio">Este pedido no tiene ítems registrados.</p>
+            }
+          </div>
+
+          <div class="totales">
+            <div class="total">
+              <span>Subtotal</span>
+              <strong>{{ moneda(pedidoActual.subtotal) }}</strong>
+            </div>
+            <div class="total">
+              <span>IGV</span>
+              <strong>{{ moneda(pedidoActual.igv) }}</strong>
+            </div>
+            @if (pedidoActual.costoDelivery > 0) {
+              <div class="total">
+                <span>Delivery</span>
+                <strong>{{ moneda(pedidoActual.costoDelivery) }}</strong>
+              </div>
+            }
+            <div class="total total--fuerte">
+              <span>Total</span>
+              <strong>{{ moneda(pedidoActual.total) }}</strong>
+            </div>
+          </div>
+
+          <span class="hairline"></span>
+
+          <h2 class="bloque-title">Motivo de cancelación</h2>
+
+          <div class="motivos" role="group" aria-label="Motivo de cancelación">
+            @for (opcion of motivos; track opcion) {
+              <button
+                type="button"
+                class="motivo"
+                [class.is-active]="motivo() === opcion"
+                [attr.aria-pressed]="motivo() === opcion"
+                [disabled]="!puedeConfirmar()"
+                (click)="elegirMotivo(opcion)"
+              >
+                @if (motivo() === opcion) {
+                  <app-icon name="check" [size]="10" />
+                }
+                {{ opcion }}
+              </button>
+            }
+          </div>
+
+          <span class="hairline"></span>
+
+          <div class="reversa">
+            <app-icon name="arrow-clockwise" [size]="14" class="reversa__icon" />
+            <p class="reversa__texto">
+              <strong>Reversa automática de stock:</strong> al confirmar, el servidor
+              repone los insumos descontados por este pedido. No requiere aprobación
+              del cocinero.
+            </p>
+          </div>
+
+          <span class="panel__grow"></span>
+
+          <span class="panel__note">
+            @if (resultado()) {
+              Cancelación registrada en el historial del pedido
+            } @else {
+              La cancelación queda registrada en el historial del pedido
+            }
+          </span>
         </div>
+      </app-panel>
 
-        <span class="hairline"></span>
+      <app-dark-panel class="confirmar">
+        <div class="conf__inner">
+          <header class="conf__head">
+            <span class="conf__kicker">CONFIRMAR CANCELACIÓN</span>
+            <span class="conf__icon">
+              <app-icon name="warning-circle" [size]="14" />
+            </span>
+          </header>
 
-        <h2 class="bloque-title">Motivo de cancelación</h2>
+          @if (resultado(); as resultadoActual) {
+            <h2 class="conf__titulo">Pedido {{ numero() }} cancelado</h2>
+            <p class="conf__texto">
+              El pedido quedó anulado y el inventario se actualizó según la respuesta
+              del servidor.
+            </p>
 
-        <div class="motivos" role="group" aria-label="Motivo de cancelación">
-          @for (opcion of motivos; track opcion) {
+            <span class="conf__sep"></span>
+
+            <div class="stock" role="status">
+              <app-icon name="arrow-clockwise" [size]="14" class="stock__icon" />
+              <div class="stock__body">
+                <strong>Stock repuesto</strong>
+                @if (resultadoActual.movimientos.length > 0) {
+                  <span>{{ repuestosTexto() }}</span>
+                } @else if (resultadoActual.cantidadMovimientos > 0) {
+                  <span>{{ resultadoActual.cantidadMovimientos }} movimiento(s) de inventario registrados.</span>
+                } @else {
+                  <span>No había stock descontado: no se repuso inventario.</span>
+                }
+              </div>
+            </div>
+
+            <span class="conf__sep"></span>
+
+            <div class="conf__lineas">
+              <div class="conf__linea">
+                <span>Movimientos</span>
+                <strong>{{ resultadoActual.cantidadMovimientos }}</strong>
+              </div>
+              <div class="conf__linea">
+                <span>Importe anulado</span>
+                <strong>{{ moneda(total()) }}</strong>
+              </div>
+              <div class="conf__linea">
+                <span>Motivo</span>
+                <strong>{{ motivo() }}</strong>
+              </div>
+            </div>
+
+            <span class="conf__grow"></span>
+
+            <button type="button" class="accion accion--ghost" (click)="mantener()">
+              <app-icon name="arrow-left" [size]="15" />
+              Volver a la bandeja
+            </button>
+            <span class="conf__pie">La cancelación ya no se puede deshacer.</span>
+          } @else {
+            <h2 class="conf__titulo">Se anulará el pedido {{ numero() }}</h2>
+            <p class="conf__texto">
+              Esta acción no se puede deshacer y se aplica al pedido completo, con
+              todos sus ítems.
+            </p>
+
+            <span class="conf__sep"></span>
+
+            <div class="conf__puntos">
+              <div class="punto">
+                <app-icon name="package" [size]="14" class="punto__icon" />
+                <div class="punto__body">
+                  <strong>Stock devuelto</strong>
+                  <span>
+                    @if (pedidoActual.estado === 'borrador') {
+                      Aún no se descontó stock: no habrá reposición.
+                    } @else {
+                      Los insumos descontados vuelven al inventario.
+                    }
+                  </span>
+                </div>
+              </div>
+              <div class="punto">
+                <app-icon name="x" [size]="14" class="punto__icon" />
+                <div class="punto__body">
+                  <strong>Pedido anulado</strong>
+                  <span>
+                    @if (esExterno()) {
+                      Se marca como cancelado y se notifica a {{ canalTexto() }}.
+                    } @else {
+                      Se marca como cancelado en el sistema.
+                    }
+                  </span>
+                </div>
+              </div>
+              <div class="punto">
+                <app-icon name="receipt" [size]="14" class="punto__icon punto__icon--muted" />
+                <div class="punto__body">
+                  <strong>Sin cobro ni comprobante</strong>
+                  <span>No se genera pago ni documento para este pedido.</span>
+                </div>
+              </div>
+            </div>
+
+            <span class="conf__sep"></span>
+
+            <div class="conf__importe">
+              <span class="conf__importe-label">Importe anulado</span>
+              <div class="conf__importe-valor">
+                <span class="conf__cur">S/</span>
+                <span class="conf__big">{{ total().toFixed(2) }}</span>
+              </div>
+            </div>
+
+            @if (!cancelable()) {
+              <div class="conf__bloqueo" role="status">
+                <app-icon name="warning-circle" [size]="12" />
+                <span>
+                  @if (estado() === 'cancelado') {
+                    Este pedido ya está cancelado.
+                  } @else {
+                    Este pedido ya fue cobrado y no puede cancelarse.
+                  }
+                </span>
+              </div>
+            } @else {
+              <div class="conf__aviso">
+                <app-icon name="warning-circle" [size]="12" />
+                <span>
+                  Motivo registrado: {{ motivo() }}. La merma del plato ya preparado se
+                  evalúa aparte.
+                </span>
+              </div>
+            }
+
+            @if (errorAccion()) {
+              <div class="conf__error" role="alert">
+                <span>{{ errorAccion() }}</span>
+                @if (cancelable()) {
+                  <button type="button" (click)="confirmar()">Reintentar</button>
+                }
+              </div>
+            }
+
+            <span class="conf__grow"></span>
+
             <button
               type="button"
-              class="motivo"
-              [class.is-active]="motivo() === opcion"
-              [attr.aria-pressed]="motivo() === opcion"
+              class="accion accion--peligro"
               [disabled]="!puedeConfirmar()"
-              (click)="elegirMotivo(opcion)"
+              (click)="confirmar()"
             >
-              @if (motivo() === opcion) {
-                <app-icon name="check" [size]="10" />
-              }
-              {{ opcion }}
+              <app-icon name="x" [size]="16" />
+              {{ procesando() ? 'Cancelando…' : 'Cancelar pedido' }}
             </button>
+            <button
+              type="button"
+              class="accion accion--ghost"
+              [disabled]="procesando()"
+              (click)="mantener()"
+            >
+              <app-icon name="arrow-left" [size]="15" />
+              Mantener pedido
+            </button>
+            <span class="conf__pie">El stock se devuelve automáticamente.</span>
           }
         </div>
+      </app-dark-panel>
+    </div>
 
-        <span class="hairline"></span>
-
-        <div class="reversa">
-          <app-icon name="arrow-clockwise" [size]="14" class="reversa__icon" />
-          <p class="reversa__texto">
-            <strong>Reversa automática de stock:</strong> los insumos del pedido vuelven
-            al inventario al confirmar. No requiere aprobación del cocinero.
-          </p>
-        </div>
-
-        <span class="panel__grow"></span>
-
-        <span class="panel__note">
-          @if (confirmado()) {
-            Stock repuesto: {{ insumosRepuestos() }} · cancelación registrada
-          } @else {
-            La cancelación queda registrada en el historial del pedido
-          }
-        </span>
-      </div>
-    </app-panel>
-
-    <app-dark-panel class="confirmar">
-      <div class="conf__inner">
-        <header class="conf__head">
-          <span class="conf__kicker">CONFIRMAR CANCELACIÓN</span>
-          <span class="conf__icon">
-            <app-icon name="warning-circle" [size]="14" />
-          </span>
-        </header>
-
-        <h2 class="conf__titulo">Se anulará el pedido {{ numero }}</h2>
-        <p class="conf__texto">
-          Esta acción no se puede deshacer. El pedido ya está en cocina y aún no salió
-          a reparto.
-        </p>
-
-        <span class="conf__sep"></span>
-
-        <div class="conf__puntos">
-          <div class="punto">
-            <app-icon name="package" [size]="14" class="punto__icon" />
-            <div class="punto__body">
-              <strong>Stock devuelto</strong>
-              <span>{{ insumosRepuestos() }} vuelven al inventario.</span>
-            </div>
-          </div>
-          <div class="punto">
-            <app-icon name="x" [size]="14" class="punto__icon" />
-            <div class="punto__body">
-              <strong>Pedido anulado en {{ plataforma }}</strong>
-              <span>La app notifica al cliente y cierra el pedido.</span>
-            </div>
-          </div>
-          <div class="punto">
-            <app-icon name="receipt" [size]="14" class="punto__icon punto__icon--muted" />
-            <div class="punto__body">
-              <strong>Sin cobro ni comisión</strong>
-              <span>No se genera comprobante ni descuento.</span>
-            </div>
-          </div>
-        </div>
-
-        <span class="conf__sep"></span>
-
-        <div class="conf__importe">
-          <span class="conf__importe-label">Importe anulado</span>
-          <div class="conf__importe-valor">
-            <span class="conf__cur">S/</span>
-            <span class="conf__big">{{ total().toFixed(2) }}</span>
-          </div>
-        </div>
-
-        <div class="conf__aviso">
-          <app-icon name="warning-circle" [size]="12" />
-          <span>
-            Motivo registrado: {{ motivo() }}. La merma del plato ya preparado se
-            evalúa aparte.
-          </span>
-        </div>
-
-        <span class="conf__grow"></span>
-
-        <button
-          type="button"
-          class="accion accion--peligro"
-          [disabled]="!puedeConfirmar()"
-          (click)="confirmar()"
-        >
-          <app-icon name="x" [size]="16" />
-          {{ confirmado() ? 'Cancelación registrada' : 'Cancelar pedido' }}
-        </button>
-        <button
-          type="button"
-          class="accion accion--ghost"
-          [disabled]="!puedeConfirmar()"
-          (click)="mantener()"
-        >
-          <app-icon name="arrow-left" [size]="15" />
-          Mantener pedido
-        </button>
-        <span class="conf__pie">El stock se devuelve automáticamente.</span>
-      </div>
-    </app-dark-panel>
-  </div>
-
-  <div class="pie">
-    <span class="pie__note">
-      <app-icon name="arrow-clockwise" [size]="13" />
-      La reversa de stock es automática y no requiere aprobación del cocinero.
-    </span>
-    <span class="pie__meta">{{ plataforma }} procesa el reembolso al cliente</span>
-  </div>
+    <div class="pie">
+      <span class="pie__note">
+        <app-icon name="arrow-clockwise" [size]="13" />
+        La reversa de stock es automática y no requiere aprobación del cocinero.
+      </span>
+      <span class="pie__meta">
+        @if (esExterno()) {
+          {{ canalTexto() }} gestiona el reembolso al cliente
+        } @else {
+          Sin pago registrado · no se genera comprobante
+        }
+      </span>
+    </div>
+  }
 
   @if (toast()) {
     <div class="toast" role="status">

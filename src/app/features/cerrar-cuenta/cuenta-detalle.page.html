@@ -1,9 +1,21 @@
 ﻿<app-shell [title]="titulo()" [subtitle]="subtitulo()">
   <div actions class="header-actions">
-    <span class="caja">
-      <span class="caja__dot"></span>
-      Caja abierta · {{ turno }}
-    </span>
+    @if (cajaAbierta()) {
+      <span class="caja">
+        <span class="caja__dot"></span>
+        Caja abierta · {{ turno }}
+      </span>
+    } @else if (cajaCerradaEstado()) {
+      <a class="caja caja--cerrada" routerLink="/cuadre-caja/apertura">
+        <span class="caja__dot"></span>
+        Caja cerrada
+      </a>
+    } @else {
+      <span class="caja caja--verificando">
+        <span class="caja__dot"></span>
+        Caja · verificando
+      </span>
+    }
     <a class="ghost-link" routerLink="/cerrar-cuenta">
       <app-icon name="arrow-left" [size]="14" />
       Volver a mesas

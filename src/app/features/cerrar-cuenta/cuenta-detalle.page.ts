@@ -9,6 +9,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { esApiError, mensajeError } from '../../core/api/api.helpers';
+import { CuadreService } from '../../core/data/cuadre.service';
 import { CuentasService } from '../../core/data/cuentas.service';
 import type { MetodoPago } from '../../core/models';
 import {
@@ -59,6 +60,7 @@ export class CuentaDetallePage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly cuentas = inject(CuentasService);
+  private readonly cuadre = inject(CuadreService);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -66,6 +68,11 @@ export class CuentaDetallePage {
   readonly metodos = METODOS;
   readonly moneda = formatearMoneda;
   readonly turno = turnoActual();
+  readonly cajaAbierta = computed(() => this.cuadre.estado() === 'abierta');
+  readonly cajaCerradaEstado = computed(() => {
+    const estado = this.cuadre.estado();
+    return estado === 'cerrada' || estado === 'sin_cuadre';
+  });
 
   readonly cuenta = computed(() => this.cuentas.porId(this.cuentaId) ?? null);
   readonly metodo = signal<MetodoPago>('efectivo');
@@ -83,6 +90,7 @@ export class CuentaDetallePage {
 
   constructor() {
     void this.cargar();
+    void this.cuadre.cargar();
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);

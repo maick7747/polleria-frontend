@@ -376,39 +376,42 @@ export class ActivosService {
     }
   }
 
-  programarPreventivo(
+  async programarPreventivo(
     activoId: number,
     fecha: string,
     descripcion: string,
     _usuarioId: number,
     tipo: TipoMantenimiento = 'preventivo',
-  ): Mantenimiento {
+  ): Promise<boolean> {
     const entrada: MantenimientoEntrada = {
       tipo,
       fecha: new Date().toISOString().slice(0, 10),
       programadaPara: fecha,
       descripcion,
     };
-    const mantenimiento = this.mantenimientoLocal(activoId, entrada);
-    this.demoMantenimientos.unshift(mantenimiento);
-    this.historialMantenimientos.update((lista) => [mantenimiento, ...lista]);
-    this.fijarProximoLocal(activoId, fecha);
-    if (USE_API) {
-      void this.crearMantenimiento(activoId, entrada);
+
+    if (!USE_API) {
+      const mantenimiento = this.mantenimientoLocal(activoId, entrada);
+      this.demoMantenimientos.unshift(mantenimiento);
+      this.historialMantenimientos.update((lista) => [mantenimiento, ...lista]);
+      this.fijarProximoLocal(activoId, fecha);
+      return true;
     }
-    return mantenimiento;
+
+    const creado = await this.crearMantenimiento(activoId, entrada);
+    return creado !== null;
   }
 
-  autorizarDecision(
+  async autorizarDecision(
     activoId: number,
     decision: 'reparar' | 'reemplazar',
     costos: { reparacion: number; reposicion: number },
     descripcion: string,
-    _usuarioId: number,
-  ): Mantenimiento {
+    usuarioId: number,
+  ): Promise<boolean> {
     const hoy = new Date().toISOString().slice(0, 10);
     const mantenimiento: Mantenimiento = {
-      id: ++this.secuencia,
+      id: USE_API ? 0 : ++this.secuencia,
       activoId,
       tipo: 'correctivo',
       fecha: hoy,
@@ -417,17 +420,26 @@ export class ActivosService {
       costoReposicion: round2(costos.reposicion),
       decision,
       estado: 'programado',
-      usuarioId: _usuarioId,
+      usuarioId,
     };
-    this.demoMantenimientos.unshift(mantenimiento);
-    this.historialMantenimientos.update((lista) => [mantenimiento, ...lista]);
-    this.aplicarDecisionLocal(activoId, decision, descripcion, hoy);
 
-    if (USE_API) {
-      void this.autorizarRemoto(activoId, mantenimiento, decision);
+    if (!USE_API) {
+      this.demoMantenimientos.unshift(mantenimiento);
+      this.historialMantenimientos.update((lista) => [mantenimiento, ...lista]);
+      this.aplicarDecisionLocal(activoId, decision, descripcion, hoy);
+      return true;
     }
 
-    return mantenimiento;
+    this.cargando.set(true);
+    this.error.set(null);
+    try {
+      return await this.autorizarRemoto(activoId, mantenimiento, decision);
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return false;
+    } finally {
+      this.cargando.set(false);
+    }
   }
 
   cambiarEstadoMantenimiento(id: number, estado: EstadoMantenimiento): void {
@@ -461,11 +473,11 @@ export class ActivosService {
     }
   }
 
-  private async autorizarRemoto(
+  async autorizarRemoto(
     activoId: number,
     mantenimiento: Mantenimiento,
     decision: 'reparar' | 'reemplazar',
-  ): Promise<void> {
+  ): Promise<boolean> {
     const creado = await this.crearMantenimiento(activoId, {
       tipo: mantenimiento.tipo,
       fecha: mantenimiento.fecha,
@@ -474,9 +486,10 @@ export class ActivosService {
       costoReposicion: mantenimiento.costoReposicion,
       decision,
     });
-    if (creado) {
-      await this.autorizarMantenimiento(creado.id, decision);
+    if (!creado) {
+      return false;
     }
+    return this.autorizarMantenimiento(creado.id, decision);
   }
 
   private aplicarDecisionLocal(

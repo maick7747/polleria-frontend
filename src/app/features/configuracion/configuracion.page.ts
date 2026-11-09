@@ -54,6 +54,21 @@ const TABS: readonly { id: Tab; label: string }[] = [
   { id: 'pagos', label: 'Pagos' },
 ];
 
+const MESES = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+
 @Component({
   selector: 'app-configuracion-page',
   standalone: true,
@@ -141,7 +156,12 @@ export class ConfiguracionPage {
     },
   ]);
 
-  readonly guardado = signal<Snapshot>(this.crearSnapshot());
+  readonly guardado = signal<Snapshot | null>(null);
+
+  readonly cargando = this.config.cargando;
+  readonly guardando = this.config.guardando;
+  readonly errorCarga = signal<string | null>(null);
+  readonly actualizadoEn = signal<string | null>(null);
 
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
@@ -168,6 +188,9 @@ export class ConfiguracionPage {
   readonly cambios = computed<Cambio[]>(() => {
     const base = this.guardado();
     const items: Cambio[] = [];
+    if (!base) {
+      return items;
+    }
 
     if (!this.igual(this.numero(this.igv()), this.numero(base.igv))) {
       items.push({
@@ -244,19 +267,43 @@ export class ConfiguracionPage {
     return items;
   });
 
-  readonly hayCambios = computed<boolean>(() => this.cambios().length > 0);
+  readonly haySnapshot = computed<boolean>(() => this.guardado() !== null);
 
-  readonly subtitulo = computed<string>(
-    () =>
-      "Parámetros del sistema · Fratelli's El Tambo · última actualización 12 oct 2026, 18:40",
+  readonly hayCambios = computed<boolean>(
+    () => !this.haySnapshot() || this.cambios().length > 0,
   );
 
+  readonly subtitulo = computed<string>(() => {
+    const base = "Parámetros del sistema · Fratelli's El Tambo";
+    const fecha = this.actualizadoEn();
+    return fecha
+      ? `${base} · última actualización ${this.formatearFecha(fecha)}`
+      : `${base} · última actualización sin datos`;
+  });
+
   constructor() {
+    void this.cargar();
     this.destroyRef.onDestroy(() => {
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
       }
     });
+  }
+
+  async cargar(): Promise<void> {
+    this.errorCarga.set(null);
+    const ok = await this.config.cargarParametros();
+    if (!ok) {
+      this.errorCarga.set(
+        this.config.error() ?? 'No se pudo cargar la configuración.',
+      );
+      return;
+    }
+    this.sembrarDesdeServidor();
+  }
+
+  reintentar(): void {
+    void this.cargar();
   }
 
   numero(valor: string): number {
@@ -310,46 +357,31 @@ export class ConfiguracionPage {
     );
   }
 
-  auditoria(): void {
-    this.avisar('Auditoría de configuración · registro simulado');
-  }
-
-  guardar(): void {
+  async guardar(): Promise<void> {
+    if (this.guardando()) {
+      return;
+    }
     if (!this.valido()) {
       this.tab.set('parametros');
       this.avisar('Revisa los parámetros marcados: hay valores fuera de rango', true);
       return;
     }
+    if (!this.haySnapshot()) {
+      this.avisar('Primero carga la configuración del servidor', true);
+      return;
+    }
 
     const total = this.cambios().length;
-    this.config.actualizar('igv_pct', this.numero(this.igv()).toFixed(1));
-    this.config.actualizar('kds_sla_min', String(this.numero(this.kds())));
-    this.config.actualizar('comision_rappi_pct', this.numero(this.rappi()).toFixed(1));
-    this.config.actualizar('comision_llamafood_pct', this.numero(this.llamafood()).toFixed(1));
-    this.config.guardar(
-      'tarifa_delivery',
-      this.numero(this.delivery()).toFixed(2),
-      'Tarifa de delivery propio (S/)',
-    );
-    this.config.guardar(
-      'redondeo_activo',
-      this.redondeo() ? '1' : '0',
-      'Redondeo de totales al sol',
-    );
-    this.config.guardar(
-      'aviso_mozo_activo',
-      this.aviso() ? '1' : '0',
-      'Aviso al mozo cuando el plato está listo',
-    );
-
-    for (const canal of this.canales()) {
-      this.config.guardar(canal.clave, canal.activo ? '1' : '0', `Canal ${canal.nombre}`);
-    }
-    for (const pago of this.pagos()) {
-      this.config.guardar(pago.clave, pago.activo ? '1' : '0', `Método de pago ${pago.nombre}`);
+    const ok = await this.config.guardarParametros(this.construirCambios());
+    if (!ok) {
+      this.avisar(
+        this.config.error() ?? 'No se pudo guardar la configuración',
+        true,
+      );
+      return;
     }
 
-    this.guardado.set(this.crearSnapshot());
+    this.sembrarDesdeServidor();
     this.avisar(
       total === 0
         ? 'Configuración sin cambios'
@@ -361,6 +393,10 @@ export class ConfiguracionPage {
 
   descartar(): void {
     const base = this.guardado();
+    if (!base) {
+      this.avisar('No hay configuración cargada para descartar', true);
+      return;
+    }
     this.igv.set(base.igv);
     this.kds.set(base.kds);
     this.rappi.set(base.rappi);
@@ -371,6 +407,78 @@ export class ConfiguracionPage {
     this.canales.set(base.canales.map((canal) => ({ ...canal })));
     this.pagos.set(base.pagos.map((pago) => ({ ...pago })));
     this.avisar('Cambios descartados');
+  }
+
+  private sembrarDesdeServidor(): void {
+    if (this.config.configuracion().length === 0) {
+      this.guardado.set(null);
+      this.errorCarga.set('El servidor no devolvió parámetros de configuración.');
+      return;
+    }
+
+    const valor = (clave: string, porDefecto: string): string =>
+      this.config.valor(clave) ?? porDefecto;
+    const activo = (clave: string): boolean => valor(clave, '1') === '1';
+
+    this.igv.set(valor('igv_pct', '18'));
+    this.kds.set(valor('kds_sla_min', '30'));
+    this.rappi.set(valor('comision_rappi_pct', '25'));
+    this.llamafood.set(valor('comision_llamafood_pct', '20'));
+    this.delivery.set(valor('tarifa_delivery', '5'));
+
+    this.redondeo.set(valor('redondeo_activo', '0') === '1');
+    this.aviso.set(valor('aviso_mozo_activo', '1') === '1');
+
+    this.canales.update((lista) =>
+      lista.map((canal) => ({ ...canal, activo: activo(canal.clave) })),
+    );
+    this.pagos.update((lista) =>
+      lista.map((pago) => ({ ...pago, activo: activo(pago.clave) })),
+    );
+
+    this.actualizadoEn.set(this.config.actualizadoEn());
+    this.guardado.set(this.crearSnapshot());
+    this.errorCarga.set(null);
+  }
+
+  private construirCambios(): Record<string, string | number | boolean> {
+    const cambios: Record<string, string | number | boolean> = {
+      igv_pct: this.numero(this.igv()),
+      kds_sla_min: this.numero(this.kds()),
+      comision_rappi_pct: this.numero(this.rappi()),
+      comision_llamafood_pct: this.numero(this.llamafood()),
+      tarifa_delivery: this.numero(this.delivery()),
+      redondeo_activo: this.redondeo(),
+      aviso_mozo_activo: this.aviso(),
+    };
+    for (const canal of this.canales()) {
+      cambios[canal.clave] = canal.activo;
+    }
+    for (const pago of this.pagos()) {
+      cambios[pago.clave] = pago.activo;
+    }
+    return cambios;
+  }
+
+  private formatearFecha(iso: string): string {
+    const fecha = new Date(iso);
+    if (Number.isNaN(fecha.getTime())) {
+      return 'sin datos';
+    }
+    const partes = new Intl.DateTimeFormat('es-PE', {
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'America/Lima',
+    }).formatToParts(fecha);
+    const dato = (tipo: string): string =>
+      partes.find((parte) => parte.type === tipo)?.value ?? '';
+    const hora = dato('hour') === '24' ? '00' : dato('hour');
+    const mes = MESES[Number(dato('month')) - 1] ?? dato('month');
+    return `${dato('day')} ${mes} ${dato('year')}, ${hora}:${dato('minute')}`;
   }
 
   private crearSnapshot(): Snapshot {

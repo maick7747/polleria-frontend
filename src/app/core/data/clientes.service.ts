@@ -3,7 +3,12 @@ import { firstValueFrom } from 'rxjs';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
 import { mensajeError } from '../api/api.helpers';
-import type { ApiList, ClienteListaDto, PageMeta } from '../api/api.types';
+import type {
+  ApiList,
+  ClienteListaDto,
+  DocumentoValidacionDto,
+  PageMeta,
+} from '../api/api.types';
 import { toClienteResumen, type ClienteResumen } from '../api/api.mappers';
 
 export interface ClientesQuery {
@@ -102,5 +107,23 @@ export class ClientesService {
       return undefined;
     }
     return this.clientes().find((cliente) => cliente.id === id);
+  }
+
+  /**
+   * Valida un DNI/RUC contra el backend (`POST /api/clientes/validar-documento`).
+   * El backend usa el patrón Strategy (mock/apiperu/openruc) y nunca bloquea la
+   * venta: si no puede validar devuelve `modo: 'manual'`. Los errores de red o
+   * de permisos se propagan como `ApiError`.
+   */
+  async validarDocumento(
+    tipo: 'DNI' | 'RUC',
+    numero: string,
+  ): Promise<DocumentoValidacionDto> {
+    return firstValueFrom(
+      this.api.post<DocumentoValidacionDto>('/clientes/validar-documento', {
+        tipo_documento: tipo,
+        numero_documento: numero,
+      }),
+    );
   }
 }

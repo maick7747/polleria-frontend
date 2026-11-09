@@ -130,6 +130,7 @@ export class CuadreService {
   readonly efectivoContado = signal<number>(0);
   readonly pagosDigitales = signal<number>(0);
   readonly fechaApertura = signal<string>('2026-10-14T11:00:00-05:00');
+  readonly fechaCierre = signal<string | null>(null);
 
   readonly montoEsperado = computed<number>(() =>
     round2(this.fondoInicial() + this.totalVentas() - this.totalEgresos()),
@@ -164,6 +165,7 @@ export class CuadreService {
         this.estado.set('sin_cuadre');
         this.reabiertoEn.set(null);
         this.motivoReapertura.set(null);
+        this.fechaCierre.set(null);
         this.totalVentas.set(0);
         this.totalEgresos.set(0);
       }
@@ -253,7 +255,9 @@ export class CuadreService {
 
     this.fondoInicial.set(fondoInicial);
     this.abierta.set(true);
+    this.estado.set('abierta');
     this.fechaApertura.set(new Date().toISOString());
+    this.fechaCierre.set(null);
     return true;
   }
 
@@ -300,6 +304,7 @@ export class CuadreService {
     this.pagosDigitales.set(pagosDigitales);
     this.abierta.set(false);
     this.estado.set('cerrada');
+    this.fechaCierre.set(new Date().toISOString());
     return true;
   }
 
@@ -323,6 +328,7 @@ export class CuadreService {
       this.estado.set('abierta');
       this.reabiertoEn.set(new Date().toISOString());
       this.motivoReapertura.set(motivo);
+      this.fechaCierre.set(null);
       return true;
     }
 
@@ -402,5 +408,6 @@ export class CuadreService {
     this.efectivoContado.set(dto.efectivo_contado ?? 0);
     this.pagosDigitales.set(dto.pagos_digitales);
     this.fechaApertura.set(dto.fecha_apertura);
+    this.fechaCierre.set(dto.fecha_cierre ?? null);
   }
 }

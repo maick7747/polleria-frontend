@@ -221,16 +221,6 @@
 
             <span class="liquidacion__sep"></span>
 
-            <label class="campo campo--dark">
-              <span class="detalle__label">Motivo de cancelación (opcional)</span>
-              <textarea
-                class="input input--dark input--area"
-                [value]="motivo()"
-                (input)="onMotivo($event)"
-                placeholder="Solo si rechazas el pedido"
-              ></textarea>
-            </label>
-
             <div class="liquidacion__grow"></div>
 
             <button
@@ -242,10 +232,17 @@
               <app-icon name="check" [size]="16" />
               Aceptar pedido
             </button>
-            <button type="button" class="rechazar" [disabled]="accionando()" (click)="cancelar()">
-              <app-icon name="x" [size]="15" />
-              Cancelar pedido
-            </button>
+            @if (puedeCancelar()) {
+              <a class="rechazar" [routerLink]="['/cancelacion-delivery', pedido.id]">
+                <app-icon name="x" [size]="15" />
+                Cancelar pedido
+              </a>
+            } @else {
+              <button type="button" class="rechazar" disabled>
+                <app-icon name="x" [size]="15" />
+                Cancelar pedido
+              </button>
+            }
             <span class="liquidacion__pie">
               {{ pedido.estado === 'borrador' ? 'Aceptar lo envía a cocina' : 'Pedido ya procesado' }}
             </span>

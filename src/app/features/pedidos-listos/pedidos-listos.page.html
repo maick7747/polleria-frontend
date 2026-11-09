@@ -119,9 +119,14 @@
               <span class="entrega__meta">
                 {{ pedido.meta }} · hace {{ pedido.minutos }} min
               </span>
-              <button type="button" class="btn-entregar" (click)="entregar(pedido.id)">
+              <button
+                type="button"
+                class="btn-entregar"
+                title="Se oculta en este navegador; el pedido desaparece al cobrarse"
+                (click)="entregar(pedido.id)"
+              >
                 <app-icon name="check" [size]="13" />
-                Entregar
+                Archivar aviso
               </button>
             </footer>
           </article>
@@ -190,8 +195,8 @@
 
         <p class="aviso__info">
           <app-icon name="warning-circle" [size]="13" />
-          Al entregar se archiva el aviso. No se cobra ahora: el cobro es al cerrar la
-          cuenta.
+          Al archivar, el aviso se oculta solo en este navegador; el pedido desaparece al
+          cobrarse. No se cobra ahora: el cobro es al cerrar la cuenta.
         </p>
 
         <span class="aviso__grow"></span>
@@ -199,11 +204,12 @@
         <button
           type="button"
           class="accion accion--brand"
+          title="Se oculta en este navegador; el pedido desaparece al cobrarse"
           [disabled]="total() === 0"
           (click)="marcarEntregado()"
         >
           <app-icon name="check-circle" [size]="16" />
-          Marcar entregado
+          Archivar aviso
         </button>
         <a class="accion accion--ghost" routerLink="/comandas">
           <app-icon name="clock" [size]="15" />

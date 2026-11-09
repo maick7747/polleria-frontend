@@ -220,8 +220,8 @@
         <div class="exportar__grow"></div>
 
         <div class="exportar__generados">
-          <span>Generados este mes</span>
-          <strong>{{ generados() }} reportes</strong>
+          <span>Tipos de reporte disponibles</span>
+          <strong>{{ generados() }} {{ generados() === 1 ? 'tipo' : 'tipos' }}</strong>
         </div>
 
         <span class="exportar__foot">
@@ -238,7 +238,7 @@
     </span>
     <span class="pie__item">
       <app-icon name="clock" [size]="12" />
-      Actualizado 17:45 · SUNAT simulado
+      Actualizado {{ actualizado() }} · SUNAT simulado
     </span>
   </div>
 

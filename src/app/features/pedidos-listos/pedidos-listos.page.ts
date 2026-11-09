@@ -172,13 +172,13 @@ export class PedidosListosPage {
     this.entregados.add(id);
     this.guardarEntregados();
     this.pedidos.update((lista) => lista.filter((actual) => actual.id !== id));
-    this.avisar(`${pedido.etiqueta} entregado · aviso archivado`);
+    this.avisar(`${pedido.etiqueta} · aviso archivado en este navegador`);
   }
 
   marcarEntregado(): void {
     const siguiente = this.pedidos()[0];
     if (!siguiente) {
-      this.avisar('Sin pedidos listos por entregar');
+      this.avisar('Sin avisos por archivar');
       return;
     }
     this.entregar(siguiente.id);

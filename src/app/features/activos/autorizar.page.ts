@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { mensajeError } from '../../core/api/api.helpers';
 import { AuthService } from '../../core/auth/auth.service';
 import { ActivosService } from '../../core/data/activos.service';
 import type { Activo } from '../../core/models';
@@ -80,8 +81,6 @@ export class ActivosAutorizarPage {
   private toastTimer: number | null = null;
 
   readonly moneda = formatearMoneda;
-  readonly presupuesto = 1400;
-  readonly fondo = 4780;
 
   readonly activo = computed<Activo | null>(
     () => this.activos.enReparacion()[0] ?? this.activos.activos()[0] ?? null,
@@ -164,6 +163,7 @@ export class ActivosAutorizarPage {
 
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
+  readonly procesando = signal<boolean>(false);
 
   readonly costoSeleccionado = computed<number>(() =>
     this.decision() === 'reemplazar' ? this.costoReposicion() : this.costoReparacion(),
@@ -241,7 +241,10 @@ export class ActivosAutorizarPage {
     this.avisar('Cotización adjunta · documento simulado');
   }
 
-  autorizar(): void {
+  async autorizar(): Promise<void> {
+    if (this.procesando()) {
+      return;
+    }
     const actual = this.activo();
     if (!actual) {
       this.avisar('No hay un activo pendiente de autorización', true);
@@ -250,23 +253,38 @@ export class ActivosAutorizarPage {
 
     const usuarioId = this.auth.usuario()?.id ?? 1;
     const decision = this.decision();
-    this.activos.autorizarDecision(
-      actual.id,
-      decision,
-      { reparacion: this.costoReparacion(), reposicion: this.costoReposicion() },
-      `${decision === 'reemplazar' ? 'Reemplazo' : 'Reparación'} autorizado · ${actual.nombre}`,
-      usuarioId,
-    );
+    this.procesando.set(true);
+    try {
+      const ok = await this.activos.autorizarDecision(
+        actual.id,
+        decision,
+        { reparacion: this.costoReparacion(), reposicion: this.costoReposicion() },
+        `${decision === 'reemplazar' ? 'Reemplazo' : 'Reparación'} autorizado · ${actual.nombre}`,
+        usuarioId,
+      );
 
-    this.avisar(
-      decision === 'reemplazar'
-        ? `Reemplazo autorizado · ${actual.nombre}`
-        : `Reparación autorizada · ${actual.nombre}`,
-    );
+      if (!ok) {
+        this.avisar(
+          this.activos.error() ?? 'No se pudo autorizar la decisión. Intenta de nuevo.',
+          true,
+        );
+        return;
+      }
 
-    this.temporizador = window.setTimeout(() => {
-      void this.router.navigate(['/activos']);
-    }, 950);
+      this.avisar(
+        decision === 'reemplazar'
+          ? `Reemplazo autorizado · ${actual.nombre}`
+          : `Reparación autorizada · ${actual.nombre}`,
+      );
+
+      this.temporizador = window.setTimeout(() => {
+        void this.router.navigate(['/activos']);
+      }, 950);
+    } catch (error) {
+      this.avisar(mensajeError(error), true);
+    } finally {
+      this.procesando.set(false);
+    }
   }
 
   private avisar(mensaje: string, error = false): void {

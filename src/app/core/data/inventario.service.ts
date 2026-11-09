@@ -43,6 +43,55 @@ export interface MovimientosQuery {
   sort?: string;
 }
 
+export interface VerificacionItem {
+  insumo_id: number;
+  conteo_fisico: number;
+}
+
+export interface DiferenciaStock {
+  insumo_id: number;
+  insumo: string;
+  unidad_medida: string;
+  stock_sistema: number;
+  conteo_fisico: number;
+  diferencia: number;
+  ajuste_propuesto: number;
+  requiere_ajuste: boolean;
+}
+
+export interface VerificacionStock {
+  aplicado: boolean;
+  diferencias: DiferenciaStock[];
+  resumen: {
+    items: number;
+    con_diferencia: number;
+  };
+}
+
+export interface AjusteItem {
+  insumo_id: number;
+  cantidad: number;
+  observacion?: string;
+}
+
+export interface AjusteLote {
+  movimientos: MovimientoStock[];
+  total: number;
+}
+
+export interface ConsumoInsumoDto {
+  insumo_id: number;
+  consumo: number;
+  promedio_diario: number;
+}
+
+export interface ConsumoResponseDto {
+  dias: number;
+  desde: string;
+  hasta: string;
+  data: ConsumoInsumoDto[];
+}
+
 const paginar = <T>(
   lista: readonly T[],
   page: number,
@@ -78,6 +127,11 @@ export class InventarioService {
 
   readonly cargando = signal<boolean>(false);
   readonly error = signal<string | null>(null);
+
+  readonly consumoCargando = signal<boolean>(false);
+  readonly consumoError = signal<string | null>(null);
+  /** Consumo acumulado de los últimos `dias` por insumo (`insumo_id → consumo`). */
+  readonly consumo = signal<Map<number, number>>(new Map());
 
   readonly insumos = signal<Insumo[]>(
     USE_API ? [] : MOCK_INSUMOS.map((insumo) => ({ ...insumo })),
@@ -148,8 +202,58 @@ export class InventarioService {
     }
   }
 
-  async cargarMovimientos(opciones: MovimientosQuery = {}): Promise<boolean> {
-    const page = Math.max(1, opciones.page ?? 1);
+  /** Consumo real del insumo en la última carga, o `undefined` si no hay dato. */
+  consumoDe(insumoId: number): number | undefined {
+    return this.consumo().get(insumoId);
+  }
+
+  /**
+   * Consumo acumulado por insumo en los últimos `dias` (movimientos `salida`).
+   * Si el endpoint no existe o falla, deja el mapa vacío y expone
+   * `consumoError` para que la UI muestre «—» en lugar de inventar cifras.
+   */
+  async cargarConsumo(dias = 7): Promise<Map<number, number>> {
+    this.consumoCargando.set(true);
+    this.consumoError.set(null);
+
+    if (!USE_API) {
+      const desde = new Date();
+      desde.setDate(desde.getDate() - dias);
+      const limite = desde.toISOString().slice(0, 10);
+      const mapa = new Map<number, number>();
+      for (const movimiento of MOCK_MOVIMIENTOS) {
+        if (movimiento.tipo !== 'salida' || movimiento.fecha.slice(0, 10) < limite) {
+          continue;
+        }
+        mapa.set(movimiento.insumoId, (mapa.get(movimiento.insumoId) ?? 0) + movimiento.cantidad);
+      }
+      this.consumo.set(mapa);
+      this.consumoCargando.set(false);
+      return mapa;
+    }
+
+    try {
+      const respuesta = await firstValueFrom(
+        this.api.get<ConsumoResponseDto>('/inventario/consumo', { dias }),
+      );
+      const mapa = new Map<number, number>();
+      for (const item of respuesta?.data ?? []) {
+        if (Number.isFinite(item.insumo_id) && Number.isFinite(item.consumo)) {
+          mapa.set(item.insumo_id, item.consumo);
+        }
+      }
+      this.consumo.set(mapa);
+      return mapa;
+    } catch (error) {
+      this.consumo.set(new Map());
+      this.consumoError.set(mensajeError(error));
+      return new Map();
+    } finally {
+      this.consumoCargando.set(false);
+    }
+  }
+
+  async cargarMovimientos(opciones: MovimientosQuery = {}): Promise<boolean> {    const page = Math.max(1, opciones.page ?? 1);
     const limit = opciones.limit ?? 20;
     const tipo = opciones.tipo || undefined;
     const insumoId = opciones.insumoId || undefined;
@@ -294,47 +398,27 @@ export class InventarioService {
     }
 
     if (USE_API) {
-      try {
-        const respuesta = await firstValueFrom(
-          this.api.post<AjusteResponseDto>('/inventario/ajustes', {
-            items: [
-              {
-                insumo_id: insumoId,
-                cantidad: nuevoStock,
-                observacion,
-              },
-            ],
-          }),
-        );
-        const movimiento = respuesta.movimientos[0];
-        if (movimiento) {
-          const normalizado = toMovimiento(movimiento);
-          this.insumos.update((lista) =>
-            lista.map((actual) =>
-              actual.id === insumoId
-                ? { ...actual, stockActual: normalizado.stockResultante }
-                : actual,
-            ),
-          );
-          this.movimientos.update((lista) => [normalizado, ...lista]);
-          return normalizado;
-        }
-        const stockResultante = this.actualizarStockLocal(insumoId, nuevoStock);
-        return this.crearMovimiento(
-          insumoId,
-          'ajuste',
-          round3(nuevoStock - insumo.stockActual),
-          stockResultante,
-          'ajuste',
-          0,
-          usuarioId,
-          observacion,
-        );
-      } catch (error) {
-        if (!esFalloRed(error)) {
-          throw error;
-        }
+      // Un fallo de red NO debe mutar el stock local en silencio: se propaga.
+      const respuesta = await firstValueFrom(
+        this.api.post<AjusteResponseDto>('/inventario/ajustes', {
+          items: [
+            {
+              insumo_id: insumoId,
+              cantidad: nuevoStock,
+              observacion,
+            },
+          ],
+        }),
+      );
+      const movimiento = respuesta.movimientos[0];
+      // El backend omite los ítems sin diferencia: no inventar un movimiento.
+      if (!movimiento) {
+        return null;
       }
+      const normalizado = toMovimiento(movimiento);
+      this.aplicarStock(normalizado.insumoId, normalizado.stockResultante);
+      this.movimientos.update((lista) => [normalizado, ...lista]);
+      return normalizado;
     }
 
     const cantidad = round3(nuevoStock - insumo.stockActual);
@@ -349,6 +433,120 @@ export class InventarioService {
       usuarioId,
       observacion,
     );
+  }
+
+  /**
+   * Previsualiza un conteo físico sin tocar el stock. La respuesta llega
+   * calculada por el backend (`aplicado: false`).
+   */
+  async verificarStock(items: VerificacionItem[]): Promise<VerificacionStock> {
+    if (!USE_API) {
+      const diferencias = items.flatMap<DiferenciaStock>((item) => {
+        const insumo = this.porId(item.insumo_id);
+        if (!insumo) {
+          return [];
+        }
+        const diferencia = round3(item.conteo_fisico - insumo.stockActual);
+        return [
+          {
+            insumo_id: insumo.id,
+            insumo: insumo.nombre,
+            unidad_medida: insumo.unidadMedida,
+            stock_sistema: insumo.stockActual,
+            conteo_fisico: item.conteo_fisico,
+            diferencia,
+            ajuste_propuesto: diferencia,
+            requiere_ajuste: Math.abs(diferencia) > 0.0005,
+          },
+        ];
+      });
+      return {
+        aplicado: false,
+        diferencias,
+        resumen: {
+          items: diferencias.length,
+          con_diferencia: diferencias.filter((item) => item.requiere_ajuste).length,
+        },
+      };
+    }
+
+    return firstValueFrom(
+      this.api.post<VerificacionStock>('/inventario/verificar', { items }),
+    );
+  }
+
+  /**
+   * Aplica un lote de ajustes en una sola transacción del backend.
+   * `cantidad` es el stock objetivo, no la diferencia.
+   */
+  async aplicarAjustes(items: AjusteItem[]): Promise<AjusteLote> {
+    if (items.length === 0) {
+      return { movimientos: [], total: 0 };
+    }
+
+    if (!USE_API) {
+      const movimientos: MovimientoStock[] = [];
+      for (const item of items) {
+        const insumo = this.porId(item.insumo_id);
+        if (!insumo) {
+          continue;
+        }
+        const cantidad = round3(item.cantidad - insumo.stockActual);
+        if (Math.abs(cantidad) <= 0.0005) {
+          continue;
+        }
+        const stockResultante = this.actualizarStockLocal(item.insumo_id, item.cantidad);
+        movimientos.push(
+          this.crearMovimiento(
+            item.insumo_id,
+            'ajuste',
+            cantidad,
+            stockResultante,
+            'ajuste',
+            0,
+            0,
+            item.observacion ?? 'Verificación física de stock',
+          ),
+        );
+      }
+      return { movimientos, total: movimientos.length };
+    }
+
+    const respuesta = await firstValueFrom(
+      this.api.post<AjusteResponseDto>('/inventario/ajustes', { items }),
+    );
+    const movimientos = respuesta.movimientos.map(toMovimiento);
+    for (const movimiento of movimientos) {
+      this.aplicarStock(movimiento.insumoId, movimiento.stockResultante);
+    }
+    if (movimientos.length > 0) {
+      this.movimientos.update((lista) => [...movimientos, ...lista]);
+    }
+    return { movimientos, total: respuesta.total ?? movimientos.length };
+  }
+
+  /** Fecha del último ajuste de inventario, o `null` si no hay o falla. */
+  async ultimoAjuste(): Promise<string | null> {
+    if (!USE_API) {
+      const ajustes = MOCK_MOVIMIENTOS.filter((movimiento) => movimiento.tipo === 'ajuste')
+        .map((movimiento) => movimiento.fecha)
+        .sort((a, b) => Date.parse(b) - Date.parse(a));
+      return ajustes[0] ?? null;
+    }
+
+    try {
+      const lista = await firstValueFrom(
+        this.api.get<ApiList<MovimientoDto>>('/inventario/movimientos', {
+          page: 1,
+          limit: 1,
+          tipo: 'ajuste',
+          sort: 'fecha:desc',
+        }),
+      );
+      return lista.data[0]?.fecha ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async ajustarMinimo(insumoId: number, nuevoMinimo: number): Promise<boolean> {
@@ -377,6 +575,14 @@ export class InventarioService {
       ),
     );
     return true;
+  }
+
+  private aplicarStock(insumoId: number, stockResultante: number): void {
+    this.insumos.update((lista) =>
+      lista.map((actual) =>
+        actual.id === insumoId ? { ...actual, stockActual: stockResultante } : actual,
+      ),
+    );
   }
 
   private actualizarStockLocal(insumoId: number, nuevoStock: number): number {

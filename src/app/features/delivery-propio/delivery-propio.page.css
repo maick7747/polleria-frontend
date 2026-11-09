@@ -660,7 +660,12 @@
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  text-decoration: none;
   transition: background var(--dur) var(--ease);
+}
+
+.btn-ghost-dark--bloque {
+  width: 100%;
 }
 
 .btn-ghost-dark:hover {
