@@ -816,6 +816,18 @@
   white-space: nowrap;
 }
 
+.ronda__entregada {
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: rgba(129, 140, 248, 0.2);
+  color: #a5b4fc;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .item__estado {
   margin-left: auto;
   padding: 1px 7px;
@@ -835,6 +847,15 @@
 .item__estado--listo {
   background: rgba(34, 197, 94, 0.18);
   color: #4ade80;
+}
+
+.item__estado--entregado {
+  background: rgba(129, 140, 248, 0.2);
+  color: #a5b4fc;
+}
+
+.item--entregado .item__name {
+  opacity: 0.62;
 }
 
 .toast {

@@ -120,7 +120,7 @@
                       <span [class]="'pill pill--' + linea.estado">
                         {{ estadoTexto(linea.estado) }}
                       </span>
-                      @if (linea.estado !== 'entregado') {
+                      @if (accionTexto(linea.estado)) {
                         <button
                           type="button"
                           class="mini"
@@ -182,15 +182,10 @@
                   >
                     Todo listo
                   </button>
-                  <button
-                    type="button"
-                    class="btn btn--brand"
-                    [disabled]="!ronda.puedeEntregar || accionando() !== null"
-                    (click)="entregarRonda(ronda)"
-                  >
-                    Entregar ronda
-                  </button>
                 </div>
+                <p class="ronda__entrega-nota">
+                  La entrega la confirma el mozo en <a routerLink="/pedidos-listos">Pedidos listos</a>.
+                </p>
               </footer>
             </article>
           }

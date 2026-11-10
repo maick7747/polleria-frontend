@@ -14,7 +14,7 @@ import { CuentasService } from '../../core/data/cuentas.service';
 import { MesasService } from '../../core/data/mesas.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
 import { RealtimeService } from '../../core/data/realtime.service';
-import type { Cuenta, Mesa, Ronda } from '../../core/models';
+import type { Cuenta, Mesa, PedidoDetalle, Ronda } from '../../core/models';
 import {
   abreviarNombre,
   fechaLarga,
@@ -115,7 +115,9 @@ export class VentaLocalPage {
       const listos = cuenta
         ? cuenta.rondas.reduce(
             (total, ronda) =>
-              total + ronda.items.filter((item) => item.estadoPreparacion === 'listo').length,
+              total + ronda.items.filter(
+                (item) => !item.entregadoEn && item.estadoPreparacion === 'listo',
+              ).length,
             0,
           )
         : 0;
@@ -264,11 +266,28 @@ export class VentaLocalPage {
     this.toastTimer = window.setTimeout(() => this.toast.set(''), 4000);
   }
 
+  rondaEntregada(ronda: Ronda): boolean {
+    return ronda.items.length > 0 && ronda.items.every((item) => Boolean(item.entregadoEn));
+  }
+
   rondaLista(ronda: Ronda): boolean {
-    return ronda.items.length > 0 && ronda.items.every((item) => item.estadoPreparacion === 'listo');
+    return (
+      !this.rondaEntregada(ronda) &&
+      ronda.items.length > 0 &&
+      ronda.items.every(
+        (item) => Boolean(item.entregadoEn) || item.estadoPreparacion === 'listo',
+      )
+    );
+  }
+
+  estadoLinea(item: PedidoDetalle): string {
+    return item.entregadoEn ? 'entregado' : item.estadoPreparacion;
   }
 
   estadoPlato(estado: string): string {
+    if (estado === 'entregado') {
+      return 'Entregado';
+    }
     if (estado === 'listo') {
       return 'Listo';
     }

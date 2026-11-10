@@ -242,6 +242,7 @@ export function toPedido(dto: PedidoDto): Pedido {
     comprobanteTipo: toComprobanteTipo(dto.comprobante_tipo),
     items: (dto.detalles ?? []).map(toDetalle),
     fechaEntrega: dto.fecha_entrega ?? undefined,
+    estadoEntrega: toEstadoEntrega(dto.estado_entrega),
   };
 }
 

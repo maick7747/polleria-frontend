@@ -7,6 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   CocinaService,
   UMBRAL_KDS_MIN,
@@ -70,7 +71,6 @@ interface RondaVista {
   lineas: LineaVista[];
   progreso: ProgresoRonda;
   puedeTodoListo: boolean;
-  puedeEntregar: boolean;
 }
 
 interface FocoVista {
@@ -94,6 +94,7 @@ const reloj = (segundos: number): string =>
   selector: 'app-cocina-page',
   standalone: true,
   imports: [
+    RouterLink,
     AppShellComponent,
     ChipComponent,
     DarkPanelComponent,
@@ -377,8 +378,6 @@ export class CocinaPage {
         return 'Iniciar';
       case 'en_preparacion':
         return 'Listo';
-      case 'listo':
-        return 'Entregar';
       default:
         return '';
     }
@@ -404,8 +403,7 @@ export class CocinaPage {
         await this.cocina.marcarEstado(ronda.pedidoId, linea.item.id, 'listo');
         this.avisar(`Listo · ${linea.item.nombre}`);
       } else {
-        await this.cocina.entregarPlato(ronda.pedidoId, linea.item.id);
-        this.avisar(`Entregado · ${linea.item.nombre}`);
+        return;
       }
       await this.refrescar(true);
     } catch (error) {
@@ -423,22 +421,6 @@ export class CocinaPage {
     try {
       await this.cocina.marcarTodoListo(ronda.pedidoId);
       this.avisar(`${ronda.etiqueta} · lista para entregar`);
-      await this.refrescar(true);
-    } catch (error) {
-      this.avisar(mensajeError(error));
-    } finally {
-      this.accionando.set(null);
-    }
-  }
-
-  async entregarRonda(ronda: RondaVista): Promise<void> {
-    if (this.accionando() || !ronda.puedeEntregar) {
-      return;
-    }
-    this.accionando.set(`ronda-${ronda.pedidoId}`);
-    try {
-      await this.cocina.entregarRonda(ronda.pedidoId);
-      this.avisar(`${ronda.etiqueta} · ronda entregada`);
       await this.refrescar(true);
     } catch (error) {
       this.avisar(mensajeError(error));
@@ -513,7 +495,6 @@ export class CocinaPage {
           (item.estadoPreparacion === 'pendiente' ||
             item.estadoPreparacion === 'en_preparacion'),
       ),
-      puedeEntregar: lista,
     };
   }
 

@@ -211,7 +211,9 @@
                       <strong class="ronda__title">Ronda {{ ronda.numero }}</strong>
                       <span class="ronda__hora">{{ hora(ronda.creadaEn) }}</span>
                       <span class="ronda__spacer"></span>
-                      @if (rondaLista(ronda)) {
+                      @if (rondaEntregada(ronda)) {
+                        <span class="ronda__entregada">Entregada</span>
+                      } @else if (rondaLista(ronda)) {
                         <span class="ronda__listo">Lista</span>
                       }
                       <span class="ronda__meta">
@@ -219,14 +221,15 @@
                       </span>
                     </header>
                     @for (item of ronda.items; track item.id) {
-                      <div class="item">
+                      <div class="item" [class.item--entregado]="estadoLinea(item) === 'entregado'">
                         <span class="item__name">{{ item.nombre }} x{{ item.cantidad }}</span>
                         <span
                           class="item__estado"
-                          [class.item__estado--listo]="item.estadoPreparacion === 'listo'"
-                          [class.item__estado--prep]="item.estadoPreparacion === 'en_preparacion'"
+                          [class.item__estado--listo]="estadoLinea(item) === 'listo'"
+                          [class.item__estado--prep]="estadoLinea(item) === 'en_preparacion'"
+                          [class.item__estado--entregado]="estadoLinea(item) === 'entregado'"
                         >
-                          {{ estadoPlato(item.estadoPreparacion) }}
+                          {{ estadoPlato(estadoLinea(item)) }}
                         </span>
                         <strong class="item__total">{{ moneda(item.subtotal) }}</strong>
                       </div>

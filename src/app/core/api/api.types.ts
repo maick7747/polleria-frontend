@@ -137,6 +137,7 @@ export interface PedidoDto {
   comprobante_numero: string | null;
   cliente_nombre?: string | null;
   fecha_entrega: string | null;
+  estado_entrega?: string | null;
   detalles?: DetallePedidoDto[];
   idempotente?: boolean;
 }
