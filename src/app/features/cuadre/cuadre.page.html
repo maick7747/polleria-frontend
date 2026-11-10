@@ -75,6 +75,10 @@
           <div class="pendiente__info">
             <strong>Caja del {{ fechaPendiente(pendiente.fecha) }}</strong>
             <span>esperado {{ moneda(pendiente.montoEsperado) }}</span>
+            <span class="pendiente__split">
+              efectivo {{ moneda(pendienteEsperadoEfectivo(pendiente)) }} ·
+              digital {{ moneda(pendienteEsperadoDigital(pendiente)) }}
+            </span>
           </div>
 
           @if (!puedeAdministrar()) {
@@ -122,6 +126,10 @@
                   >
                     {{ moneda(diferenciaPendiente(pendiente)) }}
                   </strong>
+                  <span class="pendiente__split">
+                    efectivo {{ moneda(diferenciaPendienteEfectivo(pendiente)) }} ·
+                    digital {{ moneda(diferenciaPendienteDigital(pendiente)) }}
+                  </span>
                 </span>
               </div>
 
@@ -211,6 +219,9 @@
                 <span class="row__label">Ventas cobradas</span>
                 <strong class="row__value">{{ moneda(totalVentas()) }}</strong>
               </div>
+              <span class="hint">
+                Efectivo {{ moneda(ventasEfectivo()) }} · Digital {{ moneda(ventasDigital()) }}
+              </span>
               <div class="row">
                 <span class="row__label">Egresos y gastos</span>
                 <strong class="row__value row__value--negative">
@@ -229,6 +240,9 @@
                 <strong class="row__big">{{ moneda(esperado()) }}</strong>
               </div>
               <span class="hint">Ventas − egresos + fondo inicial</span>
+              <span class="hint">
+                Efectivo {{ moneda(esperadoEfectivo()) }} · Digital {{ moneda(esperadoDigital()) }}
+              </span>
             </div>
 
             <span class="col-sep"></span>
@@ -251,6 +265,7 @@
                   />
                 </span>
               </div>
+              <span class="hint">Esperado en efectivo {{ moneda(esperadoEfectivo()) }}</span>
               <div class="row row--editable">
                 <span class="row__label">Digital (Yape · Plin · Tarjeta)</span>
                 <span class="inline-input">
@@ -266,6 +281,7 @@
                   />
                 </span>
               </div>
+              <span class="hint">Esperado digital {{ moneda(esperadoDigital()) }}</span>
               <div class="row">
                 <span class="row__label">Total contado</span>
                 <strong class="row__value">{{ moneda(totalReal()) }}</strong>
@@ -294,6 +310,10 @@
                   {{ diferencia() > 0 ? 'Sobrante en caja' : 'Faltante en caja' }}
                 </span>
               }
+              <span class="hint">
+                Por canal · efectivo {{ moneda(diferenciaEfectivo()) }} · digital
+                {{ moneda(diferenciaDigital()) }}
+              </span>
             </div>
           </div>
 

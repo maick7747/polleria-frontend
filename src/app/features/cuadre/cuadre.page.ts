@@ -121,8 +121,12 @@ export class CuadrePage {
   readonly fondoInicial = this.cuadre.fondoInicial;
   readonly fechaCierre = this.cuadre.fechaCierre;
   readonly totalVentas = this.cuadre.totalVentas;
+  readonly ventasEfectivo = this.cuadre.ventasEfectivo;
+  readonly ventasDigital = this.cuadre.ventasDigital;
   readonly totalEgresos = this.cuadre.totalEgresos;
   readonly esperado = this.cuadre.montoEsperado;
+  readonly esperadoEfectivo = this.cuadre.esperadoEfectivo;
+  readonly esperadoDigital = this.cuadre.esperadoDigital;
 
   readonly efectivoContado = signal<number>(0);
   readonly pagosDigitales = signal<number>(0);
@@ -181,6 +185,14 @@ export class CuadrePage {
   );
 
   readonly diferencia = computed<number>(() => round2(this.totalReal() - this.esperado()));
+
+  readonly diferenciaEfectivo = computed<number>(() =>
+    round2(this.efectivoContado() - this.esperadoEfectivo()),
+  );
+
+  readonly diferenciaDigital = computed<number>(() =>
+    round2(this.pagosDigitales() - this.esperadoDigital()),
+  );
 
   readonly diferenciaAbs = computed<number>(() => Math.abs(this.diferencia()));
 
@@ -499,6 +511,22 @@ export class CuadrePage {
     return round2(
       this.pendienteEfectivo() + this.pendienteDigitales() - pendiente.montoEsperado,
     );
+  }
+
+  pendienteEsperadoEfectivo(pendiente: CuadrePendiente): number {
+    return round2(pendiente.fondoInicial + pendiente.ventasEfectivo - pendiente.totalEgresos);
+  }
+
+  pendienteEsperadoDigital(pendiente: CuadrePendiente): number {
+    return round2(pendiente.ventasDigital);
+  }
+
+  diferenciaPendienteEfectivo(pendiente: CuadrePendiente): number {
+    return round2(this.pendienteEfectivo() - this.pendienteEsperadoEfectivo(pendiente));
+  }
+
+  diferenciaPendienteDigital(pendiente: CuadrePendiente): number {
+    return round2(this.pendienteDigitales() - this.pendienteEsperadoDigital(pendiente));
   }
 
   pendienteCuadrada(pendiente: CuadrePendiente): boolean {

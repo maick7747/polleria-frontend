@@ -386,14 +386,20 @@ export interface AjusteResponseDto {
 
 export interface CuadreResumenDto {
   total_ventas: number;
+  ventas_efectivo?: number;
+  ventas_digital?: number;
   total_gastos: number;
   total_reembolsos: number;
   total_egresos: number;
   monto_esperado: number;
+  esperado_efectivo?: number;
+  esperado_digital?: number;
   efectivo_contado: number | null;
   pagos_digitales: number;
   total_real: number | null;
   diferencia: number | null;
+  diferencia_efectivo?: number | null;
+  diferencia_digital?: number | null;
   alerta: boolean;
 }
 

@@ -24,8 +24,14 @@ export interface CuadrePendienteDto {
   monto_esperado?: number;
   resumen?: {
     total_ventas?: number;
+    ventas_efectivo?: number;
+    ventas_digital?: number;
     total_egresos?: number;
     monto_esperado?: number;
+    esperado_efectivo?: number;
+    esperado_digital?: number;
+    diferencia_efectivo?: number | null;
+    diferencia_digital?: number | null;
   };
 }
 
@@ -37,6 +43,8 @@ export interface CuadrePendiente {
   totalVentas: number;
   totalEgresos: number;
   montoEsperado: number;
+  ventasEfectivo: number;
+  ventasDigital: number;
 }
 
 export interface CuadreHistorialFila {
@@ -78,6 +86,8 @@ const mapaPendiente = (dto: CuadrePendienteDto): CuadrePendiente => ({
   totalVentas: Number(dto.resumen?.total_ventas ?? dto.total_ventas ?? 0),
   totalEgresos: Number(dto.resumen?.total_egresos ?? dto.total_egresos ?? 0),
   montoEsperado: Number(dto.resumen?.monto_esperado ?? dto.monto_esperado ?? 0),
+  ventasEfectivo: Number(dto.resumen?.ventas_efectivo ?? 0),
+  ventasDigital: Number(dto.resumen?.ventas_digital ?? 0),
 });
 
 const mapaCuadre = (dto: CuadreDto): CuadreHistorialFila => ({
@@ -126,6 +136,8 @@ export class CuadreService {
   readonly motivoReapertura = signal<string | null>(null);
   readonly fondoInicial = signal<number>(200);
   readonly totalVentas = signal<number>(2450);
+  readonly ventasEfectivo = signal<number>(1450);
+  readonly ventasDigital = signal<number>(1000);
   readonly totalEgresos = signal<number>(225);
   readonly efectivoContado = signal<number>(0);
   readonly pagosDigitales = signal<number>(0);
@@ -135,6 +147,14 @@ export class CuadreService {
   readonly montoEsperado = computed<number>(() =>
     round2(this.fondoInicial() + this.totalVentas() - this.totalEgresos()),
   );
+
+  // Esperado separado por canal: el efectivo incluye el fondo y descuenta los
+  // egresos; lo digital es solo lo cobrado por Yape/Plin/tarjeta.
+  readonly esperadoEfectivo = computed<number>(() =>
+    round2(this.fondoInicial() + this.ventasEfectivo() - this.totalEgresos()),
+  );
+
+  readonly esperadoDigital = computed<number>(() => round2(this.ventasDigital()));
 
   readonly totalReal = computed<number>(() =>
     round2(this.efectivoContado() + this.pagosDigitales()),
@@ -167,6 +187,8 @@ export class CuadreService {
         this.motivoReapertura.set(null);
         this.fechaCierre.set(null);
         this.totalVentas.set(0);
+        this.ventasEfectivo.set(0);
+        this.ventasDigital.set(0);
         this.totalEgresos.set(0);
       }
       this.error.set(null);
@@ -404,6 +426,8 @@ export class CuadreService {
     this.motivoReapertura.set(dto.motivo_reapertura ?? null);
     this.fondoInicial.set(dto.fondo_inicial);
     this.totalVentas.set(dto.resumen?.total_ventas ?? dto.total_ventas);
+    this.ventasEfectivo.set(dto.resumen?.ventas_efectivo ?? 0);
+    this.ventasDigital.set(dto.resumen?.ventas_digital ?? 0);
     this.totalEgresos.set(dto.resumen?.total_egresos ?? dto.total_egresos);
     this.efectivoContado.set(dto.efectivo_contado ?? 0);
     this.pagosDigitales.set(dto.pagos_digitales);

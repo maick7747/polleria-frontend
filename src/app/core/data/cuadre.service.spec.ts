@@ -23,13 +23,26 @@ const PENDIENTES: CuadrePendienteDto[] = [
     total_ventas: 900,
     total_egresos: 100,
     monto_esperado: 1000,
+    resumen: {
+      total_ventas: 900,
+      total_egresos: 100,
+      monto_esperado: 1000,
+      ventas_efectivo: 600,
+      ventas_digital: 300,
+    },
   },
   {
     id: 8,
     fecha: '2026-11-07',
     estado: 'abierta',
     fondo_inicial: 150,
-    resumen: { total_ventas: 500, total_egresos: 50, monto_esperado: 600 },
+    resumen: {
+      total_ventas: 500,
+      total_egresos: 50,
+      monto_esperado: 600,
+      ventas_efectivo: 400,
+      ventas_digital: 100,
+    },
   },
 ];
 
@@ -87,6 +100,8 @@ describe('CuadreService (cajas pendientes)', () => {
         totalVentas: 900,
         totalEgresos: 100,
         montoEsperado: 1000,
+        ventasEfectivo: 600,
+        ventasDigital: 300,
       },
       {
         id: 8,
@@ -96,6 +111,8 @@ describe('CuadreService (cajas pendientes)', () => {
         totalVentas: 500,
         totalEgresos: 50,
         montoEsperado: 600,
+        ventasEfectivo: 400,
+        ventasDigital: 100,
       },
     ]);
     expect(api.peticiones).toContain('/cuadre-caja/pendientes');
