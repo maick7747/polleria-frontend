@@ -540,9 +540,15 @@
 }
 
 .perm__roles .role.is-on.role--admin {
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
   color: var(--c-white);
+}
+
+.perm__roles .role.is-on.role--turno {
+  border: 1px solid rgba(120, 220, 170, 0.4);
+  background: rgba(46, 160, 100, 0.2);
+  color: #8fe0b4;
 }
 
 .perm__error {
@@ -671,6 +677,11 @@
   text-align: center;
   font-size: 10.5px;
   color: var(--c-on-dark-3);
+}
+
+.perm__foot--inline {
+  padding-top: 4px;
+  text-align: left;
 }
 
 .pie {

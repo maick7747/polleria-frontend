@@ -151,7 +151,6 @@
             <input
               type="email"
               [value]="email()"
-              [readOnly]="modo() === 'editar'"
               (input)="onCampo($event, 'email')"
             />
           </label>
@@ -160,7 +159,6 @@
             <input
               type="text"
               [value]="usuario()"
-              [readOnly]="modo() === 'editar'"
               placeholder="usuario"
               (input)="onCampo($event, 'usuario')"
             />
@@ -172,18 +170,40 @@
             <span>Teléfono</span>
             <input type="text" [value]="telefono()" (input)="onCampo($event, 'telefono')" />
           </label>
-          @if (modo() === 'nuevo') {
-            <label class="campo-dark">
-              <span>Clave</span>
-              <input type="password" [value]="clave()" (input)="onCampo($event, 'clave')" />
-            </label>
-          }
+          <label class="campo-dark">
+            <span>{{ modo() === 'nuevo' ? 'Clave' : 'Nueva clave' }}</span>
+            <input
+              type="password"
+              [value]="clave()"
+              [attr.placeholder]="modo() === 'nuevo' ? '' : 'dejar vacío para no cambiar'"
+              autocomplete="new-password"
+              (input)="onCampo($event, 'clave')"
+            />
+          </label>
         </div>
 
         <label class="switch">
           <input type="checkbox" [checked]="activo()" (change)="cambiarActivo($event)" />
           <span>{{ activo() ? 'Usuario activo' : 'Usuario inactivo' }}</span>
         </label>
+
+        <span class="perm__eyebrow">TURNOS DEL PERSONAL</span>
+        <div class="perm__roles">
+          @for (turno of turnosCatalogo; track turno.id) {
+            <button
+              type="button"
+              class="role role--turno"
+              [class.is-on]="turnosDraft().includes(turno.id)"
+              [attr.aria-pressed]="turnosDraft().includes(turno.id)"
+              (click)="toggleTurno(turno.id)"
+            >
+              {{ turno.label }}
+            </button>
+          }
+        </div>
+        <span class="perm__foot perm__foot--inline">
+          Un usuario puede cubrir varios turnos (ej. mañana y tarde).
+        </span>
 
         <div class="perm__roles">
           @for (rol of roles(); track rol.id) {

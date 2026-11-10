@@ -24,6 +24,17 @@ import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 type FiltroActivo = 'todos' | 'activos' | 'inactivos';
 type Modo = 'editar' | 'nuevo';
 
+interface TurnoVista {
+  id: string;
+  label: string;
+}
+
+const TURNOS_PERSONAL: readonly TurnoVista[] = [
+  { id: 'mañana', label: 'Mañana' },
+  { id: 'tarde', label: 'Tarde' },
+  { id: 'noche', label: 'Noche' },
+];
+
 interface FiltroVista {
   id: FiltroActivo;
   label: string;
@@ -64,6 +75,7 @@ export class UsuariosPage {
   private buscarTimer: number | null = null;
 
   readonly filtros = FILTROS;
+  readonly turnosCatalogo = TURNOS_PERSONAL;
   readonly abreviar = abreviarNombre;
 
   readonly busqueda = signal<string>('');
@@ -80,6 +92,7 @@ export class UsuariosPage {
   readonly clave = signal<string>('');
   readonly activo = signal<boolean>(true);
   readonly rolesDraft = signal<string[]>([]);
+  readonly turnosDraft = signal<string[]>([]);
 
   readonly errorRoles = signal<boolean>(false);
   readonly toast = signal<string>('');
@@ -114,9 +127,13 @@ export class UsuariosPage {
     }
     return (
       [...this.rolesDraft()].sort().join('|') !== [...actual.roles].sort().join('|') ||
+      [...this.turnosDraft()].sort().join('|') !== [...actual.turnos].sort().join('|') ||
       this.nombre() !== actual.nombre ||
+      this.email() !== actual.email ||
+      (this.usuario().trim() || '') !== (actual.usuario ?? '') ||
       this.telefono() !== actual.telefono ||
-      this.activo() !== actual.activo
+      this.activo() !== actual.activo ||
+      this.clave().trim().length > 0
     );
   });
 
@@ -168,22 +185,19 @@ export class UsuariosPage {
   }
 
   detalle(usuario: UsuarioVista): string {
-    if (usuario.roles.includes('Dueño/Admin')) {
-      return 'Dueño del local';
+    const cargo =
+      usuario.roles.includes('Dueño/Admin') ? 'Dueño del local'
+        : usuario.roles.includes('Cocinero') ? 'Cocina'
+          : usuario.roles.includes('Repartidor') ? 'Reparto · moto propia'
+            : usuario.roles.includes('Cajero') ? 'Caja y salón'
+              : usuario.roles.includes('Admin') ? 'Soporte técnico'
+                : 'Personal';
+    const turnos = usuario.turnos ?? [];
+    if (turnos.length === 0) {
+      return `${cargo} · sin turno`;
     }
-    if (usuario.roles.includes('Cocinero')) {
-      return 'Cocina · turno tarde';
-    }
-    if (usuario.roles.includes('Repartidor')) {
-      return 'Reparto · moto propia';
-    }
-    if (usuario.roles.includes('Cajero')) {
-      return 'Turno mañana';
-    }
-    if (usuario.roles.includes('Admin')) {
-      return 'Soporte técnico';
-    }
-    return 'Turno tarde';
+    const etiquetas = turnos.map((turno) => turno.charAt(0).toUpperCase() + turno.slice(1));
+    return `${cargo} · ${etiquetas.join(', ')}`;
   }
 
   acceso(usuario: UsuarioVista): string {
@@ -269,6 +283,7 @@ export class UsuariosPage {
     this.clave.set('');
     this.activo.set(true);
     this.rolesDraft.set([]);
+    this.turnosDraft.set([]);
     this.errorRoles.set(false);
   }
 
@@ -310,6 +325,14 @@ export class UsuariosPage {
     }
   }
 
+  toggleTurno(turno: string): void {
+    this.turnosDraft.update((actuales) =>
+      actuales.includes(turno)
+        ? actuales.filter((actual) => actual !== turno)
+        : [...actuales, turno],
+    );
+  }
+
   origen(codigo: string): string {
     const rol = this.roles().find((item) => item.permisos.includes(codigo));
     return rol ? rol.nombre : '';
@@ -338,6 +361,7 @@ export class UsuariosPage {
         telefono: this.telefono().trim() || undefined,
         clave: this.clave().trim(),
         activo: this.activo(),
+        turnos: this.turnosDraft(),
         roles: this.rolesDraft() as RolNombre[],
       });
       if (!creado) {
@@ -359,8 +383,12 @@ export class UsuariosPage {
 
     const actualizado = await this.config.actualizarUsuario(actual.id, {
       nombre: this.nombre().trim(),
+      email: this.email().trim(),
+      usuario: this.usuario().trim() || undefined,
       telefono: this.telefono().trim(),
       activo: this.activo(),
+      clave: this.clave().trim() || undefined,
+      turnos: this.turnosDraft(),
     });
     if (!actualizado) {
       this.avisar(this.config.error() ?? 'No se pudo actualizar el usuario', true);
@@ -422,6 +450,7 @@ export class UsuariosPage {
     this.clave.set('');
     this.activo.set(usuario.activo);
     this.rolesDraft.set([...usuario.roles]);
+    this.turnosDraft.set([...(usuario.turnos ?? [])]);
   }
 
   private sincronizarUrl(): void {

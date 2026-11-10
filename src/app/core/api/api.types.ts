@@ -650,6 +650,7 @@ export interface UsuarioDto {
   usuario: string;
   telefono: string | null;
   activo: boolean;
+  turnos?: string[];
   roles: Array<string | UsuarioRolDto>;
   permisos: string[];
   ultimo_acceso: string | null;

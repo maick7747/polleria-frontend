@@ -37,13 +37,18 @@ export interface UsuarioEntrada {
   telefono?: string;
   clave?: string;
   activo?: boolean;
+  turnos?: string[];
   roles: RolNombre[];
 }
 
 export interface UsuarioCambios {
   nombre?: string;
+  email?: string;
+  usuario?: string;
   telefono?: string;
+  clave?: string;
   activo?: boolean;
+  turnos?: string[];
 }
 
 export interface ParametrosConfiguracion {
@@ -166,11 +171,11 @@ export class ConfiguracionService {
   readonly actualizadoEn = signal<string | null>(null);
 
   readonly usuarios = signal<UsuarioVista[]>(
-    USE_API ? [] : MOCK_USUARIOS.map((usuario) => ({ ...usuario, roles: [...usuario.roles] })),
+    USE_API ? [] : MOCK_USUARIOS.map((usuario) => ({ ...usuario, turnos: [], roles: [...usuario.roles] })),
   );
 
   private readonly todosDemo = signal<UsuarioVista[]>(
-    MOCK_USUARIOS.map((usuario) => ({ ...usuario, roles: [...usuario.roles] })),
+    MOCK_USUARIOS.map((usuario) => ({ ...usuario, turnos: [], roles: [...usuario.roles] })),
   );
 
   readonly meta = signal<PageMeta>({ ...META_INICIAL });
@@ -370,6 +375,7 @@ export class ConfiguracionService {
         roles: [...entrada.roles],
         permisos: [...this.permisosDe(entrada.roles)],
         usuario: entrada.usuario,
+        turnos: [...(entrada.turnos ?? [])],
         creadoEn: new Date().toISOString(),
       };
       this.todosDemo.update((lista) => [nuevo, ...lista]);
@@ -388,6 +394,7 @@ export class ConfiguracionService {
         telefono: entrada.telefono || undefined,
         clave: entrada.clave || undefined,
         activo: entrada.activo ?? true,
+        turnos: entrada.turnos ?? [],
       }, entrada.roles);
       await this.cargar(this.ultimaConsulta);
       return toUsuario(dto);
@@ -408,7 +415,11 @@ export class ConfiguracionService {
       if (!actual) {
         return null;
       }
-      const actualizado: UsuarioVista = { ...actual, ...cambios };
+      const actualizado: UsuarioVista = {
+        ...actual,
+        ...cambios,
+        turnos: cambios.turnos ? [...cambios.turnos] : actual.turnos,
+      };
       this.todosDemo.update((lista) =>
         lista.map((usuario) => (usuario.id === id ? actualizado : usuario)),
       );
@@ -424,8 +435,12 @@ export class ConfiguracionService {
       const dto = await firstValueFrom(
         this.api.patch<UsuarioDto>(`/configuracion/usuarios/${id}`, {
           nombre: cambios.nombre,
+          email: cambios.email,
+          usuario: cambios.usuario,
           telefono: cambios.telefono,
           activo: cambios.activo,
+          clave: cambios.clave || undefined,
+          turnos: cambios.turnos,
         }),
       );
       await this.cargar(this.ultimaConsulta);

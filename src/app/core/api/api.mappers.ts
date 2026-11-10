@@ -641,6 +641,7 @@ export interface MovimientoDetalle extends MovimientoStock {
 export interface UsuarioVista extends Usuario {
   usuario?: string;
   creadoEn?: string;
+  turnos: string[];
 }
 
 export interface RolCatalogo {
@@ -734,6 +735,7 @@ export function toUsuario(dto: UsuarioDto): UsuarioVista {
     activo: Boolean(dto.activo),
     roles,
     permisos: Array.isArray(dto.permisos) ? [...dto.permisos] : [],
+    turnos: Array.isArray(dto.turnos) ? [...dto.turnos] : [],
     ultimoAcceso: dto.ultimo_acceso ?? undefined,
     usuario: dto.usuario,
     creadoEn: dto.creado_en,
