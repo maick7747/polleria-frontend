@@ -67,6 +67,9 @@ export class CuentasService {
   // Cliente capturado antes de que exista la cuenta (cuenta perezosa).
   private readonly clientesPendientes = new Map<number, DatosCliente>();
 
+  // Indica si esta instancia ya aplicó un tablero (para hidratarse con un 304).
+  private hidratado = false;
+
   readonly cargando = signal<boolean>(false);
   readonly error = signal<string | null>(null);
   readonly errorDetalle = signal<ApiError | null>(null);
@@ -117,11 +120,13 @@ export class CuentasService {
       const resultado = await firstValueFrom(
         this.api.getConEtag<TableroDto>('/venta-local/tablero'),
       );
-      // 304: el tablero no cambió; no se reasignan señales (evita repintado).
-      if (resultado.changed && resultado.data) {
+      // 304: llega el tablero cacheado. Se aplica si el servidor confirma que
+      // cambió o si esta pantalla aún no tiene datos (recién abierta).
+      if (resultado.data && (resultado.changed || !this.hidratado)) {
         const tablero = resultado.data;
         this.cuentas.set(tablero.cuentas.map(toCuenta));
         this.mesas.reemplazar(tablero.mesas);
+        this.hidratado = true;
       }
       this.error.set(null);
       this.aviso.set(null);

@@ -133,6 +133,9 @@ export class CocinaPage {
 
   private temporizador: number | null = null;
   private ultimaRevision = 0;
+  // Un 304 trae el cuerpo cacheado: se aplica solo la primera vez, para que la
+  // pantalla no arranque vacía si otra vista ya pidió el KDS en esta pestaña.
+  private hidratado = false;
 
   readonly ahora = signal(Date.now());
   readonly pedidosKds = signal<Pedido[]>([]);
@@ -202,9 +205,10 @@ export class CocinaPage {
     }
     try {
       const resultado = await this.cocina.listKds();
-      if (resultado.changed) {
+      if (resultado.changed || !this.hidratado) {
         this.pedidosKds.set(resultado.pedidos);
         this.metaKds.set(resultado.meta);
+        this.hidratado = true;
         this.ajustarSeleccion();
       }
       this.error.set(null);

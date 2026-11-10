@@ -99,8 +99,9 @@ export class CocinaService {
   }
 
   /**
-   * `GET /api/kds/pedidos` con ETag. En un 304 devuelve `changed: false` para
-   * que la pantalla conserve el estado y no repinte.
+   * `GET /api/kds/pedidos` con ETag. En un 304 `getConEtag` devuelve el cuerpo
+   * cacheado: se reenvía con `changed: false` para que la pantalla decida si
+   * repinta (si ya tenía datos) o se hidrata (si acaba de abrirse).
    */
   async listKds(): Promise<KdsListado> {
     if (!USE_API) {
@@ -109,12 +110,12 @@ export class CocinaService {
     const resultado = await firstValueFrom(
       this.api.getConEtag<ApiList<KdsPedidoDto>>('/kds/pedidos'),
     );
-    if (!resultado.changed || !resultado.data) {
+    if (!resultado.data) {
       return { changed: false, pedidos: [], meta: null };
     }
     const respuesta = resultado.data;
     return {
-      changed: true,
+      changed: resultado.changed,
       pedidos: respuesta.data.map(toPedidoKds),
       meta: this.toMeta(respuesta.meta),
     };

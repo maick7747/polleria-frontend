@@ -192,8 +192,9 @@ export class DashboardService {
       const respuesta = await firstValueFrom(
         this.api.getConEtag<DashboardDto>('/dashboard'),
       );
-      // 304 (o cuerpo nulo): los datos no cambiaron, no se repinta ni la hora.
-      if (respuesta.changed && respuesta.data !== null) {
+      // 304: llega el cuerpo cacheado. Se aplica si cambió o en la primera
+      // carga (pantalla recién abierta), sin repintar las siguientes veces.
+      if (respuesta.data !== null && (respuesta.changed || this.primeraCarga)) {
         this.aplicarKpis(respuesta.data);
       } else {
         // Mantiene la fecha y el turno al día aunque la respuesta sea un 304

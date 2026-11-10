@@ -74,6 +74,16 @@ describe('DashboardService (ETag)', () => {
     expect(servicio.actualizado()).toBe('--:--');
   });
 
+  it('304 con cuerpo cacheado hidrata la primera carga (pantalla recién abierta)', async () => {
+    api.respuesta = { data: DTO, changed: false, status: 304 };
+    const ok = await servicio.cargar();
+
+    expect(ok).toBe(true);
+    expect(servicio.kpis().ventasHoy).toBe(4321);
+    expect(servicio.kpis().topPlatos).toHaveLength(1);
+    expect(servicio.actualizado()).not.toBe('--:--');
+  });
+
   it('changed:true aplica los KPIs y sella la hora Lima actual', async () => {
     api.respuesta = { data: DTO, changed: true, status: 200 };
     const ok = await servicio.cargar();

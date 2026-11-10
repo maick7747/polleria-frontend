@@ -82,6 +82,9 @@ export class PedidosService {
         })),
   );
 
+  // Si el KDS ya se aplicó (permite hidratarse con el cuerpo de un 304).
+  private hidratadoKds = false;
+
   readonly activos = computed<Pedido[]>(() =>
     this.pedidos().filter(
       (pedido) => pedido.estado !== 'cobrado' && pedido.estado !== 'cancelado',
@@ -194,8 +197,9 @@ export class PedidosService {
       const resultado = await firstValueFrom(
         this.api.getConEtag<ApiList<KdsPedidoDto>>('/kds/pedidos'),
       );
-      // 304: el KDS no cambió; se conserva la lista actual sin repintar.
-      if (resultado.changed && resultado.data) {
+      // 304: el cuerpo llega cacheado. Se aplica si cambió o si el servicio
+      // aún no tiene datos (primera carga tras abrir la pantalla).
+      if (resultado.data && (resultado.changed || !this.hidratadoKds)) {
         const respuesta = resultado.data;
         this.pedidos.set(respuesta.data.map(toPedidoKds));
         this.meta.set({
@@ -206,6 +210,7 @@ export class PedidosService {
           prioritarios: respuesta.meta.prioritarios,
           sla_min: respuesta.meta.sla_min,
         });
+        this.hidratadoKds = true;
       }
       return true;
     } catch (error) {
