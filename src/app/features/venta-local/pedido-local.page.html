@@ -90,7 +90,7 @@
               </div>
             </article>
           } @empty {
-            <p class="menu__vacio">No hay platos para este filtro.</p>
+            <p class="menu__vacio">{{ menuError() ?? 'No hay platos para este filtro.' }}</p>
           }
         </div>
       </div>

@@ -88,6 +88,9 @@ export class PedidoLocalPage {
   readonly enviando = signal(false);
   readonly moneda = formatearMoneda;
 
+  // Mensaje del backend si la carta no se pudo cargar (403, red, etc.).
+  readonly menuError = this.fichas.error;
+
   readonly mesa = computed(() => this.mesas.porId(this.mesaId) ?? null);
   readonly cuenta = computed(() => this.cuentas.cuentaDeMesa(this.mesaId) ?? null);
 
@@ -204,7 +207,12 @@ export class PedidoLocalPage {
     // signal nunca está vacía; en modo API se mantiene la carga (1 request)
     // para no mostrar stock simulado.
     const tareas: Promise<boolean>[] = [];
-    if (this.inventario.insumos().length === 0 || USE_API) {
+    // El inventario solo alimenta el aviso de stock bajo: si el rol no puede
+    // consultarlo (p. ej. Mozo), no se pide para no provocar un 403 inútil.
+    if (
+      this.auth.hasPermission('inventario.gestionar') &&
+      (this.inventario.insumos().length === 0 || USE_API)
+    ) {
       tareas.push(this.inventario.cargar({ limit: 100 }));
     }
     if (this.fichas.platos().length === 0) {
