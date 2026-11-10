@@ -10,8 +10,9 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { esApiError, mensajeError } from '../../core/api/api.helpers';
 import { CuadreService } from '../../core/data/cuadre.service';
+import { ClientesService } from '../../core/data/clientes.service';
 import { CuentasService } from '../../core/data/cuentas.service';
-import type { MetodoPago } from '../../core/models';
+import type { ComprobanteTipo, MetodoPago } from '../../core/models';
 import {
   abreviarNombre,
   formatearMoneda,
@@ -61,6 +62,7 @@ export class CuentaDetallePage {
   private readonly router = inject(Router);
   private readonly cuentas = inject(CuentasService);
   private readonly cuadre = inject(CuadreService);
+  private readonly clientes = inject(ClientesService);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -84,6 +86,13 @@ export class CuentaDetallePage {
   readonly toast = signal('');
   readonly toastError = signal(false);
   readonly cajaCerrada = signal('');
+
+  // Datos de cobro: el cliente y el comprobante se piden aquí, al cerrar la
+  // cuenta, no al abrir la mesa (por defecto "Consumidor final").
+  readonly comprobanteSel = signal<ComprobanteTipo>('boleta');
+  readonly clienteNombre = signal('');
+  readonly clienteDocumento = signal('');
+  readonly buscandoDocumento = signal(false);
 
   private toastTimer: number | null = null;
   private navTimer: number | null = null;
@@ -115,6 +124,8 @@ export class CuentaDetallePage {
             ? 'La cuenta no existe o ya fue cerrada.'
             : detalle?.message ?? 'No se pudo cargar la cuenta.',
         );
+      } else {
+        this.sincronizarDatosCobro();
       }
     } finally {
       window.clearTimeout(temporizador);
@@ -217,6 +228,49 @@ export class CuentaDetallePage {
     this.recibido.set(input.value);
   }
 
+  // Copia a los campos lo que ya tenga guardado la cuenta.
+  private sincronizarDatosCobro(): void {
+    const cuenta = this.cuenta();
+    if (!cuenta) {
+      return;
+    }
+    this.comprobanteSel.set(cuenta.comprobanteTipo);
+    this.clienteNombre.set(cuenta.cliente?.nombre ?? '');
+    this.clienteDocumento.set(cuenta.cliente?.numeroDocumento ?? '');
+  }
+
+  elegirComprobante(tipo: ComprobanteTipo): void {
+    if (this.procesando()) {
+      return;
+    }
+    this.comprobanteSel.set(tipo);
+  }
+
+  onClienteNombre(event: Event): void {
+    this.clienteNombre.set((event.target as HTMLInputElement).value);
+  }
+
+  // Al completar 8 dígitos se intenta traer el nombre (RENIEC sandbox); si no
+  // hay proveedor disponible, el cajero lo escribe a mano.
+  async onClienteDocumento(event: Event): Promise<void> {
+    const valor = (event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 8);
+    this.clienteDocumento.set(valor);
+    if (valor.length !== 8 || this.clienteNombre().trim()) {
+      return;
+    }
+    this.buscandoDocumento.set(true);
+    try {
+      const validado = await this.clientes.validarDocumento('DNI', valor);
+      if (validado.valido && validado.nombre && !this.clienteNombre().trim()) {
+        this.clienteNombre.set(validado.nombre);
+      }
+    } catch {
+      // Sin RENIEC disponible: queda el nombre manual.
+    } finally {
+      this.buscandoDocumento.set(false);
+    }
+  }
+
   async registrarPago(): Promise<void> {
     const cuenta = this.cuenta();
     if (!cuenta || cuenta.estado !== 'abierta' || this.procesando()) {
@@ -228,14 +282,38 @@ export class CuentaDetallePage {
       return;
     }
 
+    const documento = this.clienteDocumento().trim();
+    const nombre = this.clienteNombre().trim();
+    if (documento && !/^\d{8}$/.test(documento)) {
+      this.avisar('El DNI debe tener 8 dígitos.', true);
+      return;
+    }
+    if (documento && !nombre) {
+      this.avisar('Ingresa el nombre del cliente para la boleta.', true);
+      return;
+    }
+
     this.procesando.set(true);
     this.cajaCerrada.set('');
-    const numero = this.numeroComprobante(cuenta.comprobanteTipo);
     try {
+      // Los datos de cobro se guardan antes de cobrar: el comprobante y el
+      // cliente se deciden aquí, no al abrir la mesa.
+      const cambioTipo = this.comprobanteSel() !== cuenta.comprobanteTipo;
+      const cambioCliente = documento !== (cuenta.cliente?.numeroDocumento ?? '');
+      if (cambioTipo || cambioCliente) {
+        await this.cuentas.guardarDatosCobro(cuenta.id, {
+          comprobanteTipo: this.comprobanteSel(),
+          cliente: documento
+            ? { tipoDocumento: 'DNI', numeroDocumento: documento, nombre }
+            : undefined,
+        });
+      }
+
+      const numero = this.numeroComprobante(this.comprobanteSel());
       const cerrada = await this.cuentas.cerrar(
         cuenta.id,
         this.auth.usuario()?.id ?? 3,
-        cuenta.comprobanteTipo,
+        this.comprobanteSel(),
         numero,
         this.metodo(),
       );

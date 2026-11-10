@@ -142,15 +142,6 @@ export class PedidoLocalPage {
     round2((this.cuenta()?.total ?? 0) + this.totalRonda()),
   );
 
-  readonly clientePendiente = computed(
-    () => this.cuentas.clientePendiente(this.mesaId) ?? null,
-  );
-  readonly clienteNombre = computed(
-    () => this.cuenta()?.cliente?.nombre ?? this.clientePendiente()?.nombre ?? 'Sin datos',
-  );
-  readonly clienteAccion = computed(
-    () => ((this.cuenta()?.cliente ?? this.clientePendiente()) ? 'Editar' : 'Agregar'),
-  );
   readonly puedeEnviar = computed(() => this.items().length > 0 && !this.enviando());
 
   readonly stockBajoTexto = computed(() => {

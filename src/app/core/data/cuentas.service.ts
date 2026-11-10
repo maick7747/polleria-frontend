@@ -202,6 +202,58 @@ export class CuentasService {
     }
   }
 
+  /**
+   * `PATCH /cuentas/:id/cliente` con los datos de cobro: cliente y/o tipo de
+   * comprobante. Se usa al cerrar la cuenta (es cuando el cliente elige
+   * boleta/factura), no al abrir la mesa.
+   */
+  async guardarDatosCobro(
+    cuentaId: number,
+    datos: { cliente?: DatosCliente; comprobanteTipo?: ComprobanteTipo },
+  ): Promise<Cuenta | null> {
+    const cuenta = this.porId(cuentaId);
+    if (!cuenta) {
+      return null;
+    }
+
+    const cuerpo: Record<string, unknown> = {};
+    if (datos.cliente) {
+      cuerpo['cliente'] = this.aClientePayload(datos.cliente);
+    }
+    if (datos.comprobanteTipo) {
+      cuerpo['comprobante_tipo'] = datos.comprobanteTipo;
+    }
+
+    if (USE_API) {
+      try {
+        const dto = await firstValueFrom(
+          this.api.patch<CuentaDto>(`/cuentas/${cuentaId}/cliente`, cuerpo),
+        );
+        // El PATCH devuelve un resumen (sin rondas completas): se conservan las
+        // locales y solo se actualizan cliente y comprobante.
+        const actualizada: Cuenta = {
+          ...cuenta,
+          cliente: toCuenta(dto).cliente ?? cuenta.cliente,
+          comprobanteTipo: datos.comprobanteTipo ?? cuenta.comprobanteTipo,
+        };
+        this.upsert(actualizada);
+        return actualizada;
+      } catch (error) {
+        if (!esFalloRed(error)) {
+          throw error;
+        }
+      }
+    }
+
+    const actualizada: Cuenta = {
+      ...cuenta,
+      cliente: datos.cliente ?? cuenta.cliente,
+      comprobanteTipo: datos.comprobanteTipo ?? cuenta.comprobanteTipo,
+    };
+    this.upsert(actualizada);
+    return actualizada;
+  }
+
   async guardarCliente(
     cuentaId: number,
     cliente: DatosCliente,

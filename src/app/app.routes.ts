@@ -1,8 +1,13 @@
 import type { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { AuthService } from './core/auth/auth.service';
 import { guestGuard, roleGuard } from './core/auth/role.guard';
 import type { RolNombre } from './core/models';
 
 const roles = (...valores: RolNombre[]): RolNombre[] => valores;
+
+// Cada usuario entra a la pantalla de su rol (Mozo → mesas, Cocinero → KDS…).
+const inicio = (): string => inject(AuthService).home();
 
 export const routes: Routes = [
   {
@@ -15,6 +20,7 @@ export const routes: Routes = [
     path: 'dashboard',
     title: "Pulso del turno · Fratelli's",
     canActivate: [roleGuard],
+    data: { roles: roles('Dueño/Admin', 'Admin') },
     loadComponent: () =>
       import('./features/dashboard/dashboard.page').then((m) => m.DashboardPage),
   },
@@ -26,14 +32,6 @@ export const routes: Routes = [
     data: { roles: roles('Mozo', 'Cajero', 'Dueño/Admin') },
     loadComponent: () =>
       import('./features/venta-local/pedido-local.page').then((m) => m.PedidoLocalPage),
-  },
-  {
-    path: 'venta-local/cliente',
-    title: "Datos del Cliente · Fratelli's",
-    canActivate: [roleGuard],
-    data: { roles: roles('Mozo', 'Cajero', 'Dueño/Admin') },
-    loadComponent: () =>
-      import('./features/venta-local/datos-cliente.page').then((m) => m.DatosClientePage),
   },
   {
     path: 'venta-local',
@@ -311,6 +309,6 @@ export const routes: Routes = [
       import('./features/configuracion/configuracion.page').then((m) => m.ConfiguracionPage),
   },
 
-  { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-  { path: '**', redirectTo: 'dashboard' },
+  { path: '', pathMatch: 'full', redirectTo: inicio },
+  { path: '**', redirectTo: inicio },
 ];

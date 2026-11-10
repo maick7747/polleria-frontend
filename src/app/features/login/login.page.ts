@@ -71,6 +71,7 @@ export class LoginPage {
       return;
     }
     this.error.set('');
-    void this.router.navigateByUrl('/dashboard');
+    // Cada rol entra a su pantalla operativa (no todos pueden ver el Dashboard).
+    void this.router.navigateByUrl(this.auth.home());
   }
 }

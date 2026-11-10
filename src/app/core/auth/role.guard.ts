@@ -18,7 +18,7 @@ export const guestGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   if (auth.isAuthenticated()) {
-    return router.createUrlTree(['/dashboard']);
+    return router.createUrlTree([auth.home()]);
   }
   return true;
 };
@@ -36,5 +36,6 @@ export const roleGuard: CanActivateFn = (route) => {
     return true;
   }
 
-  return auth.hasAnyRole(requeridos) ? true : router.createUrlTree(['/dashboard']);
+  // Sin permiso se vuelve a su pantalla de inicio (nunca a una que tampoco ve).
+  return auth.hasAnyRole(requeridos) ? true : router.createUrlTree([auth.home()]);
 };

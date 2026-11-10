@@ -164,21 +164,6 @@
           </span>
         </div>
 
-        <div class="cliente">
-          <div class="cliente__info">
-            <app-icon name="user" [size]="13" />
-            Cliente · {{ clienteNombre() }}
-          </div>
-          <a
-            class="cliente__link"
-            [routerLink]="['/venta-local/cliente']"
-            [queryParams]="{ mesaId: mesaId }"
-          >
-            <app-icon name="plus" [size]="11" />
-            {{ clienteAccion() }}
-          </a>
-        </div>
-
         <label class="observaciones">
           <span>Observaciones para cocina</span>
           <textarea

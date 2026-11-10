@@ -888,3 +888,47 @@
     transform: rotate(360deg);
   }
 }
+
+/* Datos de cobro: tipo de comprobante, cliente y DNI al cerrar la cuenta */
+.comp-ops {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.comp-op {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--c-sep);
+  background: transparent;
+  color: var(--c-text-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comp-op.is-sel {
+  border-color: var(--c-brand);
+  color: var(--c-brand-text);
+}
+
+.comprobante__row--stack {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+}
+
+.comp-input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--c-sep);
+  background: transparent;
+  color: var(--c-text);
+  font-size: 12.5px;
+}
+
+.comp-input::placeholder {
+  color: var(--c-text-3);
+}

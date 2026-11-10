@@ -20,7 +20,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: readonly NavItem[] = [
-  { label: 'Dashboard', route: '/dashboard', icon: 'house', roles: [], exact: true },
+  { label: 'Dashboard', route: '/dashboard', icon: 'house', roles: ['Dueño/Admin', 'Admin'], exact: true },
   { label: 'Venta en Local', route: '/venta-local', icon: 'receipt', roles: ['Mozo', 'Cajero', 'Dueño/Admin'], exact: false },
   { label: 'Comandas', route: '/comandas', icon: 'clipboard-text', roles: ['Mozo', 'Cajero', 'Cocinero', 'Dueño/Admin'], exact: false },
   { label: 'Historial de pedidos', route: '/historial-pedidos', icon: 'clock', roles: ['Mozo', 'Cajero', 'Dueño/Admin', 'Admin'], exact: false },
@@ -63,6 +63,9 @@ export class AppShellComponent {
   readonly nav = computed<readonly NavItem[]>(() =>
     NAV_ITEMS.filter((item) => this.auth.hasAnyRole(item.roles)),
   );
+
+  // El logo lleva a la pantalla de inicio del rol (no todos ven el Dashboard).
+  readonly inicio = this.auth.home;
 
   readonly iniciales = computed<string>(() => {
     const nombre = this.usuario()?.nombre ?? '';

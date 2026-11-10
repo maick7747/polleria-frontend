@@ -56,6 +56,31 @@ export class AuthService {
   readonly roles = computed<readonly RolNombre[]>(() => this.usuario()?.roles ?? []);
   readonly permisos = computed<readonly string[]>(() => this.usuario()?.permisos ?? []);
 
+  /**
+   * Pantalla de inicio según el perfil: cada rol entra donde puede trabajar,
+   * así nadie cae en el Dashboard y recibe un 403.
+   */
+  readonly home = computed<string>(() => {
+    const usuario = this.usuario();
+    if (!usuario) {
+      return '/login';
+    }
+    const roles = usuario.roles;
+    if (roles.includes('Dueño/Admin') || roles.includes('Admin')) {
+      return '/dashboard';
+    }
+    if (roles.includes('Cocinero')) {
+      return '/cocina';
+    }
+    if (roles.includes('Mozo') || roles.includes('Cajero')) {
+      return '/venta-local';
+    }
+    if (roles.includes('Repartidor')) {
+      return '/delivery-propio';
+    }
+    return '/login';
+  });
+
   isAuthenticated(): boolean {
     const actual = this.sesion();
     return actual !== null && actual.expiraEn > Date.now();

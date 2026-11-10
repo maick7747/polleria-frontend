@@ -122,20 +122,72 @@
                 <span class="comprobante__tag">SUNAT simulado</span>
               </div>
               <span class="comprobante__sep"></span>
-              <div class="comprobante__row">
-                <span>Cliente</span>
-                <strong>{{ cliente() }}</strong>
-              </div>
-              <span class="comprobante__sep"></span>
-              <div class="comprobante__row">
-                <span>Documento</span>
-                <strong>{{ documento() }}</strong>
-              </div>
-              <span class="comprobante__sep"></span>
-              <div class="comprobante__row">
-                <span>Comprobante</span>
-                <strong>{{ comprobante() }}</strong>
-              </div>
+              @if (abierta()) {
+                <div class="comprobante__row">
+                  <span>Comprobante</span>
+                  <div class="comp-ops" role="group" aria-label="Tipo de comprobante">
+                    <button
+                      type="button"
+                      class="comp-op"
+                      [class.is-sel]="comprobanteSel() === 'ticket'"
+                      [attr.aria-pressed]="comprobanteSel() === 'ticket'"
+                      (click)="elegirComprobante('ticket')"
+                    >
+                      Ticket
+                    </button>
+                    <button
+                      type="button"
+                      class="comp-op"
+                      [class.is-sel]="comprobanteSel() === 'boleta'"
+                      [attr.aria-pressed]="comprobanteSel() === 'boleta'"
+                      (click)="elegirComprobante('boleta')"
+                    >
+                      Boleta
+                    </button>
+                  </div>
+                </div>
+                <span class="comprobante__sep"></span>
+                <div class="comprobante__row comprobante__row--stack">
+                  <span>Cliente</span>
+                  <input
+                    class="comp-input"
+                    type="text"
+                    placeholder="Consumidor final"
+                    aria-label="Nombre del cliente"
+                    [value]="clienteNombre()"
+                    (input)="onClienteNombre($event)"
+                  />
+                </div>
+                <span class="comprobante__sep"></span>
+                <div class="comprobante__row comprobante__row--stack">
+                  <span>DNI {{ buscandoDocumento() ? '· consultando…' : '(opcional)' }}</span>
+                  <input
+                    class="comp-input"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="8"
+                    placeholder="8 dígitos"
+                    aria-label="DNI del cliente"
+                    [value]="clienteDocumento()"
+                    (input)="onClienteDocumento($event)"
+                  />
+                </div>
+              } @else {
+                <div class="comprobante__row">
+                  <span>Cliente</span>
+                  <strong>{{ cliente() }}</strong>
+                </div>
+                <span class="comprobante__sep"></span>
+                <div class="comprobante__row">
+                  <span>Documento</span>
+                  <strong>{{ documento() }}</strong>
+                </div>
+                <span class="comprobante__sep"></span>
+                <div class="comprobante__row">
+                  <span>Comprobante</span>
+                  <strong>{{ comprobante() }}</strong>
+                </div>
+              }
               <span class="comprobante__sep"></span>
             </div>
 
