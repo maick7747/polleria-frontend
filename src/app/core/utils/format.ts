@@ -72,6 +72,9 @@ export const turnoActual = (fecha: Date = new Date()): string => {
       timeZone: ZONA_LIMA,
     }).format(fecha),
   );
+  if (horaDia < 11) {
+    return 'turno mañana';
+  }
   return horaDia < 17 ? 'turno tarde' : 'turno noche';
 };
 

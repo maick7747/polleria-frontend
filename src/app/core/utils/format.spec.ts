@@ -109,7 +109,12 @@ describe('fechaLarga', () => {
 });
 
 describe('turnoActual', () => {
-  it('marca turno tarde antes de las 17:00 de Lima', () => {
+  it('marca turno mañana antes de las 11:00 de Lima', () => {
+    // 13:00 UTC = 08:00 en Lima.
+    expect(turnoActual(new Date('2026-10-14T13:00:00Z'))).toBe('turno mañana');
+  });
+
+  it('marca turno tarde entre 11:00 y 16:59 de Lima', () => {
     // 18:00 UTC = 13:00 en Lima.
     expect(turnoActual(new Date('2026-10-14T18:00:00Z'))).toBe('turno tarde');
   });

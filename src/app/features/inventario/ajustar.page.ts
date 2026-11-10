@@ -10,6 +10,7 @@ import { Router, RouterLink } from '@angular/router';
 import { mensajeError } from '../../core/api/api.helpers';
 import { InventarioService } from '../../core/data/inventario.service';
 import type { Insumo } from '../../core/models';
+import { turnoActual } from '../../core/utils/format';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -219,7 +220,7 @@ export class InventarioAjustarPage {
 
   readonly subtitulo = computed<string>(
     () =>
-      `${this.insumos().length} insumos · ${this.bajoMinimo()} bajo mínimo · turno tarde`,
+      `${this.insumos().length} insumos · ${this.bajoMinimo()} bajo mínimo · ${turnoActual()}`,
   );
 
   constructor() {

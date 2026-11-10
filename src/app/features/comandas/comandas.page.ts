@@ -17,6 +17,7 @@ import {
   formatearNumero,
   horaActual,
   minutosEntre,
+  turnoActual,
 } from '../../core/utils/format';
 import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
@@ -233,7 +234,9 @@ export class ComandasPage {
     const listas = this.conteos().listas;
     const sello = this.ultimaCarga();
     const hora = sello === null ? '—' : horaActual(new Date(sello));
-    return `Turno tarde · ${this.conteos().todas} abiertas · ${listas} ${
+    const turno = turnoActual();
+    const turnoMayus = `${turno.charAt(0).toUpperCase()}${turno.slice(1)}`;
+    return `${turnoMayus} · ${this.conteos().todas} abiertas · ${listas} ${
       listas === 1 ? 'lista' : 'listas'
     } · actualizado ${hora}`;
   });
