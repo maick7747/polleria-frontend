@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import {
   ConfiguracionService,
@@ -47,6 +47,7 @@ const LIMITES = [10, 20, 50, 100];
     IconComponent,
     PaginadorComponent,
     PanelComponent,
+    RouterLink,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './usuarios.page.html',

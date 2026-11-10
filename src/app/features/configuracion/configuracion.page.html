@@ -1,5 +1,9 @@
 <app-shell title="Configuración" [subtitle]="subtitulo()">
   <div actions class="header-actions">
+    <a class="ghost-link" routerLink="/configuracion/usuarios">
+      <app-icon name="users" [size]="13" />
+      Usuarios y roles
+    </a>
     <span class="lock-chip">
       <app-icon name="gear" [size]="11" />
       Solo Dueño/Admin

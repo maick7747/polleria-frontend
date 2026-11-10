@@ -6,6 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { ConfiguracionService } from '../../core/data/configuracion.service';
 import { formatearMoneda, round2 } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
@@ -77,6 +78,7 @@ const MESES = [
     DarkPanelComponent,
     IconComponent,
     PanelComponent,
+    RouterLink,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './configuracion.page.html',

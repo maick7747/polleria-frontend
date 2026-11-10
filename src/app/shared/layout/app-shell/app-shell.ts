@@ -39,7 +39,8 @@ const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Cuadre de caja', route: '/cuadre-caja', icon: 'credit-card', roles: ['Cajero', 'Dueño/Admin'], exact: false },
   { label: 'Reportes', route: '/reportes', icon: 'chart-bar', roles: ['Dueño/Admin', 'Admin'], exact: false },
   { label: 'Activos', route: '/activos', icon: 'wrench', roles: ['Dueño/Admin', 'Admin'], exact: false },
-  { label: 'Configuración', route: '/configuracion', icon: 'gear', roles: ['Dueño/Admin', 'Admin'], exact: false },
+  { label: 'Configuración', route: '/configuracion', icon: 'gear', roles: ['Dueño/Admin', 'Admin'], exact: true },
+  { label: 'Usuarios y roles', route: '/configuracion/usuarios', icon: 'users', roles: ['Dueño/Admin', 'Admin'], exact: true },
 ];
 
 @Component({
