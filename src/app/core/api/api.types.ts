@@ -582,6 +582,7 @@ export interface PlatoDto {
   activo: boolean;
   categoria?: string | null;
   ingredientes?: IngredientePlatoDto[] | null;
+  disponible?: boolean | null;
 }
 
 export interface ActivoMantenimientoRefDto {

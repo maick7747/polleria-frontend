@@ -59,4 +59,6 @@ export interface Plato {
   precioVenta: number;
   activo: boolean;
   ingredientes: IngredienteFicha[];
+  /** Stock suficiente para 1 unidad. `null` = sin ficha activa (no se controla). */
+  disponible?: boolean | null;
 }

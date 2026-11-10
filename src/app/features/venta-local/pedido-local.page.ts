@@ -35,7 +35,7 @@ import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 interface StockPlato {
   etiqueta: string;
-  tono: 'success' | 'warning';
+  tono: 'success' | 'warning' | 'neutral';
 }
 
 @Component({
@@ -225,13 +225,25 @@ export class PedidoLocalPage {
     }
   }
 
+  // El backend ya calcula si alcanza el stock para 1 unidad (`disponible`,
+  // misma cuenta que el descuento). Se usa eso; el inventario local solo es
+  // respaldo cuando el dato no viene (demo).
   stockDe(plato: Plato): StockPlato {
+    if (plato.disponible === false) {
+      return { etiqueta: 'Sin stock', tono: 'warning' };
+    }
+    if (plato.disponible === true) {
+      return { etiqueta: 'Stock ok', tono: 'success' };
+    }
+    if (plato.disponible === null) {
+      return { etiqueta: 'Sin control de stock', tono: 'neutral' };
+    }
     const insuficiente = plato.ingredientes.some((ingrediente) => {
       const insumo = this.inventario.porId(ingrediente.insumoId);
-      return insumo ? insumo.stockActual <= insumo.stockMinimo : false;
+      return insumo ? insumo.stockActual < ingrediente.cantidad : false;
     });
     return insuficiente
-      ? { etiqueta: 'Stock bajo', tono: 'warning' }
+      ? { etiqueta: 'Sin stock', tono: 'warning' }
       : { etiqueta: 'Stock ok', tono: 'success' };
   }
 
@@ -345,6 +357,8 @@ export class PedidoLocalPage {
       this.items.set([]);
       this.observacion.set('');
       this.borrador.limpiar(this.mesaId);
+      // El stock cambió: se refresca la carta para no mostrar badges viejos.
+      void this.fichas.cargar(true);
       this.temporizador = window.setTimeout(() => {
         void this.router.navigate(['/venta-local']);
       }, 950);

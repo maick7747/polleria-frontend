@@ -515,6 +515,8 @@ export function toPlato(dto: PlatoDto): Plato {
       unidadMedida: (ingrediente.unidad_medida ?? 'und') as UnidadMedida,
       costoUnitario: Number(ingrediente.costo_promedio ?? 0),
     })),
+    disponible:
+      typeof dto.disponible === 'boolean' ? dto.disponible : null,
   };
 }
 
