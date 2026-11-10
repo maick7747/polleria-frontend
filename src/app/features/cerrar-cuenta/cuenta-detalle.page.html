@@ -147,31 +147,20 @@
                   </div>
                 </div>
                 <span class="comprobante__sep"></span>
-                <div class="comprobante__row comprobante__row--stack">
+                <div class="comprobante__row">
                   <span>Cliente</span>
-                  <input
-                    class="comp-input"
-                    type="text"
-                    placeholder="Consumidor final"
-                    aria-label="Nombre del cliente"
-                    [value]="clienteNombre()"
-                    (input)="onClienteNombre($event)"
-                  />
+                  <strong>{{ cliente() }}</strong>
                 </div>
                 <span class="comprobante__sep"></span>
-                <div class="comprobante__row comprobante__row--stack">
-                  <span>DNI {{ buscandoDocumento() ? '· consultando…' : '(opcional)' }}</span>
-                  <input
-                    class="comp-input"
-                    type="text"
-                    inputmode="numeric"
-                    maxlength="8"
-                    placeholder="8 dígitos"
-                    aria-label="DNI del cliente"
-                    [value]="clienteDocumento()"
-                    (input)="onClienteDocumento($event)"
-                  />
+                <div class="comprobante__row">
+                  <span>Documento</span>
+                  <strong>{{ documento() }}</strong>
                 </div>
+                <span class="comprobante__sep"></span>
+                <button type="button" class="cliente-btn" (click)="abrirCliente()">
+                  <app-icon name="user" [size]="13" />
+                  {{ clienteAccion() }} cliente / DNI
+                </button>
               } @else {
                 <div class="comprobante__row">
                   <span>Cliente</span>
@@ -348,6 +337,142 @@
     >
       <a class="ghost-link" routerLink="/cerrar-cuenta">Volver a mesas abiertas</a>
     </app-empty-state>
+  }
+
+  @if (clienteAbierto()) {
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cliente-titulo">
+      <div class="modal__box">
+        <header class="modal__head">
+          <div>
+            <span class="eyebrow">COMPROBANTE</span>
+            <h2 id="cliente-titulo">Cliente</h2>
+          </div>
+          <button type="button" class="modal__x" aria-label="Cerrar" (click)="cerrarCliente()">
+            ×
+          </button>
+        </header>
+
+        <p class="modal__hint">
+          Por defecto el comprobante va a <strong>Consumidor final</strong>. Agrega DNI/RUC
+          solo si el cliente lo pide.
+        </p>
+
+        <div class="campo">
+          <span class="campo__label">Documento</span>
+          <div class="campo__fila">
+            <div class="seg-doc" role="group" aria-label="Tipo de documento">
+              <button
+                type="button"
+                [class.is-sel]="tipoDoc() === 'DNI'"
+                [attr.aria-pressed]="tipoDoc() === 'DNI'"
+                (click)="setTipoDoc('DNI')"
+              >
+                DNI
+              </button>
+              <button
+                type="button"
+                [class.is-sel]="tipoDoc() === 'RUC'"
+                [attr.aria-pressed]="tipoDoc() === 'RUC'"
+                (click)="setTipoDoc('RUC')"
+              >
+                RUC
+              </button>
+            </div>
+            <input
+              class="campo__input"
+              type="text"
+              inputmode="numeric"
+              aria-label="Número de documento"
+              [attr.maxlength]="docLargo()"
+              [placeholder]="tipoDoc() === 'DNI' ? '8 dígitos' : '11 dígitos'"
+              [value]="docNumero()"
+              (input)="onDocNumero($event)"
+            />
+            <button
+              type="button"
+              class="btn-validar"
+              [disabled]="validando()"
+              (click)="validarDocumento()"
+            >
+              {{ validando() ? 'Validando…' : 'Validar' }}
+            </button>
+          </div>
+          @if (validacionEtiqueta()) {
+            <span
+              class="valida"
+              [class.valida--ok]="docEstado() === 'valido'"
+              [class.valida--warn]="docEstado() !== 'valido'"
+            >
+              {{ validacionEtiqueta() }}
+              @if (fuenteEtiqueta()) {
+                · {{ fuenteEtiqueta() }}
+              }
+              @if (modoEtiqueta()) {
+                · {{ modoEtiqueta() }}
+              }
+            </span>
+          }
+          @if (docError()) {
+            <span class="valida valida--warn">{{ docError() }}</span>
+          }
+        </div>
+
+        <label class="campo">
+          <span class="campo__label">Nombre / razón social</span>
+          <input
+            class="campo__input"
+            type="text"
+            placeholder="Cliente varios"
+            [value]="docNombre()"
+            (input)="onDocNombre($event)"
+          />
+        </label>
+
+        <div class="campo__duo">
+          <label class="campo">
+            <span class="campo__label">Teléfono (opcional)</span>
+            <input
+              class="campo__input"
+              type="tel"
+              [value]="docTelefono()"
+              (input)="onDocTelefono($event)"
+            />
+          </label>
+          <label class="campo">
+            <span class="campo__label">Correo (opcional)</span>
+            <input
+              class="campo__input"
+              type="email"
+              [value]="docCorreo()"
+              (input)="onDocCorreo($event)"
+            />
+          </label>
+        </div>
+
+        <footer class="modal__foot">
+          @if (tieneCliente()) {
+            <button
+              type="button"
+              class="btn-link"
+              [disabled]="guardandoCliente()"
+              (click)="quitarCliente()"
+            >
+              Quitar cliente
+            </button>
+          }
+          <span class="modal__grow"></span>
+          <button type="button" class="btn-sec" (click)="cerrarCliente()">Cancelar</button>
+          <button
+            type="button"
+            class="btn-prim"
+            [disabled]="guardandoCliente()"
+            (click)="guardarCliente()"
+          >
+            {{ guardandoCliente() ? 'Guardando…' : 'Guardar cliente' }}
+          </button>
+        </footer>
+      </div>
+    </div>
   }
 
   @if (toast()) {

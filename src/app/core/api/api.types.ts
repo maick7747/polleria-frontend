@@ -92,6 +92,7 @@ export interface ClienteDto {
   tipo_documento?: string | null;
   numero_documento?: string | null;
   telefono?: string | null;
+  correo?: string | null;
   direccion?: string | null;
   referencia?: string | null;
 }

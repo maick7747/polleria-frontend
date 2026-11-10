@@ -292,6 +292,7 @@ function toDatosCliente(dto: ClienteDto): DatosCliente {
     numeroDocumento: dto.numero_documento ?? '',
     nombre: dto.nombre,
     telefono: dto.telefono ?? undefined,
+    correo: dto.correo ?? undefined,
   };
 }
 

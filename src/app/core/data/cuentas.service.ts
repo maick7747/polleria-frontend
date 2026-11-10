@@ -209,7 +209,7 @@ export class CuentasService {
    */
   async guardarDatosCobro(
     cuentaId: number,
-    datos: { cliente?: DatosCliente; comprobanteTipo?: ComprobanteTipo },
+    datos: { cliente?: DatosCliente; comprobanteTipo?: ComprobanteTipo; quitarCliente?: boolean },
   ): Promise<Cuenta | null> {
     const cuenta = this.porId(cuentaId);
     if (!cuenta) {
@@ -217,7 +217,9 @@ export class CuentasService {
     }
 
     const cuerpo: Record<string, unknown> = {};
-    if (datos.cliente) {
+    if (datos.quitarCliente) {
+      cuerpo['cliente'] = null;
+    } else if (datos.cliente) {
       cuerpo['cliente'] = this.aClientePayload(datos.cliente);
     }
     if (datos.comprobanteTipo) {
@@ -233,7 +235,7 @@ export class CuentasService {
         // locales y solo se actualizan cliente y comprobante.
         const actualizada: Cuenta = {
           ...cuenta,
-          cliente: toCuenta(dto).cliente ?? cuenta.cliente,
+          cliente: datos.quitarCliente ? undefined : toCuenta(dto).cliente ?? cuenta.cliente,
           comprobanteTipo: datos.comprobanteTipo ?? cuenta.comprobanteTipo,
         };
         this.upsert(actualizada);
@@ -247,7 +249,7 @@ export class CuentasService {
 
     const actualizada: Cuenta = {
       ...cuenta,
-      cliente: datos.cliente ?? cuenta.cliente,
+      cliente: datos.quitarCliente ? undefined : datos.cliente ?? cuenta.cliente,
       comprobanteTipo: datos.comprobanteTipo ?? cuenta.comprobanteTipo,
     };
     this.upsert(actualizada);
@@ -470,13 +472,16 @@ export class CuentasService {
     tipo_documento: string;
     numero_documento: string;
     telefono?: string;
+    correo?: string;
   } {
     const telefono = cliente.telefono?.trim();
+    const correo = cliente.correo?.trim();
     return {
       nombre: cliente.nombre,
       tipo_documento: cliente.tipoDocumento,
       numero_documento: cliente.numeroDocumento,
       ...(telefono ? { telefono } : {}),
+      ...(correo ? { correo } : {}),
     };
   }
 
