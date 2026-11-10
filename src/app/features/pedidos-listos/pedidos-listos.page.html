@@ -42,10 +42,10 @@
     <div class="resumen__bloque">
       <app-icon name="bell-ringing" [size]="19" class="resumen__icon resumen__icon--brand" />
       <div class="resumen__data">
-        <span class="resumen__label resumen__label--brand">Avisos al mozo</span>
+        <span class="resumen__label resumen__label--brand">Platos por entregar</span>
         <div class="resumen__valor">
-          <strong class="resumen__valor--brand">{{ total() }}</strong>
-          <span>sin entregar</span>
+          <strong class="resumen__valor--brand">{{ platosPendientes() }}</strong>
+          <span>líneas pendientes</span>
         </div>
       </div>
     </div>
@@ -104,13 +104,32 @@
             </header>
 
             <div class="entrega__platos">
-              @for (plato of pedido.items; track plato.nombre) {
-                <div class="plato">
-                  <app-icon [name]="iconoPlato(plato.nombre)" [size]="13" class="plato__icon" />
-                  <span class="plato__nombre" [class.plato__nombre--obs]="plato.nota">
-                    {{ plato.nombre }}
+              @for (linea of pedido.lineas; track linea.id) {
+                <div class="plato" [class.plato--entregado]="linea.estado === 'entregado'">
+                  <app-icon [name]="iconoPlato(linea.nombre)" [size]="13" class="plato__icon" />
+                  <span class="plato__cant">×{{ linea.cantidad }}</span>
+                  <span class="plato__nombre">{{ linea.nombre }}</span>
+                  <span [class]="'pill pill--' + linea.estado">
+                    {{ estadoTexto(linea.estado) }}
                   </span>
-                  <span class="plato__qty">{{ plato.nota ? plato.nota : '×' + plato.cantidad }}</span>
+                  <span [class]="'badge-est badge-est--' + linea.estacion">
+                    <span class="dot"></span>{{ estacionLabel[linea.estacion] }}
+                  </span>
+                  <span class="badge-curso">{{ cursoLabel[linea.curso] }}</span>
+                  @if (linea.nota) {
+                    <span class="plato__nota">{{ linea.nota }}</span>
+                  }
+                  @if (linea.estado === 'listo') {
+                    <button
+                      type="button"
+                      class="btn-linea"
+                      [disabled]="accionando() !== null"
+                      [attr.aria-label]="'Entregar ' + linea.nombre + ' de ' + pedido.etiqueta"
+                      (click)="entregarLinea(pedido, linea, $event)"
+                    >
+                      Entregar
+                    </button>
+                  }
                 </div>
               }
             </div>
@@ -122,11 +141,11 @@
               <button
                 type="button"
                 class="btn-entregar"
-                title="Se oculta en este navegador; el pedido desaparece al cobrarse"
-                (click)="entregar(pedido.id)"
+                [disabled]="!puedeEntregarPedido(pedido) || accionando() !== null"
+                (click)="entregarPedido(pedido)"
               >
                 <app-icon name="check" [size]="13" />
-                Archivar aviso
+                Entregar pedido
               </button>
             </footer>
           </article>
@@ -135,7 +154,7 @@
             <app-empty-state
               icon="check-circle"
               title="Sin pedidos listos"
-              description="Los avisos de cocina aparecerán aquí cuando el KDS marque un plato como listo."
+              description="Los avisos de cocina aparecerán aquí cuando el KDS marque todos los platos de una ronda como listos."
             />
           </div>
         }
@@ -145,7 +164,7 @@
     <app-dark-panel class="aviso">
       <div class="aviso__inner">
         <header class="aviso__head">
-          <span class="aviso__kicker">AVISO DE COCINA</span>
+          <span class="aviso__kicker">ENTREGA AL MOZO</span>
           <span class="aviso__icon">
             <app-icon name="bell-ringing" [size]="14" />
           </span>
@@ -157,7 +176,8 @@
         </div>
 
         <p class="aviso__texto">
-          Cocina marcó los platos como terminados. Retira en barra y entrega al cliente.
+          Cocina marcó los platos como terminados. Entrega por línea o el pedido completo:
+          la entrega se guarda en el servidor y desaparece para todos los terminales.
         </p>
 
         <span class="aviso__chip">
@@ -176,9 +196,7 @@
             <div class="aviso__fila">
               <span class="aviso__punto"></span>
               <span class="aviso__fila-nombre">{{ pedido.etiqueta }}</span>
-              <span class="aviso__fila-meta">
-                {{ pedido.tipo === 'llevar' ? 'Para llevar' : pedido.ronda }}
-              </span>
+              <span class="aviso__fila-meta">{{ pedido.canal }} · {{ pedido.ronda }}</span>
               <span class="aviso__fila-hora">{{ pedido.hora }}</span>
             </div>
           } @empty {
@@ -195,25 +213,19 @@
 
         <p class="aviso__info">
           <app-icon name="warning-circle" [size]="13" />
-          Al archivar, el aviso se oculta solo en este navegador; el pedido desaparece al
-          cobrarse. No se cobra ahora: el cobro es al cerrar la cuenta.
+          La entrega se persiste en el servidor. El pedido sale de esta bandeja cuando
+          todas sus líneas están entregadas o al cobrarse la cuenta.
         </p>
 
         <span class="aviso__grow"></span>
 
-        <button
-          type="button"
-          class="accion accion--brand"
-          title="Se oculta en este navegador; el pedido desaparece al cobrarse"
-          [disabled]="total() === 0"
-          (click)="marcarEntregado()"
-        >
-          <app-icon name="check-circle" [size]="16" />
-          Archivar aviso
-        </button>
         <a class="accion accion--ghost" routerLink="/comandas">
           <app-icon name="clock" [size]="15" />
           Ver comandas
+        </a>
+        <a class="accion accion--ghost" routerLink="/cocina">
+          <app-icon name="flame" [size]="15" />
+          Abrir KDS
         </a>
       </div>
     </app-dark-panel>
@@ -221,7 +233,8 @@
 
   <div class="pie">
     <span class="pie__note">
-      Cocina notifica al mozo cuando un plato está listo (SLA 30 min en KDS)
+      La entrega por línea se guarda en el servidor; el pedido desaparece al estar todo
+      entregado o cobrado.
     </span>
     <span class="pie__meta">{{ metaPie() }}</span>
   </div>

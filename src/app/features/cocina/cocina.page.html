@@ -1,7 +1,7 @@
 <app-shell title="KDS — Cocina" [subtitle]="subtitulo()">
   <div actions class="header-actions">
-    <app-chip variant="warning" [dot]="true">SLA 30 min</app-chip>
-    <span class="live"><span class="live__dot"></span>En vivo</span>
+    <app-chip variant="warning" [dot]="true">SLA {{ umbral }} min</app-chip>
+    <span class="live"><span class="live__dot"></span>En vivo · 10 s</span>
   </div>
 
   @if (error()) {
@@ -10,249 +10,350 @@
       <button type="button" (click)="reintentar()">Reintentar</button>
     </div>
   }
+  @if (cargando() && rondas().length === 0) {
+    <div class="kds-carga" role="status">Cargando tablero de cocina…</div>
+  }
 
-  <section class="ritmo" aria-label="Ritmo de cocina">
-    @for (item of ritmo(); track item.label; let i = $index) {
-      <div class="ritmo__item" [class.ritmo__item--first]="i === 0">
-        <span [class]="'ritmo__icon ritmo__icon--' + item.tono">
-          <app-icon [name]="item.icon" [size]="16" />
-        </span>
-        <div class="ritmo__text">
-          <span [class]="'ritmo__label ritmo__label--' + item.tono">{{ item.label }}</span>
-          <div class="ritmo__value">
-            <strong [class]="'ritmo__num ritmo__num--' + item.tono">{{ item.value }}</strong>
-            <span>{{ item.detalle }}</span>
-          </div>
-        </div>
+  <section class="stats" aria-label="Resumen de cocina">
+    <span class="stat stat--ink">En cocina {{ stats().enCocina }}</span>
+    <span class="stat stat--ok">Listas para entregar {{ stats().listas }}</span>
+    <span class="stat stat--danger">Retrasadas {{ stats().retrasadas }}</span>
+    <span class="stat stat--warning">SLA {{ stats().sla }} min</span>
+    <span class="stat">Rondas activas {{ stats().rondas }}</span>
+  </section>
+
+  <section class="filtros" aria-label="Filtros del KDS">
+    <div class="grupo">
+      <span class="etq">Estación</span>
+      <div class="seg" role="group" aria-label="Filtrar por estación">
+        @for (opcion of estaciones; track opcion.valor) {
+          <button
+            type="button"
+            [class.on]="filtroEstacion() === opcion.valor"
+            [attr.aria-pressed]="filtroEstacion() === opcion.valor"
+            (click)="filtrarEstacion(opcion.valor)"
+          >
+            @if (opcion.valor !== 'todas') {
+              <span [class]="'dot dot--' + opcion.valor"></span>
+            }
+            {{ opcion.label }}
+          </button>
+        }
       </div>
-    }
-    <span class="ritmo__prio">
-      <app-icon name="warning-circle" [size]="12" />
-      {{ prioritarias() }} prioritaria{{ prioritarias() === 1 ? '' : 's' }}
-    </span>
+    </div>
+    <div class="grupo">
+      <span class="etq">Curso</span>
+      @for (opcion of cursos; track opcion.valor) {
+        <button
+          type="button"
+          class="chipf"
+          [class.on]="filtroCurso() === opcion.valor"
+          [attr.aria-pressed]="filtroCurso() === opcion.valor"
+          (click)="filtrarCurso(opcion.valor)"
+        >
+          {{ opcion.label }}
+        </button>
+      }
+    </div>
   </section>
 
   <div class="board">
     <div class="lado">
-      <div class="grid-cards">
-        @for (comanda of comandas(); track comanda.pedidoId) {
-          <div
-            class="card"
-            role="button"
-            tabindex="0"
-            [class.is-sel]="esSeleccionada(comanda.pedidoId)"
-            [class.is-prio]="comanda.prioritaria"
-            [attr.aria-pressed]="esSeleccionada(comanda.pedidoId)"
-            [attr.aria-label]="'Comanda ' + comanda.etiqueta"
-            (click)="seleccionar(comanda.pedidoId)"
-            (keydown.enter)="seleccionar(comanda.pedidoId)"
-          >
-            <span class="card__stripe" [class.card__stripe--prio]="comanda.prioritaria"></span>
-            <div class="card__body">
-              <header class="card__head">
-                <span class="card__num">{{ comanda.etiqueta }}</span>
-                <span class="card__ronda">{{ comanda.tipo }}</span>
-                <span class="card__spacer"></span>
-                <span [class]="'canal canal--' + comanda.canalTono">
-                  <app-icon
-                    [name]="comanda.canalTono === 'local' ? 'storefront' : 'package'"
-                    [size]="10"
-                  />
-                  {{ comanda.canal }}
+      @if (rondas().length === 0) {
+        @if (!cargando()) {
+          <app-empty-state
+            icon="flame"
+            title="Sin rondas para este filtro"
+            description="No hay comandas activas en cocina para la estación y el curso seleccionados."
+          />
+        }
+      } @else {
+        <div class="grid-cards">
+          @for (ronda of rondas(); track ronda.pedidoId) {
+            <article
+              class="ronda"
+              [class.is-prio]="ronda.prioritaria"
+              [class.is-lista]="ronda.lista"
+            >
+              <span class="ronda__stripe"></span>
+              <header class="ronda__head">
+                <div class="ronda__id">
+                  <strong class="ronda__etiqueta">{{ ronda.etiqueta }}</strong>
+                  <span class="ronda__sub">
+                    <span class="ronda__turno">{{ ronda.ronda }}</span>
+                    <span [class]="'canal canal--' + ronda.canalTono">{{ ronda.canal }}</span>
+                    @if (ronda.estadoEntrega === 'en_camino') {
+                      <span class="tag tag--camino">EN CAMINO</span>
+                    }
+                    @if (ronda.lista) {
+                      <span class="tag tag--lista">LISTA</span>
+                    }
+                    <span class="ronda__desde">desde {{ ronda.minutos }} min</span>
+                  </span>
+                </div>
+                <span class="ronda__sla" [class.ronda__sla--alert]="ronda.prioritaria">
+                  @if (ronda.minutos > umbral) {
+                    SLA +{{ ronda.minutos - umbral }}
+                  } @else {
+                    {{ ronda.minutos }}/{{ umbral }}
+                  }
+                  min
                 </span>
               </header>
 
-              <div class="card__timer">
-                <span class="timer" [class.timer--prio]="comanda.prioritaria">
-                  {{ reloj(comanda.segundos) }}
-                </span>
-                <span class="timer__label">en cocina</span>
-                <span class="card__spacer"></span>
-                @if (comanda.prioritaria) {
-                  <span class="prio">
-                    <app-icon name="warning-circle" [size]="9" />
-                    PRIORITARIO
-                  </span>
-                }
-              </div>
-
-              <span class="card__divider"></span>
-
-              <div class="card__items">
-                @for (item of comanda.items; track item.id) {
-                  <div class="item" [class.item--foco]="esItemFoco(item)">
-                    <button
-                      type="button"
-                      class="check"
-                      [class.check--done]="item.estadoPreparacion === 'listo'"
-                      [disabled]="item.estadoPreparacion === 'listo'"
-                      [attr.aria-label]="'Marcar listo ' + item.nombre"
-                      (click)="marcarItem(comanda, item, $event)"
-                    >
-                      @if (item.estadoPreparacion === 'listo') {
-                        <app-icon name="check" [size]="8" />
-                      }
-                    </button>
-                    <button
-                      type="button"
-                      class="item__focus-btn"
-                      [class.item__focus-btn--sel]="esItemFoco(item)"
-                      [attr.aria-pressed]="esItemFoco(item)"
-                      [attr.aria-label]="'Ver detalle de ' + item.nombre + ' en la comanda ' + comanda.etiqueta"
-                      (click)="seleccionarItem(comanda, item, $event)"
-                    >
-                      <app-icon name="flame" [size]="12" class="item__icon" />
-                      <span
-                        class="item__name"
-                        [class.item__name--done]="item.estadoPreparacion === 'listo'"
-                      >
-                        {{ item.nombre }}
+              <div class="ronda__lineas">
+                @for (linea of ronda.lineas; track linea.item.id) {
+                  <div
+                    class="linea"
+                    [class.is-sel]="esFoco(ronda, linea)"
+                    [class.is-entregada]="linea.estado === 'entregado'"
+                    role="button"
+                    tabindex="0"
+                    [attr.aria-pressed]="esFoco(ronda, linea)"
+                    [attr.aria-label]="'Ver ' + linea.item.nombre + ' de ' + ronda.etiqueta"
+                    (click)="seleccionarLinea(ronda, linea, $event)"
+                    (keydown.enter)="seleccionarLinea(ronda, linea, $event)"
+                  >
+                    <div class="linea__top">
+                      <span class="linea__cant">×{{ linea.item.cantidad }}</span>
+                      <span class="linea__nombre">{{ linea.item.nombre }}</span>
+                      <span [class]="'pill pill--' + linea.estado">
+                        {{ estadoTexto(linea.estado) }}
                       </span>
-                      <span class="item__qty">×{{ item.cantidad }}</span>
-                    </button>
+                      @if (linea.estado !== 'entregado') {
+                        <button
+                          type="button"
+                          class="mini"
+                          [class.mini--listo]="linea.estado === 'listo'"
+                          [class.mini--prep]="linea.estado === 'en_preparacion'"
+                          [disabled]="accionando() !== null"
+                          [attr.aria-label]="accionTexto(linea.estado) + ' ' + linea.item.nombre"
+                          (click)="accionLinea(ronda, linea, $event)"
+                        >
+                          {{ accionTexto(linea.estado) }}
+                        </button>
+                      }
+                    </div>
+                    <div class="linea__meta">
+                      <span [class]="'badge-est badge-est--' + linea.estacion">
+                        <span class="dot"></span>{{ estacionLabel[linea.estacion] }}
+                      </span>
+                      <span class="badge-curso">{{ cursoLabel[linea.curso] }}</span>
+                      @if (linea.prepMin !== null) {
+                        <span class="badge-prep">~{{ linea.prepMin }} min</span>
+                      }
+                      @if (linea.auto) {
+                        <span class="badge-auto">auto</span>
+                      }
+                      @if (linea.item.notas) {
+                        <span class="badge-nota">nota</span>
+                      }
+                    </div>
                   </div>
                 }
               </div>
 
-              <span class="card__grow"></span>
-
-              <span class="card__track">
-                <span
-                  class="card__fill"
-                  [class.card__fill--prio]="comanda.prioritaria"
-                  [style.width.%]="comanda.progreso"
-                ></span>
-              </span>
-              <div class="card__foot">
-                <span class="card__count">
-                  {{ comanda.listos }}/{{ comanda.items.length }} platos
-                </span>
-                @if (comanda.faltan === 0) {
-                  <span class="card__hint card__hint--ok">completa</span>
-                } @else if (comanda.prioritaria) {
-                  <span class="card__hint card__hint--alert">
-                    +{{ comanda.minutos - umbral }} min sobre SLA
+              <footer class="ronda__foot">
+                <div class="progreso">
+                  <span class="progreso__txt">
+                    Cocina <b>{{ ronda.progreso.cocinaOk }}/{{ ronda.progreso.cocinaTotal }}</b>
+                    @if (ronda.progreso.barTotal > 0) {
+                      · Bar <b>{{ ronda.progreso.barOk }}/{{ ronda.progreso.barTotal }}</b>
+                    }
                   </span>
-                } @else {
-                  <span class="card__hint">falta {{ comanda.faltan }}</span>
-                }
-              </div>
-            </div>
-          </div>
-        }
-      </div>
+                  <span class="progreso__track" aria-hidden="true">
+                    @for (linea of ronda.lineas; track linea.item.id) {
+                      <i
+                        [class.on]="linea.estado === 'listo' || linea.estado === 'entregado'"
+                        [class.bar-on]="
+                          linea.estacion === 'bar' &&
+                          (linea.estado === 'listo' || linea.estado === 'entregado')
+                        "
+                      ></i>
+                    }
+                  </span>
+                </div>
+                <div class="ronda__btns">
+                  <button
+                    type="button"
+                    class="btn"
+                    [disabled]="!ronda.puedeTodoListo || accionando() !== null"
+                    (click)="marcarTodoListo(ronda)"
+                  >
+                    Todo listo
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn--brand"
+                    [disabled]="!ronda.puedeEntregar || accionando() !== null"
+                    (click)="entregarRonda(ronda)"
+                  >
+                    Entregar ronda
+                  </button>
+                </div>
+              </footer>
+            </article>
+          }
+        </div>
+      }
     </div>
 
-    <app-dark-panel class="foco">
-      @if (foco(); as f) {
-        <div class="foco__inner">
-          <header class="foco__head">
-            <span class="foco__eyebrow">PLATO EN FOCO</span>
-            <span class="foco__estado">
-              <span class="foco__dot"></span>
-              {{ estadoItem(f.item) }}
-            </span>
+    <div class="panel-lado">
+      <app-panel class="allday">
+        <div class="allday__inner">
+          <header class="allday__head">
+            <strong>All day · pendientes</strong>
+            <span>{{ allDay().total }} {{ allDay().total === 1 ? 'plato' : 'platos' }}</span>
           </header>
 
-          <span class="foco__icon"><app-icon name="flame" [size]="30" /></span>
-
-          <h2 class="foco__title">{{ f.item.nombre }}</h2>
-          <p class="foco__meta">
-            {{ f.comanda.etiqueta }} · {{ f.comanda.tipo }} · {{ f.comanda.canal }}
-          </p>
-
-          <span class="foco__divider"></span>
-
-          <span class="foco__label">Tiempo en cocina</span>
-          <div class="foco__time">
-            <strong>{{ reloj(f.comanda.segundos) }}</strong>
-            <span>de {{ umbral }} min de SLA</span>
-          </div>
-
-          <span class="foco__divider"></span>
-
-          <span class="foco__eyebrow">INGREDIENTES</span>
-          <div class="foco__chips">
-            @for (ingrediente of f.ingredientes; track $index) {
-              <span class="ing">{{ ingrediente }}</span>
+          <div class="allday__lista">
+            @for (grupo of allDay().grupos; track grupo.estacion) {
+              <section class="grupo">
+                <h3 [class]="'grupo__title grupo__title--' + grupo.estacion">
+                  <span class="dot"></span>{{ estacionLabel[grupo.estacion] }}
+                  <span class="grupo__total">{{ grupo.total }}</span>
+                </h3>
+                @for (fila of grupo.filas; track fila.platilloId + '|' + fila.nombre) {
+                  <div class="fila">
+                    <span class="fila__nom">{{ fila.nombre }}</span>
+                    @if (fila.enFuego > 0) {
+                      <span class="fuego">{{ fila.enFuego }} en fuego</span>
+                    }
+                    <span class="fila__n">×{{ fila.cantidad }}</span>
+                  </div>
+                }
+              </section>
             } @empty {
-              <span class="ing">Sin ficha técnica</span>
+              <p class="vacio">Sin pendientes para este filtro.</p>
             }
           </div>
 
-          <span class="foco__eyebrow foco__eyebrow--gap">OBSERVACIONES</span>
-          <p class="foco__note">
-            <app-icon name="warning-circle" [size]="12" />
-            {{ f.observacion }}
+          <p class="allday__nota">
+            Suma <b>todas las rondas activas</b>. Si hay 4 pollos, se ponen juntos en la
+            brasa; cada ronda se controla aparte.
           </p>
+        </div>
+      </app-panel>
 
-          <span class="foco__grow"></span>
+      <app-dark-panel class="foco">
+        @if (foco(); as f) {
+          <div class="foco__inner">
+            <div class="foco__scroll">
+            <header class="foco__head">
+              <span class="foco__eyebrow">PLATO EN FOCO</span>
+              <span [class]="'pill pill--dark pill--' + f.linea.estado">
+                {{ estadoTexto(f.linea.estado) }}
+              </span>
+            </header>
 
-          <div class="foco__progress">
-            <span class="foco__progress-label">
-              {{ f.comanda.listos }} de {{ f.comanda.items.length }} platos listos
-            </span>
-            <strong class="foco__pct">{{ f.comanda.progreso }}%</strong>
-          </div>
-          <div class="foco__segments">
-            @for (item of f.comanda.items; track item.id) {
-              <span class="foco__seg" [class.foco__seg--done]="item.estadoPreparacion === 'listo'"></span>
+            <span class="foco__icon"><app-icon name="flame" [size]="28" /></span>
+
+            <h2 class="foco__title">
+              {{ f.linea.item.nombre }}
+              <span class="foco__cant">×{{ f.linea.item.cantidad }}</span>
+            </h2>
+            <p class="foco__meta">
+              {{ f.ronda.etiqueta }} · {{ f.ronda.ronda }} · {{ f.ronda.canal }}
+            </p>
+
+            <div class="foco__badges">
+              <span [class]="'badge-est badge-est--' + f.linea.estacion">
+                <span class="dot"></span>{{ estacionLabel[f.linea.estacion] }}
+              </span>
+              <span class="badge-curso">{{ cursoLabel[f.linea.curso] }}</span>
+              @if (f.linea.prepMin !== null) {
+                <span class="badge-prep">~{{ f.linea.prepMin }} min</span>
+              }
+              @if (f.linea.auto) {
+                <span class="badge-auto">auto</span>
+              }
+            </div>
+
+            @if (f.linea.prepMin !== null) {
+              <p class="foco__objetivo">
+                Tiempo objetivo <b>~{{ f.linea.prepMin }} min</b> · SLA de la ronda
+                {{ umbral }} min
+              </p>
             }
-          </div>
 
-          <div class="foco__actions">
-            <button
-              type="button"
-              class="dark-btn dark-btn--brand"
-              [disabled]="f.item.estadoPreparacion === 'listo'"
-              (click)="marcarFocoListo()"
-            >
-              <app-icon name="check" [size]="15" />
-              {{ f.item.estadoPreparacion === 'listo' ? 'Plato listo' : 'Marcar listo' }}
-            </button>
+            <span class="foco__eyebrow">INGREDIENTES</span>
+            <div class="foco__chips">
+              @for (ingrediente of f.ingredientes; track $index) {
+                <span class="ing">{{ ingrediente }}</span>
+              } @empty {
+                <span class="ing">Sin ficha técnica</span>
+              }
+            </div>
+
+            <span class="foco__eyebrow foco__eyebrow--gap">OBSERVACIONES</span>
+            <p class="foco__note">
+              <app-icon name="warning-circle" [size]="12" />
+              {{ f.observacion }}
+            </p>
+
+            @if (f.linea.auto) {
+              <p class="foco__auto">
+                Bar: nace listo; no bloquea la cocina. El mozo puede entregarlo.
+              </p>
+            }
+
+            <span class="foco__divider"></span>
+
+            <span class="foco__label">Tiempo en cocina</span>
+            <div class="foco__time">
+              <strong>{{ reloj(f.ronda.minutos * 60) }}</strong>
+              <span>de {{ umbral }} min de SLA</span>
+            </div>
+
+            <div class="foco__progress">
+              <span class="foco__progress-label">
+                {{ f.ronda.progreso.cocinaOk + f.ronda.progreso.barOk }} de
+                {{ f.ronda.progreso.cocinaTotal + f.ronda.progreso.barTotal }} platos
+                listos
+              </span>
+            </div>
+            <div class="foco__segments">
+              @for (linea of f.ronda.lineas; track linea.item.id) {
+                <span
+                  class="foco__seg"
+                  [class.foco__seg--done]="linea.estado === 'listo' || linea.estado === 'entregado'"
+                ></span>
+              }
+            </div>
+            </div>
+
+            <div class="foco__actions">
+              <button type="button" class="dark-btn dark-btn--ghost" (click)="rechazarFoco()">
+                Rechazar plato
+              </button>
+              <button
+                type="button"
+                class="dark-btn dark-btn--brand"
+                [disabled]="
+                  f.linea.estado === 'listo' ||
+                  f.linea.estado === 'entregado' ||
+                  accionando() !== null
+                "
+                (click)="marcarFocoListo()"
+              >
+                <app-icon name="check" [size]="15" />
+                {{ f.linea.estado === 'listo' ? 'Plato listo' : 'Marcar listo' }}
+              </button>
+            </div>
+            <p class="foco__foot">
+              Al marcar el plato como listo se avisa al mozo en su bandeja.
+            </p>
           </div>
-          <p class="foco__foot">Al marcar el plato como listo se avisa al mozo en su bandeja.</p>
-        </div>
-      } @else {
-        <app-empty-state
-          icon="flame"
-          title="Sin comandas"
-          description="No hay comandas activas en cocina para este turno."
-        />
-      }
-    </app-dark-panel>
+        } @else {
+          <app-empty-state
+            icon="flame"
+            title="Sin comandas"
+            description="No hay comandas activas en cocina para este turno."
+          />
+        }
+      </app-dark-panel>
+    </div>
   </div>
-
-  <section class="cola">
-    <div class="cola__title">
-      <span class="cola__bar"></span>
-      <h2>Cola por estación</h2>
-    </div>
-
-    <div class="cola__items">
-      @for (estacion of estaciones(); track estacion.nombre) {
-        <div class="estacion">
-          <div class="estacion__head">
-            <span class="estacion__name">{{ estacion.nombre }}</span>
-            <strong [class]="'estacion__num estacion__num--' + estacion.tono">
-              {{ estacion.cantidad }}
-            </strong>
-          </div>
-          <span class="estacion__track">
-            <span
-              [class]="'estacion__fill estacion__fill--' + estacion.tono"
-              [style.width.%]="estacion.porcentaje"
-            ></span>
-          </span>
-        </div>
-      }
-    </div>
-
-    <span class="cola__ritmo">
-      <app-icon name="clock" [size]="12" />
-      Ritmo {{ ritmoPromedio() }} min
-    </span>
-  </section>
 
   @if (toast()) {
     <div class="toast" role="status">{{ toast() }}</div>

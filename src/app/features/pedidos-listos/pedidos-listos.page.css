@@ -164,7 +164,7 @@
 }
 
 .entrega {
-  flex: 0 0 186px;
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -251,8 +251,134 @@
 .plato {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
+  flex-wrap: wrap;
   min-width: 0;
+  padding: 2px 0;
+}
+
+.plato--entregado {
+  opacity: 0.55;
+}
+
+.plato__cant {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--c-neutral-soft);
+  color: var(--c-text);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.plato__nota {
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--c-warning);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pill--pendiente {
+  background: var(--c-neutral-soft);
+  color: var(--c-text);
+}
+
+.pill--en_preparacion {
+  background: var(--c-warning-soft);
+  color: var(--c-warning);
+}
+
+.pill--listo {
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}
+
+.pill--entregado {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.badge-est,
+.badge-curso {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-est {
+  border: 1px solid #edeef2;
+  background: #f7f8fa;
+  color: #4b5563;
+  font-weight: 800;
+}
+
+.badge-est .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-text-3);
+}
+
+.badge-est--parrilla .dot {
+  background: var(--c-brand);
+}
+
+.badge-est--frituras .dot {
+  background: #f59e0b;
+}
+
+.badge-est--frios .dot {
+  background: #2563eb;
+}
+
+.badge-est--bar .dot {
+  background: #7c3aed;
+}
+
+.badge-curso {
+  border: 1px solid var(--c-border);
+  color: var(--c-text-2);
+}
+
+.btn-linea {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  background: var(--c-white);
+  color: var(--c-text);
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn-linea:not(:disabled):hover {
+  border-color: var(--c-success);
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}
+
+.btn-linea:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .plato__icon {
@@ -315,9 +441,15 @@
     background var(--dur) var(--ease);
 }
 
-.btn-entregar:hover {
-  border-color: var(--c-brand);
-  background: var(--c-brand-soft);
+.btn-entregar:not(:disabled):hover {
+  border-color: var(--c-success);
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}
+
+.btn-entregar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .vacio {

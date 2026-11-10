@@ -10,10 +10,19 @@ import {
 import { RouterLink } from '@angular/router';
 import { mensajeError } from '../../core/api/api.helpers';
 import type { PedidoListoDto } from '../../core/api/api.types';
+import { toDetalle } from '../../core/api/api.mappers';
 import { CocinaService } from '../../core/data/cocina.service';
 import { NotificacionesService } from '../../core/data/notificaciones.service';
 import { RealtimeService } from '../../core/data/realtime.service';
+import type { Curso, EstadoLineaKds, Estacion } from '../../core/models';
 import { hora as formatearHora, turnoActual } from '../../core/utils/format';
+import {
+  CURSO_LABEL,
+  ESTACION_LABEL,
+  cursoDe,
+  estadoLinea,
+  estacionDe,
+} from '../../core/utils/kds';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
@@ -23,24 +32,29 @@ import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 type TipoEntrega = 'mesa' | 'llevar';
 
-interface PlatoListo {
+interface LineaLista {
+  id: number;
   nombre: string;
   cantidad: number;
+  estado: EstadoLineaKds;
+  estacion: Estacion;
+  curso: Curso;
   nota?: string;
 }
 
 interface PedidoListo {
-  id: string;
+  id: number;
   etiqueta: string;
   tipo: TipoEntrega;
   ronda: string;
   hora: string;
   minutos: number;
   meta: string;
-  items: readonly PlatoListo[];
+  canal: string;
+  lineas: LineaLista[];
+  todosListos: boolean;
 }
 
-const CLAVE_ENTREGADOS = 'fratelli.avisos.entregados';
 const REFRESCO_MS = 15000;
 const FORMATO_DIA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' });
 
@@ -66,18 +80,29 @@ export class PedidosListosPage {
   private readonly realtime = inject(RealtimeService);
   private readonly destroyRef = inject(DestroyRef);
 
+  readonly estacionLabel = ESTACION_LABEL;
+  readonly cursoLabel = CURSO_LABEL;
+
   private temporizador: number | null = null;
   private ultimaRevision = 0;
-  private entregados = this.leerEntregados();
 
   readonly pedidos = signal<PedidoListo[]>([]);
   readonly cargando = signal(true);
   readonly error = signal<string | null>(null);
   readonly horaActualizacion = signal<string>('—');
   readonly toast = signal<string>('');
+  readonly accionando = signal<string | null>(null);
   readonly noLeidos = this.notificaciones.noLeidos;
 
   readonly total = computed<number>(() => this.pedidos().length);
+
+  readonly platosPendientes = computed<number>(() =>
+    this.pedidos().reduce(
+      (suma, pedido) =>
+        suma + pedido.lineas.filter((linea) => linea.estado !== 'entregado').length,
+      0,
+    ),
+  );
 
   readonly mayorEspera = computed<number>(() =>
     this.pedidos().reduce((mayor, pedido) => Math.max(mayor, pedido.minutos), 0),
@@ -106,8 +131,6 @@ export class PedidosListosPage {
   constructor() {
     const refresco = setInterval(() => void this.refrescar(), REFRESCO_MS);
     this.realtime.iniciar();
-    // Realtime (si está disponible) adelanta el mismo refresco silencioso;
-    // el intervalo de 15 s se conserva como respaldo. La revisión 0 no cuenta.
     effect(() => {
       const revision = this.realtime.revision();
       if (revision === this.ultimaRevision) {
@@ -128,22 +151,29 @@ export class PedidosListosPage {
     void this.cargar();
   }
 
-  async cargar(): Promise<void> {
-    this.cargando.set(true);
-    this.error.set(null);
+  async cargar(silencioso = false): Promise<void> {
+    if (!silencioso) {
+      this.cargando.set(true);
+      this.error.set(null);
+    }
     try {
       const datos = await this.cocina.pedidosListos();
       this.pedidos.set(
         datos
-          .filter((dto) => this.esDeHoy(dto.fecha_listo) && !this.entregados.has(String(dto.id)))
-          .map((dto) => this.aVista(dto)),
+          .filter((dto) => !dto.todos_entregados && this.esDeHoy(dto.fecha_listo))
+          .map((dto) => this.aVista(dto))
+          .filter((pedido) => pedido.lineas.length > 0),
       );
       this.marcarHora();
       this.notificaciones.marcarLeidos();
     } catch (error) {
-      this.error.set(mensajeError(error));
+      if (!silencioso || this.pedidos().length === 0) {
+        this.error.set(mensajeError(error));
+      }
     } finally {
-      this.cargando.set(false);
+      if (!silencioso) {
+        this.cargando.set(false);
+      }
     }
   }
 
@@ -151,37 +181,49 @@ export class PedidosListosPage {
     if (document.visibilityState !== 'visible' || this.cargando()) {
       return;
     }
+    await this.cargar(true);
+  }
+
+  puedeEntregarLinea(linea: LineaLista): boolean {
+    return linea.estado === 'listo';
+  }
+
+  puedeEntregarPedido(pedido: PedidoListo): boolean {
+    const activas = pedido.lineas.filter((linea) => linea.estado !== 'entregado');
+    return activas.length > 0 && activas.every((linea) => linea.estado === 'listo');
+  }
+
+  async entregarLinea(pedido: PedidoListo, linea: LineaLista, event: Event): Promise<void> {
+    event.stopPropagation();
+    if (this.accionando() || !this.puedeEntregarLinea(linea)) {
+      return;
+    }
+    this.accionando.set(`linea-${linea.id}`);
     try {
-      const datos = await this.cocina.pedidosListos();
-      this.pedidos.set(
-        datos
-          .filter((dto) => this.esDeHoy(dto.fecha_listo) && !this.entregados.has(String(dto.id)))
-          .map((dto) => this.aVista(dto)),
-      );
-      this.marcarHora();
-    } catch {
-      // refresco silencioso: se conserva la última lista
+      await this.cocina.entregarPlato(pedido.id, linea.id);
+      this.avisar(`Entregado · ${linea.nombre}`);
+      await this.cargar(true);
+    } catch (error) {
+      this.avisar(mensajeError(error));
+    } finally {
+      this.accionando.set(null);
     }
   }
 
-  entregar(id: string): void {
-    const pedido = this.pedidos().find((actual) => actual.id === id);
-    if (!pedido) {
+  async entregarPedido(pedido: PedidoListo): Promise<void> {
+    if (this.accionando() || !this.puedeEntregarPedido(pedido)) {
       return;
     }
-    this.entregados.add(id);
-    this.guardarEntregados();
-    this.pedidos.update((lista) => lista.filter((actual) => actual.id !== id));
-    this.avisar(`${pedido.etiqueta} · aviso archivado en este navegador`);
-  }
-
-  marcarEntregado(): void {
-    const siguiente = this.pedidos()[0];
-    if (!siguiente) {
-      this.avisar('Sin avisos por archivar');
-      return;
+    this.accionando.set(`pedido-${pedido.id}`);
+    try {
+      await this.cocina.entregarRonda(pedido.id);
+      this.avisar(`${pedido.etiqueta} · entregado`);
+      await this.cargar(true);
+    } catch (error) {
+      this.avisar(mensajeError(error));
+    } finally {
+      this.accionando.set(null);
     }
-    this.entregar(siguiente.id);
   }
 
   actualizar(): void {
@@ -205,25 +247,48 @@ export class PedidosListosPage {
     return 'flame';
   }
 
+  estadoTexto(estado: EstadoLineaKds): string {
+    switch (estado) {
+      case 'en_preparacion':
+        return 'En preparación';
+      case 'listo':
+        return 'Listo';
+      case 'entregado':
+        return 'Entregado';
+      default:
+        return 'Pendiente';
+    }
+  }
+
   private aVista(dto: PedidoListoDto): PedidoListo {
     const esMesa = dto.tipo_consumo === 'sala' || dto.mesa_numero !== null;
     const etiqueta = dto.mesa_numero
       ? `M${String(dto.mesa_numero).padStart(2, '0')}`
       : `#${dto.numero}`;
-    const platos = dto.detalles.length;
+    const lineas = dto.detalles.map((detalle) => {
+      const item = toDetalle(detalle);
+      return {
+        id: item.id,
+        nombre: item.nombre,
+        cantidad: item.cantidad,
+        estado: estadoLinea(item),
+        estacion: estacionDe(item),
+        curso: cursoDe(item),
+        nota: item.notas,
+      };
+    });
+    const activas = lineas.filter((linea) => linea.estado !== 'entregado');
     return {
-      id: String(dto.id),
+      id: dto.id,
       etiqueta,
       tipo: esMesa ? 'mesa' : 'llevar',
       ronda: `Pedido ${dto.numero}`,
       hora: dto.fecha_listo ? formatearHora(dto.fecha_listo) : '—',
       minutos: dto.minutos_esperando ?? 0,
-      meta: `${platos} ${platos === 1 ? 'plato' : 'platos'} · ${this.canal(dto.canal)}`,
-      items: dto.detalles.map((detalle) => ({
-        nombre: detalle.platillo_nombre ?? `Platillo ${detalle.platillo_id}`,
-        cantidad: detalle.cantidad,
-        nota: detalle.notas ?? undefined,
-      })),
+      meta: `${lineas.length} ${lineas.length === 1 ? 'plato' : 'platos'} · ${this.canal(dto.canal)}`,
+      canal: this.canal(dto.canal),
+      lineas,
+      todosListos: activas.length > 0 && activas.every((linea) => linea.estado === 'listo'),
     };
   }
 
@@ -255,24 +320,6 @@ export class PedidosListosPage {
       return false;
     }
     return FORMATO_DIA.format(new Date(fechaIso)) === FORMATO_DIA.format(new Date());
-  }
-
-  private leerEntregados(): Set<string> {
-    try {
-      const bruto = sessionStorage.getItem(CLAVE_ENTREGADOS);
-      const lista = bruto ? (JSON.parse(bruto) as unknown) : [];
-      return new Set(Array.isArray(lista) ? lista.map((id) => String(id)) : []);
-    } catch {
-      return new Set();
-    }
-  }
-
-  private guardarEntregados(): void {
-    try {
-      sessionStorage.setItem(CLAVE_ENTREGADOS, JSON.stringify([...this.entregados]));
-    } catch {
-      // sin sessionStorage: el aviso reaparece al recargar
-    }
   }
 
   private avisar(mensaje: string): void {

@@ -20,6 +20,14 @@ export type EstadoPago = 'pendiente' | 'pagado' | 'contraentrega_pendiente';
 
 export type EstadoPreparacion = 'pendiente' | 'en_preparacion' | 'listo';
 
+export type Estacion = 'parrilla' | 'frituras' | 'frios' | 'bar';
+
+export type Curso = 'entrada' | 'fondo' | 'postre';
+
+export type EstadoEntrega = 'pendiente' | 'en_camino' | 'entregado';
+
+export type EstadoLineaKds = EstadoPreparacion | 'entregado';
+
 export type CanalPedido = 'local' | 'whatsapp' | 'delivery_propio' | 'rappi' | 'llamafood';
 
 export type TipoConsumo = 'sala' | 'para_llevar' | 'delivery';
@@ -45,6 +53,11 @@ export interface PedidoDetalle {
   estadoPreparacion: EstadoPreparacion;
   fechaInicioPrep?: string;
   fechaListo?: string;
+  // KDS v2 (opcionales para tolerar respuestas antiguas o mocks).
+  estacion?: Estacion;
+  curso?: Curso;
+  prepMin?: number;
+  entregadoEn?: string;
 }
 
 export interface Ronda {
@@ -99,6 +112,11 @@ export interface Pedido {
   comprobanteTipo: ComprobanteTipo;
   items: PedidoDetalle[];
   fechaEntrega?: string;
+  mesaNumero?: number;
+  // KDS v2 (opcionales: la bandeja/KDS los usa cuando el backend los envía).
+  estadoEntrega?: EstadoEntrega;
+  listo?: boolean;
+  todosEntregados?: boolean;
 }
 
 export interface Pago {

@@ -12,6 +12,8 @@ export interface ApiList<T> {
     limit?: number;
     total?: number;
     pages?: number;
+    all_day?: KdsAllDayDto[];
+    all_day_total?: number;
     total_alertas?: number;
     total_insumos?: number;
     total_ok?: number;
@@ -59,6 +61,9 @@ export interface MesaDto {
   cuenta_abierta?: CuentaDto | null;
 }
 
+export type EstacionDto = 'parrilla' | 'frituras' | 'frios' | 'bar';
+export type CursoDto = 'entrada' | 'fondo' | 'postre';
+
 export interface DetallePedidoDto {
   id: number;
   pedido_id: number;
@@ -71,7 +76,15 @@ export interface DetallePedidoDto {
   fecha_inicio_prep: string | null;
   fecha_listo: string | null;
   platillo_nombre?: string | null;
+  // KDS v2: tolerante a respuestas antiguas (sin estación/curso/entrega).
+  estacion?: EstacionDto | string | null;
+  curso?: CursoDto | string | null;
+  prep_min?: number | null;
+  entregado_en?: string | null;
+  entregado_por_id?: number | null;
 }
+
+export type KdsDetalleDto = DetallePedidoDto;
 
 export interface ClienteDto {
   id?: number;
@@ -137,7 +150,9 @@ export interface PedidoListoDto {
   cuenta_id: number | null;
   fecha_listo: string | null;
   minutos_esperando: number;
-  detalles: DetallePedidoDto[];
+  estado_entrega?: string | null;
+  todos_entregados?: boolean;
+  detalles: KdsDetalleDto[];
 }
 
 export interface PagoDto {
@@ -242,7 +257,8 @@ export interface KdsPedidoDto {
   estado_pago: string;
   metodo_pago: string | null;
   estado_entrega: string | null;
-  prioridad: string;
+  entregado_en?: string | null;
+  prioridad?: string;
   subtotal: number;
   igv: number;
   total: number;
@@ -252,8 +268,18 @@ export interface KdsPedidoDto {
   tiempo_min: number;
   sla_min: number;
   prioritario: boolean;
+  listo?: boolean;
+  todos_entregados?: boolean;
   observaciones: string | null;
-  detalles: DetallePedidoDto[];
+  detalles: KdsDetalleDto[];
+}
+
+export interface KdsAllDayDto {
+  platillo_id: number;
+  platillo_nombre: string;
+  estacion: EstacionDto | string;
+  cantidad: number;
+  en_fuego: number;
 }
 
 export interface KdsMetaDto {
@@ -261,6 +287,8 @@ export interface KdsMetaDto {
   prioritarios: number;
   sla_min: number;
   generado_en: string;
+  all_day?: KdsAllDayDto[];
+  all_day_total?: number;
 }
 
 export interface KdsEstadoLineaDto {
@@ -275,6 +303,33 @@ export interface KdsEstadoLineaDto {
   fecha_inicio_prep: string | null;
   fecha_listo: string | null;
   platillo_nombre: string | null;
+  estacion?: EstacionDto | string | null;
+  curso?: CursoDto | string | null;
+  prep_min?: number | null;
+  entregado_en?: string | null;
+}
+
+export interface KdsEntregaPlatoResponseDto {
+  pedido_id: number;
+  pedido_estado_entrega: string;
+  todos_entregados: boolean;
+  detalle: {
+    id: number;
+    entregado_en: string | null;
+    entregado_por_id?: number | null;
+  };
+}
+
+export interface KdsEntregaRondaResponseDto {
+  pedido_id: number;
+  estado_entrega: string;
+  entregado_en: string | null;
+}
+
+export interface KdsTodoListoResponseDto {
+  pedido_id: number;
+  estado?: string;
+  fecha_listo?: string | null;
 }
 
 export interface KdsEstadoResponseDto {

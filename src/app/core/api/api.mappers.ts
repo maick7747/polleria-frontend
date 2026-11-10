@@ -78,6 +78,7 @@ import type {
   UsuarioDto,
 } from './api.types';
 import { formatearMoneda } from '../utils/format';
+import { cursoDe, estacionDe } from '../utils/kds';
 
 const METODOS: readonly MetodoPago[] = ['efectivo', 'tarjeta', 'yape', 'plin', 'transferencia'];
 
@@ -180,10 +181,11 @@ function toComprobanteTipo(tipo: string): ComprobanteTipo {
 }
 
 export function toDetalle(dto: DetallePedidoDto): PedidoDetalle {
+  const nombre = dto.platillo_nombre ?? `Platillo ${dto.platillo_id}`;
   return {
     id: dto.id,
     platilloId: dto.platillo_id,
-    nombre: dto.platillo_nombre ?? `Platillo ${dto.platillo_id}`,
+    nombre,
     cantidad: dto.cantidad,
     precioUnitario: dto.precio_unitario,
     subtotal: dto.subtotal,
@@ -191,6 +193,14 @@ export function toDetalle(dto: DetallePedidoDto): PedidoDetalle {
     estadoPreparacion: toEstadoPreparacion(dto.estado_preparacion),
     fechaInicioPrep: dto.fecha_inicio_prep ?? undefined,
     fechaListo: dto.fecha_listo ?? undefined,
+    // Respuestas antiguas no traen estación/curso: se infieren por nombre.
+    estacion: estacionDe({ estacion: dto.estacion ?? undefined, nombre }),
+    curso: cursoDe({ curso: dto.curso ?? undefined, nombre }),
+    prepMin:
+      typeof dto.prep_min === 'number' && Number.isFinite(dto.prep_min)
+        ? dto.prep_min
+        : undefined,
+    entregadoEn: dto.entregado_en ?? undefined,
   };
 }
 
@@ -236,6 +246,10 @@ export function toPedido(dto: PedidoDto): Pedido {
 }
 
 export function toPedidoKds(dto: KdsPedidoDto): Pedido {
+  const items = dto.detalles.map(toDetalle);
+  const todosEntregados =
+    dto.todos_entregados ??
+    (items.length > 0 && items.every((item) => Boolean(item.entregadoEn)));
   return {
     id: dto.id,
     numero: dto.numero,
@@ -243,6 +257,7 @@ export function toPedidoKds(dto: KdsPedidoDto): Pedido {
     canal: toCanal(dto.canal),
     tipoConsumo: toTipoConsumo(dto.tipo_consumo),
     mesaId: dto.mesa_id ?? null,
+    mesaNumero: dto.mesa_numero ?? undefined,
     cuentaId: dto.cuenta_id ?? null,
     rondaId: null,
     usuarioCajeroId: 0,
@@ -256,8 +271,18 @@ export function toPedidoKds(dto: KdsPedidoDto): Pedido {
     costoDelivery: 0,
     observaciones: dto.observaciones ?? undefined,
     comprobanteTipo: 'ticket',
-    items: dto.detalles.map(toDetalle),
+    items,
+    estadoEntrega: toEstadoEntrega(dto.estado_entrega),
+    listo: dto.listo ?? (items.length > 0 && items.every((item) => item.estadoPreparacion === 'listo')),
+    todosEntregados,
   };
+}
+
+function toEstadoEntrega(estado: string | null | undefined): Pedido['estadoEntrega'] {
+  if (estado === 'entregado' || estado === 'en_camino' || estado === 'pendiente') {
+    return estado;
+  }
+  return undefined;
 }
 
 function toDatosCliente(dto: ClienteDto): DatosCliente {
