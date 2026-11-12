@@ -1,3 +1,4 @@
+import { crearGuardiaUrl } from '../../core/utils/url-sync';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -149,6 +150,7 @@ export class ActivosPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly urlActiva = crearGuardiaUrl(this.router, this.destroyRef, '/activos');
 
   private buscarTimer: number | null = null;
   private toastTimer: number | null = null;
@@ -613,6 +615,7 @@ export class ActivosPage {
   }
 
   private sincronizarUrl(): void {
+    if (!this.urlActiva()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {

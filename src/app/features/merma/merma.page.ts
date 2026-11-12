@@ -1,3 +1,4 @@
+import { crearGuardiaUrl } from '../../core/utils/url-sync';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -63,6 +64,7 @@ export class MermaPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly urlActiva = crearGuardiaUrl(this.router, this.destroyRef, '/merma');
 
   readonly estados = ESTADOS;
   readonly moneda = formatearMoneda;
@@ -434,6 +436,7 @@ export class MermaPage {
   }
 
   private sincronizarUrl(): void {
+    if (!this.urlActiva()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {

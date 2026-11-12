@@ -1,7 +1,9 @@
+import { crearGuardiaUrl } from '../../core/utils/url-sync';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
@@ -51,6 +53,8 @@ export class HistorialCuentasPage {
   private readonly cuentas = inject(CuentasService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly urlActiva = crearGuardiaUrl(this.router, this.destroyRef, '/historial-cuentas');
 
   readonly moneda = formatearMoneda;
   readonly estados = ESTADOS;
@@ -165,6 +169,7 @@ export class HistorialCuentasPage {
   }
 
   private sincronizarUrl(): void {
+    if (!this.urlActiva()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {

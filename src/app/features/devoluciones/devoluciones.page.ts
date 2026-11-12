@@ -1,3 +1,4 @@
+import { crearGuardiaUrl } from '../../core/utils/url-sync';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -108,6 +109,7 @@ export class DevolucionesPage {
   private readonly pedidos = inject(PedidosService);
   private readonly devoluciones = inject(DevolucionesService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly urlActiva = crearGuardiaUrl(this.router, this.destroyRef, '/devoluciones');
 
   readonly motivos = MOTIVOS;
   readonly soluciones = SOLUCIONES;
@@ -509,6 +511,7 @@ export class DevolucionesPage {
   }
 
   private sincronizarUrl(): void {
+    if (!this.urlActiva()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {

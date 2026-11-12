@@ -1,3 +1,4 @@
+import { crearGuardiaUrl } from '../../core/utils/url-sync';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -94,6 +95,7 @@ export class DeliveryPropioPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly urlActiva = crearGuardiaUrl(this.router, this.destroyRef, '/delivery-propio');
 
   private toastTimer: number | null = null;
   private buscarTimer: number | null = null;
@@ -519,6 +521,7 @@ export class DeliveryPropioPage {
   }
 
   private sincronizarUrl(): void {
+    if (!this.urlActiva()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {

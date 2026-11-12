@@ -1,3 +1,4 @@
+import { crearGuardiaUrl } from '../../core/utils/url-sync';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -271,6 +272,7 @@ export class ReportesPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly urlActiva = crearGuardiaUrl(this.router, this.destroyRef, '/reportes');
 
   private toastTimer: number | null = null;
   private ultimoFormato: FormatoDescarga = 'xlsx';
@@ -461,6 +463,7 @@ export class ReportesPage {
   }
 
   private sincronizarUrl(): void {
+    if (!this.urlActiva()) return;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
