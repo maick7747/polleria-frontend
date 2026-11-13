@@ -47,28 +47,13 @@ export class RealtimeService {
         auth: { persistSession: false, autoRefreshToken: false },
         realtime: { params: { eventsPerSecond: 5 } },
       });
+      // Broadcast público `fratelli-cambios`: el trigger de la migración 016
+      // emite {tabla, operacion} SIN datos de la fila. Antes se usaba
+      // `postgres_changes` con una política anon que exponía pedidos y
+      // direcciones a cualquiera con la clave publishable (cerrada en 016).
       this.canal = this.cliente
-        .channel('fratelli-pedidos')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'pedido_detalles' },
-          () => this.agendar(),
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'pedido_detalles' },
-          () => this.agendar(),
-        )
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'pedidos' },
-          () => this.agendar(),
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'pedidos' },
-          () => this.agendar(),
-        )
+        .channel('fratelli-cambios')
+        .on('broadcast', { event: 'cambio' }, () => this.agendar())
         .subscribe((status) => this.estadoCanal(status));
       return true;
     } catch {
