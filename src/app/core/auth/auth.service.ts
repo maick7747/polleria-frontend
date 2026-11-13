@@ -4,11 +4,10 @@ import { firstValueFrom } from 'rxjs';
 import type { RolNombre, Sesion, Usuario } from '../models';
 import { MOCK_USUARIOS, PERMISOS_POR_ROL } from '../data/mock-data';
 import { ApiClient } from '../api/api.client';
-import { USE_API } from '../api/api.config';
+import { SESSION_STORAGE_KEY, USE_API } from '../api/api.config';
 import { mensajeError } from '../api/api.helpers';
 import type { LoginResponseDto } from '../api/api.types';
 
-const STORAGE_KEY = 'fratelli.session.v1';
 const DURACION_SESION_MS = 8 * 60 * 60 * 1000;
 const ROLES: readonly RolNombre[] = [
   'Mozo',
@@ -129,7 +128,7 @@ export class AuthService {
     this.sesion.set(null);
     this.api.limpiarCacheEtag();
     if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
     }
     void this.router.navigateByUrl('/login');
   }
@@ -214,26 +213,26 @@ export class AuthService {
     if (typeof localStorage === 'undefined') {
       return;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sesion));
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sesion));
   }
 
   private hidratar(): Sesion | null {
     if (typeof localStorage === 'undefined') {
       return null;
     }
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) {
       return null;
     }
     try {
       const almacenada = JSON.parse(raw) as Sesion;
       if (!almacenada.usuario || almacenada.expiraEn <= Date.now()) {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(SESSION_STORAGE_KEY);
         return null;
       }
       return almacenada;
     } catch {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
       return null;
     }
   }
