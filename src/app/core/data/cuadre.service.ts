@@ -272,6 +272,10 @@ export class CuadreService {
         if (!esFalloRed(error)) {
           throw error;
         }
+        // DINERO: si la apertura no llegó al backend, no se finge caja abierta.
+        if (USE_API) {
+          throw error;
+        }
       }
     }
 
@@ -318,8 +322,14 @@ export class CuadreService {
           if (!esFalloRed(error)) {
             throw error;
           }
+          // DINERO: si el cierre no llegó al backend, la caja sigue abierta.
+          if (USE_API) {
+            throw error;
+          }
         }
       }
+      // En modo API nunca se cierra "en memoria" una caja inexistente.
+      throw new Error('No hay una caja abierta para cerrar.');
     }
 
     this.efectivoContado.set(efectivoContado);

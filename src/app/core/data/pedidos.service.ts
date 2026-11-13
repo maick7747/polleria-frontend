@@ -289,6 +289,10 @@ export class PedidosService {
         if (!esFalloRed(error)) {
           throw error;
         }
+        // En modo API no se marca "listo" solo en memoria: el mozo no se enteraría.
+        if (USE_API) {
+          throw error;
+        }
       }
     }
 

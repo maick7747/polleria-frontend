@@ -244,6 +244,10 @@ export class CuentasService {
         if (!esFalloRed(error)) {
           throw error;
         }
+        // En modo API no se finge éxito: el dato del cliente debe persistir.
+        if (USE_API) {
+          throw error;
+        }
       }
     }
 
@@ -283,6 +287,10 @@ export class CuentasService {
         return actualizada;
       } catch (error) {
         if (!esFalloRed(error)) {
+          throw error;
+        }
+        // En modo API no se finge éxito: evita perder el cliente capturado.
+        if (USE_API) {
           throw error;
         }
       }
@@ -329,6 +337,10 @@ export class CuentasService {
             await this.cargar();
             return this.cuentaDeMesa(mesaId) ?? null;
           }
+          throw error;
+        }
+        // En modo API no se finge una apertura que el backend no confirmó.
+        if (USE_API) {
           throw error;
         }
       }
@@ -389,6 +401,10 @@ export class CuentasService {
         if (!esFalloRed(error)) {
           throw error;
         }
+        // En modo API no se finge una ronda que el backend no registró.
+        if (USE_API) {
+          throw error;
+        }
       }
     }
 
@@ -425,6 +441,11 @@ export class CuentasService {
         if (!esFalloRed(error)) {
           throw error;
         }
+        // DINERO: si el cobro no llegó al backend, la cuenta sigue abierta.
+        // La idempotencia del backend protege el reintento del usuario.
+        if (USE_API) {
+          throw error;
+        }
       }
     }
 
@@ -457,6 +478,10 @@ export class CuentasService {
         return true;
       } catch (error) {
         if (!esFalloRed(error)) {
+          throw error;
+        }
+        // En modo API no se libera una mesa que el backend no liberó.
+        if (USE_API) {
           throw error;
         }
       }
