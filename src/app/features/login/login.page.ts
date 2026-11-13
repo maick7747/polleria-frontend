@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { USE_API } from '../../core/api/api.config';
+import { environment } from '../../../environments/environment';
 
 interface AccesoDemo {
   rol: string;
@@ -45,7 +46,9 @@ export class LoginPage {
   readonly usaApi = USE_API;
   readonly accesos: readonly AccesoDemo[] = USE_API ? ACCESOS_API : ACCESOS_MOCK;
 
-  private readonly inicial = this.accesos[0];
+  // En producción no se pre-rellenan credenciales: eran las de los usuarios
+  // demo y el repo es público. En dev/demo se mantiene el autocompletado.
+  private readonly inicial = environment.production ? undefined : this.accesos[0];
 
   readonly form = this.fb.nonNullable.group({
     email: [this.inicial?.email ?? '', [Validators.required, Validators.email]],

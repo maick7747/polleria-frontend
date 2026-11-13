@@ -5,7 +5,7 @@ import type { RolNombre, Sesion, Usuario } from '../models';
 import { MOCK_USUARIOS, PERMISOS_POR_ROL } from '../data/mock-data';
 import { ApiClient } from '../api/api.client';
 import { USE_API } from '../api/api.config';
-import { esFalloRed, mensajeError } from '../api/api.helpers';
+import { mensajeError } from '../api/api.helpers';
 import type { LoginResponseDto } from '../api/api.types';
 
 const STORAGE_KEY = 'fratelli.session.v1';
@@ -112,9 +112,10 @@ export class AuthService {
         this.persistir(nueva);
         return { ok: true };
       } catch (error) {
-        if (!esFalloRed(error)) {
-          return { ok: false, error: mensajeError(error) };
-        }
+        // Sin fallback silencioso: con USE_API un fallo de red (incluido el
+        // TIMEOUT del cold start de Render) NUNCA debe abrir una sesión mock.
+        // La pantalla muestra el banner con el mensaje y permite reintentar.
+        return { ok: false, error: mensajeError(error) };
       }
     }
 
