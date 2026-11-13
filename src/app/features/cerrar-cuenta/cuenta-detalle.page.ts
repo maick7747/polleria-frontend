@@ -28,7 +28,8 @@ import { IconComponent, type IconName } from '../../shared/components/icon/icon'
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-const AHORA = Date.now();
+// (El reloj de la cuenta se maneja con la señal `ahora` para evitar minutos
+// congelados; antes había un `const AHORA = Date.now()` a nivel de módulo.)
 
 type EstadoValidacion = 'inicial' | 'valido' | 'manual' | 'error';
 
@@ -73,6 +74,9 @@ export class CuentaDetallePage {
   readonly metodos = METODOS;
   readonly moneda = formatearMoneda;
   readonly turno = turnoActual();
+  // Reloj vivo: los minutos de la cuenta abierta no deben quedar congelados
+  // en el instante en que se cargó la pantalla.
+  readonly ahora = signal(Date.now());
   readonly cajaAbierta = computed(() => this.cuadre.estado() === 'abierta');
   readonly cajaCerradaEstado = computed(() => {
     const estado = this.cuadre.estado();
@@ -115,7 +119,9 @@ export class CuentaDetallePage {
   constructor() {
     void this.cargar();
     void this.cuadre.cargar();
+    const reloj = window.setInterval(() => this.ahora.set(Date.now()), 30_000);
     this.destroyRef.onDestroy(() => {
+      window.clearInterval(reloj);
       if (this.toastTimer !== null) {
         window.clearTimeout(this.toastTimer);
       }
@@ -170,7 +176,7 @@ export class CuentaDetallePage {
     if (cuenta.estado !== 'abierta') {
       return `${this.estadoEtiqueta()} · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
     }
-    const minutos = minutosEntre(cuenta.fechaApertura, AHORA);
+    const minutos = minutosEntre(cuenta.fechaApertura, this.ahora());
     return `Abierta ${minutos} min · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
   });
 
@@ -494,6 +500,11 @@ export class CuentaDetallePage {
       this.avisar('El efectivo recibido no cubre el total.', true);
       return;
     }
+    const usuarioId = this.auth.usuario()?.id;
+    if (!usuarioId) {
+      this.avisar('Tu sesión no está activa. Vuelve a iniciar sesión.', true);
+      return;
+    }
 
     this.procesando.set(true);
     this.cajaCerrada.set('');
@@ -509,7 +520,7 @@ export class CuentaDetallePage {
       const numero = this.numeroComprobante(this.comprobanteSel());
       const cerrada = await this.cuentas.cerrar(
         cuenta.id,
-        this.auth.usuario()?.id ?? 3,
+        usuarioId,
         this.comprobanteSel(),
         numero,
         this.metodo(),

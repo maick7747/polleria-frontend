@@ -42,7 +42,10 @@ export class ApiClient {
   private redirigiendo = false;
 
   // Caché en memoria de respuestas condicionales (ETag + body) por URL+query.
+  // Tope LRU: sin límite, una sesión larga acumularía bodies de todas las
+  // combinaciones de filtros y páginas visitadas.
   private readonly cacheEtag = new Map<string, EntradaEtag>();
+  private static readonly MAX_ETAG = 50;
 
   readonly baseUrl = API_BASE_URL;
   readonly habilitado = USE_API;
@@ -77,6 +80,9 @@ export class ApiClient {
 
     let headers = this.headers();
     if (cacheado) {
+      // Refresca la posición LRU (Map conserva el orden de inserción).
+      this.cacheEtag.delete(clave);
+      this.cacheEtag.set(clave, cacheado);
       headers = headers.set('If-None-Match', cacheado.etag);
     }
 
@@ -123,6 +129,12 @@ export class ApiClient {
     const etag = respuesta.headers.get('ETag') ?? respuesta.headers.get('etag');
     if (etag) {
       this.cacheEtag.set(clave, { etag, data: respuesta.body });
+      if (this.cacheEtag.size > ApiClient.MAX_ETAG) {
+        const masAntigua = this.cacheEtag.keys().next().value;
+        if (masAntigua !== undefined) {
+          this.cacheEtag.delete(masAntigua);
+        }
+      }
     } else {
       // Sin ETag no hay validación posible: no reutilizar una entrada vieja.
       this.cacheEtag.delete(clave);

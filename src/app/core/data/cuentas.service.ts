@@ -73,6 +73,7 @@ export class CuentasService {
   readonly cargando = signal<boolean>(false);
   readonly error = signal<string | null>(null);
   readonly errorDetalle = signal<ApiError | null>(null);
+  // La leen las pantallas de mesas/cierre para mostrar avisos de carga.
   readonly aviso = signal<string | null>(null);
 
   readonly meta = signal<PageMeta>({ ...META_INICIAL });
