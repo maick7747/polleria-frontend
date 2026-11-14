@@ -55,6 +55,12 @@
         <p class="error" role="alert">{{ error() }}</p>
       }
 
+      @if (cargando() && lento()) {
+        <p class="hint" role="status">
+          El servidor está despertando… puede tardar hasta un minuto.
+        </p>
+      }
+
       <button class="login-btn" type="submit" [disabled]="cargando()">
         {{ cargando() ? 'Ingresando…' : 'Ingresar' }}
       </button>

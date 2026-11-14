@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, OnDestroy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -28,6 +28,8 @@ const ACCESOS_MOCK: readonly AccesoDemo[] = [
   { rol: 'Admin', email: 'tecnico@fratellis.pe', password: 'tecnico123' },
 ];
 
+const AVISO_LENTO_MS = 5_000;
+
 @Component({
   selector: 'app-login-page',
   standalone: true,
@@ -36,13 +38,15 @@ const ACCESOS_MOCK: readonly AccesoDemo[] = [
   templateUrl: './login.page.html',
   styleUrl: './login.page.css',
 })
-export class LoginPage {
+export class LoginPage implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
 
   readonly error = signal<string>('');
   readonly cargando = signal<boolean>(false);
+  readonly lento = signal<boolean>(false);
+  private temporizadorLento: ReturnType<typeof setTimeout> | null = null;
   readonly usaApi = USE_API;
   readonly accesos: readonly AccesoDemo[] = USE_API ? ACCESOS_API : ACCESOS_MOCK;
 
@@ -60,14 +64,20 @@ export class LoginPage {
     this.error.set('');
   }
 
+  ngOnDestroy(): void {
+    this.limpiarAvisoLento();
+  }
+
   async ingresar(): Promise<void> {
     if (this.form.invalid || this.cargando()) {
       this.form.markAllAsTouched();
       return;
     }
     this.cargando.set(true);
+    this.programarAvisoLento();
     const { email, password } = this.form.getRawValue();
     const resultado = await this.auth.login(email, password);
+    this.limpiarAvisoLento();
     this.cargando.set(false);
     if (!resultado.ok) {
       this.error.set(resultado.error ?? 'No se pudo iniciar sesión.');
@@ -75,6 +85,28 @@ export class LoginPage {
     }
     this.error.set('');
     // Cada rol entra a su pantalla operativa (no todos pueden ver el Dashboard).
-    void this.router.navigateByUrl(this.auth.home());
+    // Se usa una carga completa: si Vercel publicó una versión nueva mientras
+    // la pestaña estaba abierta, la navegación SPA puede fallar al pedir un
+    // chunk que ya no existe y dejar al usuario en /login hasta recargar.
+    // La sesión ya quedó persistida, así que el arranque entra directo.
+    const destino = this.auth.home();
+    if (typeof window === 'undefined') {
+      void this.router.navigateByUrl(destino);
+      return;
+    }
+    window.location.assign(destino);
+  }
+
+  private programarAvisoLento(): void {
+    this.limpiarAvisoLento();
+    this.temporizadorLento = setTimeout(() => this.lento.set(true), AVISO_LENTO_MS);
+  }
+
+  private limpiarAvisoLento(): void {
+    if (this.temporizadorLento !== null) {
+      clearTimeout(this.temporizadorLento);
+      this.temporizadorLento = null;
+    }
+    this.lento.set(false);
   }
 }

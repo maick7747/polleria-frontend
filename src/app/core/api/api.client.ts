@@ -168,10 +168,11 @@ export class ApiClient {
       );
   }
 
-  post<T>(path: string, body: unknown = {}): Observable<T> {
+  post<T>(path: string, body: unknown = {}, options: { timeoutMs?: number } = {}): Observable<T> {
+    const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
     return this.http
       .post<T>(this.url(path), body, { headers: this.headers() })
-      .pipe(timeout(REQUEST_TIMEOUT_MS), catchError((error: unknown) => this.fail(error)));
+      .pipe(timeout(timeoutMs), catchError((error: unknown) => this.fail(error)));
   }
 
   put<T>(path: string, body: unknown = {}): Observable<T> {

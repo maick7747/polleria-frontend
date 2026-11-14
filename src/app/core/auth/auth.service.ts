@@ -5,10 +5,15 @@ import type { RolNombre, Sesion, Usuario } from '../models';
 import { MOCK_USUARIOS, PERMISOS_POR_ROL } from '../data/mock-data';
 import { ApiClient } from '../api/api.client';
 import { SESSION_STORAGE_KEY, USE_API } from '../api/api.config';
-import { mensajeError } from '../api/api.helpers';
+import { esApiError, mensajeError } from '../api/api.helpers';
 import type { LoginResponseDto } from '../api/api.types';
 
 const DURACION_SESION_MS = 8 * 60 * 60 * 1000;
+
+// Render (plan free) puede tardar hasta ~60 s en despertar y el login es,
+// normalmente, la primera petición del día: le damos más margen que al resto
+// de la API (45 s) para que un cold start no obligue a reintentar.
+const LOGIN_TIMEOUT_MS = 90_000;
 const ROLES: readonly RolNombre[] = [
   'Mozo',
   'Cajero',
@@ -89,7 +94,11 @@ export class AuthService {
     if (USE_API) {
       try {
         const respuesta = await firstValueFrom(
-          this.api.post<LoginResponseDto>('/auth/login', { email, password }),
+          this.api.post<LoginResponseDto>(
+            '/auth/login',
+            { email, password },
+            { timeoutMs: LOGIN_TIMEOUT_MS },
+          ),
         );
         const roles = respuesta.roles.filter(esRol);
         const usuario: Usuario = {
@@ -114,6 +123,13 @@ export class AuthService {
         // Sin fallback silencioso: con USE_API un fallo de red (incluido el
         // TIMEOUT del cold start de Render) NUNCA debe abrir una sesión mock.
         // La pantalla muestra el banner con el mensaje y permite reintentar.
+        if (esApiError(error) && error.code === 'TIMEOUT') {
+          return {
+            ok: false,
+            error:
+              'El servidor está despertando y no respondió a tiempo. Vuelve a intentarlo en unos segundos.',
+          };
+        }
         return { ok: false, error: mensajeError(error) };
       }
     }
