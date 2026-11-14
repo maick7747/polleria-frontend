@@ -53,10 +53,31 @@ interface PedidoListo {
   canal: string;
   lineas: LineaLista[];
   todosListos: boolean;
+  // Un aviso pendiente puede quedar de un día anterior (p. ej. la caja no se
+  // cerró). No se oculta: se marca para que el mozo sepa que viene de antes.
+  diaEtiqueta: string;
 }
 
 const REFRESCO_MS = 15000;
 const FORMATO_DIA = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' });
+
+// Una espera de 1470 min no se lee de un vistazo: se muestra "1 d 2 h".
+function formatearEspera(minutos: number): string {
+  if (!Number.isFinite(minutos) || minutos <= 0) {
+    return '0 min';
+  }
+  const total = Math.round(minutos);
+  if (total < 60) {
+    return `${total} min`;
+  }
+  const dias = Math.floor(total / 1440);
+  const horas = Math.floor((total % 1440) / 60);
+  const mins = total % 60;
+  if (dias > 0) {
+    return horas > 0 ? `${dias} d ${horas} h` : `${dias} d`;
+  }
+  return mins > 0 ? `${horas} h ${mins} min` : `${horas} h`;
+}
 
 @Component({
   selector: 'app-pedidos-listos-page',
@@ -107,6 +128,8 @@ export class PedidosListosPage {
   readonly mayorEspera = computed<number>(() =>
     this.pedidos().reduce((mayor, pedido) => Math.max(mayor, pedido.minutos), 0),
   );
+
+  readonly mayorEsperaTexto = computed<string>(() => formatearEspera(this.mayorEspera()));
 
   readonly avisoHace = computed<number>(() =>
     this.pedidos().reduce(
@@ -160,7 +183,11 @@ export class PedidosListosPage {
       const datos = await this.cocina.pedidosListos();
       this.pedidos.set(
         datos
-          .filter((dto) => !dto.todos_entregados && this.esDeHoy(dto.fecha_listo))
+          // El backend ya devuelve solo avisos realmente pendientes (servidos,
+          // sin cobrar y sin entregar). Antes se filtraba por "hoy" y un
+          // pedido que quedaba abierto al cambiar el día desaparecía de la
+          // bandeja sin poder entregarse.
+          .filter((dto) => !dto.todos_entregados)
           .map((dto) => this.aVista(dto))
           .filter((pedido) => pedido.lineas.length > 0),
       );
@@ -230,6 +257,10 @@ export class PedidosListosPage {
     void this.cargar();
   }
 
+  esperaTexto(minutos: number): string {
+    return formatearEspera(minutos);
+  }
+
   iconoPlato(nombre: string): IconName {
     const texto = nombre.toLowerCase();
     if (texto.includes('chicha') || texto.includes('gaseosa') || texto.includes('limonada')) {
@@ -289,6 +320,7 @@ export class PedidosListosPage {
       canal: this.canal(dto.canal),
       lineas,
       todosListos: activas.length > 0 && activas.every((linea) => linea.estado === 'listo'),
+      diaEtiqueta: this.diaEtiqueta(dto.fecha_listo),
     };
   }
 
@@ -314,12 +346,29 @@ export class PedidosListosPage {
     this.horaActualizacion.set(`${hh}:${mm}`);
   }
 
-  // La bandeja es del turno: solo avisos de hoy (zona Lima).
-  private esDeHoy(fechaIso: string | null): boolean {
+  // La bandeja muestra todos los avisos pendientes; si el aviso quedó de un
+  // día anterior se etiqueta en lugar de ocultarse (zona Lima).
+  private diaEtiqueta(fechaIso: string | null): string {
     if (!fechaIso) {
-      return false;
+      return '';
     }
-    return FORMATO_DIA.format(new Date(fechaIso)) === FORMATO_DIA.format(new Date());
+    const dias = this.diasDesde(fechaIso);
+    if (dias <= 0) {
+      return '';
+    }
+    if (dias === 1) {
+      return 'De ayer';
+    }
+    return `Hace ${dias} días`;
+  }
+
+  private diasDesde(fechaIso: string): number {
+    const dia = FORMATO_DIA.format(new Date(fechaIso));
+    const hoy = FORMATO_DIA.format(new Date());
+    const [a, m, d] = dia.split('-').map(Number);
+    const [aHoy, mHoy, dHoy] = hoy.split('-').map(Number);
+    const dias = (Date.UTC(aHoy, mHoy - 1, dHoy) - Date.UTC(a, m - 1, d)) / 86400000;
+    return Math.max(0, Math.round(dias));
   }
 
   private avisar(mensaje: string): void {

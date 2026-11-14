@@ -3,7 +3,7 @@
     <span class="live-chip">
       <app-icon name="bell-ringing" [size]="12" />
       @if (total() > 0) {
-        Cocina avisó hace {{ avisoHace() }} min
+        Cocina avisó hace {{ esperaTexto(avisoHace()) }}
       } @else {
         Sin avisos pendientes
       }
@@ -57,8 +57,8 @@
       <div class="resumen__data">
         <span class="resumen__label resumen__label--warning">Mayor espera</span>
         <div class="resumen__valor">
-          <strong class="resumen__valor--warning">{{ mayorEspera() }}</strong>
-          <span>min en barra</span>
+          <strong class="resumen__valor--warning">{{ mayorEsperaTexto() }}</strong>
+          <span>en barra</span>
         </div>
       </div>
     </div>
@@ -90,6 +90,12 @@
                 <app-icon name="bell-ringing" [size]="10" />
                 Cocina avisó
               </span>
+              @if (pedido.diaEtiqueta) {
+                <span class="chip chip--warning">
+                  <app-icon name="clock" [size]="10" />
+                  {{ pedido.diaEtiqueta }}
+                </span>
+              }
               @if (pedido.tipo === 'llevar') {
                 <span class="chip chip--neutral">
                   <app-icon name="package" [size]="10" />
@@ -136,7 +142,7 @@
 
             <footer class="entrega__foot">
               <span class="entrega__meta">
-                {{ pedido.meta }} · hace {{ pedido.minutos }} min
+                {{ pedido.meta }} · hace {{ esperaTexto(pedido.minutos) }}
               </span>
               <button
                 type="button"
@@ -154,7 +160,7 @@
             <app-empty-state
               icon="check-circle"
               title="Sin pedidos listos"
-              description="Los avisos de cocina aparecerán aquí cuando el KDS marque todos los platos de una ronda como listos."
+              description="Los avisos de cocina aparecerán aquí cuando el KDS marque todos los platos de una ronda como listos. También se muestran los avisos pendientes de días anteriores."
             />
           </div>
         }
@@ -183,7 +189,7 @@
         <span class="aviso__chip">
           <span class="aviso__dot"></span>
           @if (total() > 0) {
-            Cocina avisó hace {{ avisoHace() }} min
+            Cocina avisó hace {{ esperaTexto(avisoHace()) }}
           } @else {
             Sin avisos pendientes
           }
@@ -208,7 +214,7 @@
 
         <div class="aviso__row">
           <span>Tiempo máximo en barra</span>
-          <strong>{{ mayorEspera() }} min</strong>
+          <strong>{{ mayorEsperaTexto() }}</strong>
         </div>
 
         <p class="aviso__info">
@@ -233,6 +239,7 @@
 
   <div class="pie">
     <span class="pie__note">
+      La bandeja muestra todos los avisos pendientes (también los de días anteriores).
       La entrega por línea se guarda en el servidor; el pedido desaparece al estar todo
       entregado o cobrado.
     </span>
