@@ -212,7 +212,7 @@
           <span class="cobro__grow"></span>
 
           @if (abierta()) {
-            @if (!todoEntregado()) {
+            @if (faltanEntrega() > 0) {
               <div class="entrega-pendiente" role="status">
                 <app-icon name="warning-circle" [size]="16" />
                 <div class="entrega-pendiente__texto">
