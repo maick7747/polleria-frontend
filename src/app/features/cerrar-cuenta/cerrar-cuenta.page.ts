@@ -259,10 +259,16 @@ export class CerrarCuentaPage {
 
   private vista(cuenta: Cuenta): CuentaVista {
     const minutos = this.minutos(cuenta);
-    const subtotal = round2(cuenta.total / 1.18);
+    // El backend ya envía subtotal/IGV calculados sobre el total de la cuenta.
+    // El fallback solo cubre respuestas antiguas o el modo demo.
+    const subtotal = cuenta.subtotal ?? round2(cuenta.total / 1.18);
+    const igv = cuenta.igv ?? round2(cuenta.total - subtotal);
     const listos = cuenta.rondas.reduce(
       (total, ronda) =>
-        total + ronda.items.filter((item) => item.estadoPreparacion === 'listo').length,
+        total +
+        ronda.items.filter(
+          (item) => !item.entregadoEn && item.estadoPreparacion === 'listo',
+        ).length,
       0,
     );
     return {

@@ -138,15 +138,11 @@
 
         <div class="totales">
           <div>
-            <span>Subtotal</span>
-            <span>{{ moneda(subtotalRonda()) }}</span>
-          </div>
-          <div>
-            <span>IGV (18%)</span>
-            <span>{{ moneda(igvRonda()) }}</span>
+            <span>Subtotal de la ronda</span>
+            <span>{{ moneda(totalRonda()) }}</span>
           </div>
           <div class="totales__fuerte">
-            <span>Total ronda</span>
+            <span>Total de la ronda</span>
             <span>{{ moneda(totalRonda()) }}</span>
           </div>
         </div>
@@ -154,13 +150,14 @@
         <span class="cuenta__sep"></span>
 
         <div class="cuenta__total">
-          <span class="cuenta__total-label">Total de la cuenta al cerrar</span>
+          <span class="cuenta__total-label">Total de la cuenta al cerrar (con IGV)</span>
           <div class="cuenta__amount">
             <span class="cur">S/</span>
             <span class="big">{{ totalCuenta().toFixed(2) }}</span>
           </div>
           <span class="cuenta__meta">
-            Rondas previas + ronda {{ rondaActual() }} · comprobante único
+            Subtotal {{ moneda(subtotalCuenta()) }} + IGV {{ moneda(igvCuenta()) }} ·
+            comprobante único
           </span>
         </div>
 

@@ -212,6 +212,22 @@
           <span class="cobro__grow"></span>
 
           @if (abierta()) {
+            @if (!todoEntregado()) {
+              <div class="entrega-pendiente" role="status">
+                <app-icon name="warning-circle" [size]="16" />
+                <div class="entrega-pendiente__texto">
+                  <strong>Faltan {{ faltanEntrega() }} platos por entregar</strong>
+                  <span>
+                    El cobro se habilita cuando todo esté entregado. Si ya los llevaste,
+                    confírmalo en Pedidos listos.
+                  </span>
+                  <a class="entrega-pendiente__link" routerLink="/pedidos-listos">
+                    Ir a Pedidos listos
+                  </a>
+                </div>
+              </div>
+            }
+
             <span class="cobro__label">Método de pago</span>
             <div class="metodos">
               @for (m of metodos; track m.id) {
@@ -290,6 +306,17 @@
                 Esta cuenta ya fue cerrada; su detalle se muestra solo para consulta y no admite
                 un segundo cobro.
               </p>
+              @if (boletaLista()) {
+                <button
+                  type="button"
+                  class="reimprimir"
+                  [disabled]="boletaCargando()"
+                  (click)="reimprimirBoleta()"
+                >
+                  <app-icon name="receipt" [size]="15" />
+                  {{ boletaCargando() ? 'Generando boleta…' : 'Reimprimir boleta' }}
+                </button>
+              }
             </div>
             <span class="cobro__grow"></span>
             <p class="cobro__note">Comprobante único · SUNAT simulado.</p>

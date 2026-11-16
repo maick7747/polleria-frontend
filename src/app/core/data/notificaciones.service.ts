@@ -47,7 +47,8 @@ export class NotificacionesService {
           continue;
         }
         for (const item of ronda.items) {
-          if (item.estadoPreparacion !== 'listo') {
+          // Un plato ya entregado no debe seguir sonando ni sumando al badge.
+          if (item.estadoPreparacion !== 'listo' || item.entregadoEn) {
             continue;
           }
           actuales.push({

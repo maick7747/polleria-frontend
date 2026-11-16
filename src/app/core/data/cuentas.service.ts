@@ -203,6 +203,11 @@ export class CuentasService {
     }
   }
 
+  /** `GET /cuentas/:id/comprobante/pdf` — boleta térmica de 80 mm. */
+  async comprobantePdf(cuentaId: number): Promise<Blob> {
+    return firstValueFrom(this.api.getBlob(`/cuentas/${cuentaId}/comprobante/pdf`));
+  }
+
   /**
    * `PATCH /cuentas/:id/cliente` con los datos de cobro: cliente y/o tipo de
    * comprobante. Se usa al cerrar la cuenta (es cuando el cliente elige

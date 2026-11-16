@@ -136,10 +136,21 @@ export class PedidoLocalPage {
   readonly totalRonda = computed(() =>
     round2(this.items().reduce((suma, item) => suma + item.subtotal, 0)),
   );
-  readonly subtotalRonda = computed(() => round2(this.totalRonda() / 1.18));
-  readonly igvRonda = computed(() => round2(this.totalRonda() - this.subtotalRonda()));
+  // La carta se muestra sin IGV. El IGV se aplica una sola vez sobre el
+  // subtotal de TODA la cuenta al cobrar (regla 2026-11-14). Este preview usa
+  // la configuración vigente (18 %, mínimo S/ 70); el backend es la autoridad.
+  readonly IGV_PCT = 18;
+  readonly IGV_MIN = 70;
+  readonly subtotalCuenta = computed(() =>
+    round2((this.cuenta()?.subtotal ?? 0) + this.totalRonda()),
+  );
+  readonly igvCuenta = computed(() =>
+    this.subtotalCuenta() >= this.IGV_MIN && this.subtotalCuenta() > 0
+      ? round2((this.subtotalCuenta() * this.IGV_PCT) / 100)
+      : 0,
+  );
   readonly totalCuenta = computed(() =>
-    round2((this.cuenta()?.total ?? 0) + this.totalRonda()),
+    round2(this.subtotalCuenta() + this.igvCuenta()),
   );
 
   readonly puedeEnviar = computed(() => this.items().length > 0 && !this.enviando());
@@ -359,6 +370,9 @@ export class PedidoLocalPage {
       this.borrador.limpiar(this.mesaId);
       // El stock cambió: se refresca la carta para no mostrar badges viejos.
       void this.fichas.cargar(true);
+      // El total de la cuenta cambia con el IGV sobre el total: se refresca el
+      // tablero para que la siguiente pantalla muestre el monto real.
+      void this.cuentas.cargar(true);
       this.temporizador = window.setTimeout(() => {
         void this.router.navigate(['/venta-local']);
       }, 950);

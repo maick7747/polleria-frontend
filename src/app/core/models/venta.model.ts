@@ -75,6 +75,10 @@ export interface Cuenta {
   mesaNumero?: number;
   estado: EstadoCuenta;
   total: number;
+  // IGV calculado sobre el total de la cuenta (no por ronda). Opcional para
+  // tolerar respuestas antiguas o el modo demo.
+  subtotal?: number;
+  igv?: number;
   fechaApertura: string;
   usuarioAperturaId: number;
   usuarioAperturaNombre?: string;

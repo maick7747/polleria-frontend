@@ -22,6 +22,7 @@ import {
   round2,
   turnoActual,
 } from '../../core/utils/format';
+import { descargarBlob } from '../../core/utils/descarga';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
@@ -93,6 +94,7 @@ export class CuentaDetallePage {
   readonly toast = signal('');
   readonly toastError = signal(false);
   readonly cajaCerrada = signal('');
+  readonly boletaCargando = signal(false);
 
   // Datos de cobro: el cliente y el comprobante se piden aquí, al cerrar la
   // cuenta, no al abrir la mesa (por defecto "Consumidor final").
@@ -189,12 +191,34 @@ export class CuentaDetallePage {
     }
   });
   readonly total = computed<number>(() => this.cuenta()?.total ?? 0);
-  readonly subtotal = computed<number>(() => round2(this.total() / 1.18));
-  readonly igv = computed<number>(() => round2(this.total() - this.subtotal()));
+  // Backend: IGV sobre el total de la cuenta. El fallback es solo para
+  // respuestas antiguas o el modo demo.
+  readonly subtotal = computed<number>(() =>
+    this.cuenta()?.subtotal ?? round2(this.total() / 1.18),
+  );
+  readonly igv = computed<number>(() =>
+    this.cuenta()?.igv ?? round2(this.total() - this.subtotal()),
+  );
   readonly rondas = computed<number>(() => this.cuenta()?.rondas.length ?? 0);
   readonly platos = computed<number>(() =>
     (this.cuenta()?.rondas ?? []).reduce((suma, ronda) => suma + ronda.items.length, 0),
   );
+
+  // Candado de cobro: no se puede cerrar la cuenta mientras quede un plato
+  // sin entregar. El backend lo valida igual (409 PLATOS_NO_ENTREGADOS).
+  readonly lineas = computed(() =>
+    (this.cuenta()?.rondas ?? []).flatMap((ronda) => ronda.items),
+  );
+  readonly pendientesEntrega = computed(() =>
+    this.lineas().filter((item) => !item.entregadoEn),
+  );
+  readonly listosPendientes = computed(() =>
+    this.pendientesEntrega().filter((item) => item.estadoPreparacion === 'listo'),
+  );
+  readonly todoEntregado = computed<boolean>(
+    () => this.lineas().length > 0 && this.pendientesEntrega().length === 0,
+  );
+  readonly faltanEntrega = computed<number>(() => this.pendientesEntrega().length);
 
   readonly mozo = computed<string>(() =>
     abreviarNombre(this.cuenta()?.usuarioAperturaNombre ?? ''),
@@ -276,6 +300,9 @@ export class CuentaDetallePage {
 
   readonly puedeCobrar = computed<boolean>(() => {
     if (!this.abierta() || this.procesando()) {
+      return false;
+    }
+    if (!this.todoEntregado()) {
       return false;
     }
     if (this.metodo() === 'efectivo') {
@@ -496,6 +523,15 @@ export class CuentaDetallePage {
       this.avisar('Guarda o cierra los datos del cliente primero.', true);
       return;
     }
+    if (!this.todoEntregado()) {
+      this.avisar(
+        this.faltanEntrega() === 1
+          ? 'Falta entregar 1 plato antes de cobrar.'
+          : `Faltan entregar ${this.faltanEntrega()} platos antes de cobrar.`,
+        true,
+      );
+      return;
+    }
     if (this.metodo() === 'efectivo' && this.recibidoNumero() < cuenta.total) {
       this.avisar('El efectivo recibido no cubre el total.', true);
       return;
@@ -505,6 +541,10 @@ export class CuentaDetallePage {
       this.avisar('Tu sesión no está activa. Vuelve a iniciar sesión.', true);
       return;
     }
+
+    // La pestaña de la boleta se abre dentro del click (evita el bloqueador de
+    // popups). Si el cobro falla o no hay PDF, se cierra.
+    const ventanaBoleta = window.open('', '_blank');
 
     this.procesando.set(true);
     this.cajaCerrada.set('');
@@ -527,23 +567,72 @@ export class CuentaDetallePage {
       );
 
       if (!cerrada) {
+        ventanaBoleta?.close();
         this.procesando.set(false);
         this.avisar('No se pudo registrar el pago.', true);
         return;
       }
 
       this.avisar(`Pago registrado · ${cerrada.comprobanteNumero ?? numero}`);
+      await this.abrirBoleta(cerrada, ventanaBoleta);
       this.navTimer = window.setTimeout(() => {
         this.procesando.set(false);
         void this.router.navigate(['/cerrar-cuenta']);
       }, 1600);
     } catch (error) {
+      ventanaBoleta?.close();
       this.procesando.set(false);
       const mensaje = mensajeError(error);
       if (esApiError(error) && error.code === 'CAJA_CERRADA') {
         this.cajaCerrada.set(mensaje);
       }
       this.avisar(mensaje, true);
+    }
+  }
+
+  readonly boletaLista = computed<boolean>(() =>
+    this.cuenta()?.estado === 'cobrada' && Boolean(this.cuenta()?.comprobanteNumero),
+  );
+
+  // Reimpresión desde el detalle de una cuenta ya cobrada.
+  async reimprimirBoleta(): Promise<void> {
+    const cuenta = this.cuenta();
+    if (!cuenta || cuenta.estado !== 'cobrada' || this.boletaCargando()) {
+      return;
+    }
+    const ventana = window.open('', '_blank');
+    this.boletaCargando.set(true);
+    try {
+      await this.abrirBoleta(cuenta, ventana);
+    } finally {
+      this.boletaCargando.set(false);
+    }
+  }
+
+  // Descarga el PDF de 80 mm y lo muestra en la pestaña ya abierta. Si el
+  // navegador bloqueó la pestaña, cae a descarga directa.
+  private async abrirBoleta(
+    cuenta: { id: number; comprobanteNumero?: string },
+    ventana: Window | null,
+  ): Promise<void> {
+    try {
+      const blob = await this.cuentas.comprobantePdf(cuenta.id);
+      const url = URL.createObjectURL(blob);
+      if (ventana && !ventana.closed) {
+        ventana.location.href = url;
+      } else {
+        descargarBlob(
+          blob,
+          `boleta-${cuenta.comprobanteNumero ?? cuenta.id}.pdf`,
+        );
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      ventana?.close();
+      this.avisar(
+        'El pago se registró, pero no se pudo generar la boleta. Reimprímela desde el detalle.',
+        true,
+      );
     }
   }
 

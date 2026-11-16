@@ -159,7 +159,7 @@ export class VentaLocalPage {
     }
     const cuenta = tarjeta.cuenta;
     const total = cuenta?.total ?? 0;
-    const subtotal = round2(total / 1.18);
+    const subtotal = cuenta?.subtotal ?? round2(total / 1.18);
     return {
       ...tarjeta,
       rondas: cuenta?.rondas ?? [],
@@ -167,7 +167,7 @@ export class VentaLocalPage {
       mozo: abreviarNombre(cuenta?.usuarioAperturaNombre ?? ''),
       horaIngreso: formatearHora(cuenta?.fechaApertura),
       subtotal,
-      igv: round2(total - subtotal),
+      igv: cuenta?.igv ?? round2(total - subtotal),
     };
   });
 
