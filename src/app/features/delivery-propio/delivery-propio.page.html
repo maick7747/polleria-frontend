@@ -35,10 +35,12 @@
         <app-icon name="arrow-clockwise" [size]="14" />
         Actualizar
       </button>
-      <button type="button" class="btn-primary" (click)="abrirAlta()">
-        <app-icon name="plus" [size]="14" />
-        Nuevo pedido
-      </button>
+      @if (puedeCrearPedidos) {
+        <button type="button" class="btn-primary" (click)="abrirAlta()">
+          <app-icon name="plus" [size]="14" />
+          Nuevo pedido
+        </button>
+      }
     </div>
   </div>
 
@@ -128,6 +130,15 @@
             />
           </label>
 
+          <div class="campo campo--full">
+            <app-selector-platos
+              [items]="items()"
+              (itemsChange)="items.set($event)"
+              titulo="Platos del pedido"
+              descripcion="Selecciona los platos; al crear el pedido se envían a cocina y se descuenta el stock."
+            />
+          </div>
+
           <label class="campo campo--full">
             <span class="campo__label">Observaciones</span>
             <textarea
@@ -138,9 +149,28 @@
           </label>
         </div>
 
+        <div class="alta__resumen" aria-label="Resumen estimado del pedido">
+          <div>
+            <span>Platos</span>
+            <strong>{{ totalUnidades() }} und. · {{ moneda(subtotalItems()) }}</strong>
+          </div>
+          <div>
+            <span>IGV estimado</span>
+            <strong>{{ moneda(igvEstimado()) }}</strong>
+          </div>
+          <div>
+            <span>Delivery</span>
+            <strong>{{ moneda(costoDeliveryNumero()) }}</strong>
+          </div>
+          <div class="alta__resumen-total">
+            <span>Total estimado</span>
+            <strong>{{ moneda(totalEstimado()) }}</strong>
+          </div>
+        </div>
+
         <div class="alta__foot">
           <span class="campo__hint">
-            Se crea como borrador sin ítems; las líneas se agregan desde la comanda.
+            El pedido se crea con los platos elegidos y se envía a cocina; el stock se descuenta al enviar.
           </span>
           <div class="alta__actions">
             <button type="button" class="mini-btn" (click)="cerrarAlta()">Cancelar</button>
@@ -191,7 +221,7 @@
               <span class="fila__meta">{{ minutosTexto(pedido.minutos) }}</span>
               <span class="fila__estado">
                 <app-chip [variant]="estadoTono(pedido)">
-                  {{ pedido.estadoEntrega ? estadoTexto(pedido.estadoEntrega) : estadoTexto(pedido.estado) }}
+                  {{ estadoPedidoTexto(pedido) }}
                 </app-chip>
               </span>
               <span class="fila__total">{{ moneda(pedido.total) }}</span>

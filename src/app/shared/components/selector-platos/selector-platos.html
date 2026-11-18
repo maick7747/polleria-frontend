@@ -1,0 +1,64 @@
+<section class="selector" [class.selector--bloqueado]="bloqueado()">
+  <header class="selector__head">
+    <div class="selector__titles">
+      <h3 class="selector__title">{{ titulo() }}</h3>
+      @if (descripcion()) {
+        <p class="selector__desc">{{ descripcion() }}</p>
+      }
+    </div>
+    <span class="selector__meta">
+      {{ totalUnidades() }} {{ totalUnidades() === 1 ? 'unidad' : 'unidades' }}
+    </span>
+  </header>
+
+  <div class="selector__cuerpo">
+    <app-menu-platos [items]="items()" (agregar)="agregar($event)" />
+
+    <aside class="carrito" aria-label="Carrito del pedido">
+      <header class="carrito__head">
+        <span class="carrito__eyebrow">PEDIDO</span>
+        <span class="carrito__count">{{ items().length }} líneas</span>
+      </header>
+
+      <div class="carrito__items">
+        @for (item of items(); track item.id) {
+          <div class="linea">
+            <button
+              type="button"
+              class="linea__minus"
+              [disabled]="bloqueado()"
+              [attr.aria-label]="'Quitar ' + item.nombre"
+              (click)="quitar(item.id)"
+            >
+              −
+            </button>
+            <span class="linea__name">{{ item.nombre }}</span>
+            <span class="linea__qty">x{{ item.cantidad }}</span>
+            <strong class="linea__price">{{ moneda(item.subtotal) }}</strong>
+          </div>
+        } @empty {
+          <p class="carrito__vacio">
+            Elige platos del menú para armar el pedido.
+          </p>
+        }
+      </div>
+
+      <div class="carrito__foot">
+        <div class="carrito__total">
+          <span>Subtotal platos</span>
+          <strong>{{ moneda(subtotal()) }}</strong>
+        </div>
+        @if (items().length > 0) {
+          <button
+            type="button"
+            class="carrito__vaciar"
+            [disabled]="bloqueado()"
+            (click)="vaciar()"
+          >
+            Vaciar
+          </button>
+        }
+      </div>
+    </aside>
+  </div>
+</section>

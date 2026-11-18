@@ -12,6 +12,7 @@ import type { ClienteResumen, DeliveryPropioVista } from '../../core/api/api.map
 import { USE_API } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { ClientesService } from '../../core/data/clientes.service';
+import type { PedidoDetalle } from '../../core/models';
 import {
   COSTO_DELIVERY_PROPIO,
   DeliveryService,
@@ -25,6 +26,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { IconComponent } from '../../shared/components/icon/icon';
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
+import { SelectorPlatosComponent } from '../../shared/components/selector-platos/selector-platos';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 type EstadoFiltro =
@@ -40,6 +42,10 @@ type CanalPropio = 'whatsapp' | 'telefono';
 type MetodoEntrega = 'efectivo' | 'yape' | 'plin' | 'tarjeta';
 
 const LIMITES = [10, 20, 50, 100];
+// Misma regla que el backend (`igv_pct` / `igv_min_soles`): el preview es
+// estimado y la autoridad es el total que devuelve la API al crear el pedido.
+const IGV_PCT = 18;
+const IGV_MIN = 70;
 
 const ESTADOS: readonly { valor: EstadoFiltro; texto: string }[] = [
   { valor: 'todos', texto: 'Todos' },
@@ -83,6 +89,7 @@ const HASTA_INICIAL = USE_API ? HOY : '';
     IconComponent,
     PaginadorComponent,
     PanelComponent,
+    SelectorPlatosComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './delivery-propio.page.html',
@@ -104,6 +111,9 @@ export class DeliveryPropioPage {
   readonly estados = ESTADOS;
   readonly metodos = METODOS;
   readonly costoFijo = COSTO_DELIVERY_PROPIO;
+  // El menú exige `menu.gestionar`, `venta.registrar` o `cocina.kds`; el
+  // Repartidor solo tiene `delivery.propio`, así que no puede armar pedidos.
+  readonly puedeCrearPedidos = this.auth.hasPermission('venta.registrar');
 
   readonly lista = this.delivery.propios;
   readonly meta = this.delivery.propiosMeta;
@@ -133,6 +143,7 @@ export class DeliveryPropioPage {
   readonly referencia = signal<string>('');
   readonly observaciones = signal<string>('');
   readonly costoDelivery = signal<string>(COSTO_DELIVERY_PROPIO.toFixed(2));
+  readonly items = signal<PedidoDetalle[]>([]);
 
   readonly repartidorId = signal<string>('');
   readonly metodoPago = signal<MetodoEntrega>('efectivo');
@@ -154,8 +165,36 @@ export class DeliveryPropioPage {
 
   readonly puedeCrear = computed<boolean>(() => {
     const nombre = this.nombreCliente();
-    return nombre.length > 1 && this.direccion().trim().length > 3 && !this.guardando();
+    return (
+      nombre.length > 1 &&
+      this.direccion().trim().length > 3 &&
+      this.items().length > 0 &&
+      !this.guardando()
+    );
   });
+
+  readonly totalUnidades = computed<number>(() =>
+    this.items().reduce((suma, item) => suma + item.cantidad, 0),
+  );
+
+  readonly subtotalItems = computed<number>(() =>
+    round2(this.items().reduce((suma, item) => suma + item.subtotal, 0)),
+  );
+
+  readonly igvEstimado = computed<number>(() =>
+    this.subtotalItems() >= IGV_MIN && this.subtotalItems() > 0
+      ? round2((this.subtotalItems() * IGV_PCT) / 100)
+      : 0,
+  );
+
+  readonly costoDeliveryNumero = computed<number>(() => {
+    const costo = Number(this.costoDelivery());
+    return Number.isFinite(costo) ? Math.max(0, costo) : 0;
+  });
+
+  readonly totalEstimado = computed<number>(() =>
+    round2(this.subtotalItems() + this.igvEstimado() + this.costoDeliveryNumero()),
+  );
 
   readonly hayMasClientes = computed<boolean>(() => {
     const visibles = this.resultadosCliente().length;
@@ -338,7 +377,10 @@ export class DeliveryPropioPage {
 
   async crearPedido(): Promise<void> {
     if (!this.puedeCrear()) {
-      this.avisar('Completa el cliente y la dirección de entrega.', true);
+      this.avisar(
+        'Completa el cliente, la dirección y al menos un plato del pedido.',
+        true,
+      );
       return;
     }
     const nombre = this.nombreCliente();
@@ -352,8 +394,8 @@ export class DeliveryPropioPage {
       referenciaEntrega: this.referencia().trim() || undefined,
       observaciones: this.observaciones().trim() || undefined,
       costoDelivery: Number.isFinite(costo) ? round2(Math.max(0, costo)) : this.costoFijo,
-      items: [],
-      enviarCocina: false,
+      items: this.items(),
+      enviarCocina: true,
     });
     this.guardando.set(false);
 
@@ -363,8 +405,9 @@ export class DeliveryPropioPage {
     }
 
     this.mostrarAlta.set(false);
+    this.items.set([]);
     this.seleccionId.set(creado.id);
-    this.avisar(`${creado.numero} creado · agrega los ítems en caja para enviarlo a cocina`);
+    this.avisar(`${creado.numero} creado · enviado a cocina`);
     await this.cargar();
   }
 
@@ -450,6 +493,24 @@ export class DeliveryPropioPage {
 
   estadoTexto(estado: string): string {
     return ESTADOS.find((item) => item.valor === estado)?.texto ?? estado.replace('_', ' ');
+  }
+
+  /**
+   * El pedido combina estado de cocina (`estado`) y estado de entrega
+   * (`estado_entrega`). `pendiente` es el valor inicial de entrega y no debe
+   * tapar "En cocina"/"Servido" en la bandeja.
+   */
+  estadoPedidoTexto(pedido: DeliveryPropioVista): string {
+    if (pedido.estado === 'cancelado') {
+      return 'Cancelado';
+    }
+    if (pedido.estadoPago === 'pagado' || pedido.estadoEntrega === 'entregado') {
+      return 'Entregado';
+    }
+    if (pedido.estadoEntrega === 'en_camino') {
+      return 'En camino';
+    }
+    return this.estadoTexto(pedido.estado);
   }
 
   estadoTono(pedido: DeliveryPropioVista): ChipVariant {
@@ -546,6 +607,7 @@ export class DeliveryPropioPage {
     this.referencia.set('');
     this.observaciones.set('');
     this.costoDelivery.set(this.costoFijo.toFixed(2));
+    this.items.set([]);
   }
 
   private avisar(mensaje: string, error = false): void {

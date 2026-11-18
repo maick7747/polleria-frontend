@@ -23,78 +23,8 @@
     </div>
   }
 
-  <div class="categorias">
-    <div class="categorias__chips" role="group" aria-label="Categorías del menú">
-      @for (categoria of categorias(); track categoria) {
-        <button
-          type="button"
-          class="cat"
-          [class.is-active]="categoriaActiva() === categoria"
-          (click)="categoriaActiva.set(categoria)"
-        >
-          {{ categoria }}
-        </button>
-      }
-    </div>
-    <label class="buscador">
-      <app-icon name="magnifying-glass" [size]="14" />
-      <input
-        type="search"
-        placeholder="Buscar plato"
-        [value]="busqueda()"
-        (input)="onBusqueda($event)"
-        aria-label="Buscar plato"
-      />
-    </label>
-  </div>
-
   <div class="board">
-    <app-panel class="menu">
-      <div class="menu__inner">
-        <header class="menu__head">
-          <div class="menu__title">
-            <span class="bar"></span>
-            <h2>Menú</h2>
-          </div>
-          <span class="menu__meta">{{ platosVisibles().length }} platos</span>
-        </header>
-
-        <div class="menu__grid">
-          @for (plato of platosVisibles(); track plato.id) {
-            <article class="plato">
-              <div class="plato__top">
-                <h3 class="plato__name">{{ plato.nombre }}</h3>
-                <div class="plato__tags">
-                  <app-chip [variant]="stockDe(plato).tono">
-                    {{ stockDe(plato).etiqueta }}
-                  </app-chip>
-                  @if (cantidadEnRonda(plato.id) > 0) {
-                    <app-chip variant="brand">x{{ cantidadEnRonda(plato.id) }}</app-chip>
-                  }
-                </div>
-              </div>
-              <div class="plato__grow"></div>
-              <div class="plato__foot">
-                <div class="plato__price">
-                  <span class="cur">S/</span>
-                  <span class="amount">{{ plato.precioVenta.toFixed(2) }}</span>
-                </div>
-                <button
-                  type="button"
-                  class="plato__add"
-                  [attr.aria-label]="'Agregar ' + plato.nombre"
-                  (click)="agregar(plato)"
-                >
-                  <app-icon name="plus" [size]="14" />
-                </button>
-              </div>
-            </article>
-          } @empty {
-            <p class="menu__vacio">{{ menuError() ?? 'No hay platos para este filtro.' }}</p>
-          }
-        </div>
-      </div>
-    </app-panel>
+    <app-menu-platos [items]="items()" (agregar)="agregar($event)" />
 
     <app-dark-panel class="cuenta">
       <div class="cuenta__inner">

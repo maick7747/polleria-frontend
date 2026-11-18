@@ -67,6 +67,12 @@
         <app-icon name="arrow-clockwise" [size]="14" />
         Actualizar
       </button>
+      @if (vista() === 'pedidos' && puedeCrearPedidos) {
+        <button type="button" class="btn-primary" (click)="abrirAlta()">
+          <app-icon name="plus" [size]="14" />
+          Nuevo pedido
+        </button>
+      }
     </div>
   </div>
 
@@ -82,6 +88,118 @@
       <span>{{ liquidacionesError() }}</span>
       <button type="button" (click)="reintentar()">Reintentar</button>
     </div>
+  }
+
+  @if (vista() === 'pedidos' && mostrarAlta()) {
+    <app-panel class="alta">
+      <form class="alta__form" (submit)="$event.preventDefault(); crearPedido()">
+        <header class="alta__head">
+          <div class="panel-title">
+            <span class="bar"></span>
+            <h2>Nuevo pedido de delivery externo</h2>
+          </div>
+          <button type="button" class="mini-btn" (click)="cerrarAlta()">
+            <app-icon name="x" [size]="13" />
+            Cerrar
+          </button>
+        </header>
+
+        <div class="alta__grid">
+          <label class="campo">
+            <span class="campo__label">Plataforma</span>
+            <select
+              class="input"
+              [value]="altaPlataforma()"
+              (change)="onAltaPlataforma($event)"
+            >
+              <option value="rappi">Rappi</option>
+              <option value="llamafood">LlamaFood</option>
+            </select>
+          </label>
+
+          <label class="campo">
+            <span class="campo__label">Cliente</span>
+            <input
+              class="input"
+              type="text"
+              placeholder="Nombre del cliente"
+              [value]="altaCliente()"
+              (input)="onAltaCliente($event)"
+            />
+          </label>
+
+          <label class="campo campo--wide">
+            <span class="campo__label">Dirección de entrega</span>
+            <input
+              class="input"
+              type="text"
+              [value]="altaDireccion()"
+              (input)="onAltaDireccion($event)"
+            />
+          </label>
+
+          <label class="campo campo--wide">
+            <span class="campo__label">Referencia</span>
+            <input
+              class="input"
+              type="text"
+              [value]="altaReferencia()"
+              (input)="onAltaReferencia($event)"
+            />
+          </label>
+
+          <div class="campo campo--full">
+            <app-selector-platos
+              [items]="items()"
+              (itemsChange)="items.set($event)"
+              titulo="Platos del pedido"
+              descripcion="El pedido se crea en borrador; «Aceptar pedido» lo envía a cocina y descuenta el stock."
+            />
+          </div>
+
+          <label class="campo campo--full">
+            <span class="campo__label">Observaciones</span>
+            <textarea
+              class="input input--area"
+              [value]="altaObservaciones()"
+              (input)="onAltaObservaciones($event)"
+            ></textarea>
+          </label>
+        </div>
+
+        <div class="alta__resumen" aria-label="Resumen estimado del pedido">
+          <div>
+            <span>Platos</span>
+            <strong>{{ totalUnidades() }} und. · {{ moneda(subtotalItems()) }}</strong>
+          </div>
+          <div>
+            <span>IGV estimado</span>
+            <strong>{{ moneda(igvEstimado()) }}</strong>
+          </div>
+          <div>
+            <span>Total del pedido</span>
+            <strong>{{ moneda(totalEstimado()) }}</strong>
+          </div>
+          <div class="alta__resumen-total">
+            <span>Neto estimado ({{ comisiones[altaPlataforma()] }}% comisión)</span>
+            <strong>{{ moneda(netoAlta()) }}</strong>
+          </div>
+        </div>
+
+        <div class="alta__foot">
+          <span class="campo__hint">
+            Se crea en borrador; el stock se descuenta recién al aceptar el pedido.
+          </span>
+          <div class="alta__actions">
+            <button type="button" class="mini-btn" (click)="cerrarAlta()">Cancelar</button>
+            <button type="submit" class="btn-primary" [disabled]="!puedeCrear()">
+              <app-icon name="check" [size]="14" />
+              {{ guardando() ? 'Guardando…' : 'Crear pedido' }}
+            </button>
+          </div>
+        </div>
+      </form>
+    </app-panel>
   }
 
   @if (vista() === 'pedidos') {

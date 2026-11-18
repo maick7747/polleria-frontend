@@ -30,13 +30,8 @@ import {
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
-import { PanelComponent } from '../../shared/components/panel/panel';
+import { MenuPlatosComponent } from '../../shared/components/menu-platos/menu-platos';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
-
-interface StockPlato {
-  etiqueta: string;
-  tono: 'success' | 'warning' | 'neutral';
-}
 
 @Component({
   selector: 'app-pedido-local-page',
@@ -47,7 +42,7 @@ interface StockPlato {
     ChipComponent,
     DarkPanelComponent,
     IconComponent,
-    PanelComponent,
+    MenuPlatosComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './pedido-local.page.html',
@@ -73,8 +68,6 @@ export class PedidoLocalPage {
   private temporizador: number | null = null;
   private claveRonda = nuevaClave();
 
-  readonly categoriaActiva = signal<string>('');
-  readonly busqueda = signal<string>('');
   readonly items = signal<PedidoDetalle[]>([]);
   readonly observacion = signal<string>('');
   readonly toast = signal<string>('');
@@ -88,21 +81,8 @@ export class PedidoLocalPage {
   readonly enviando = signal(false);
   readonly moneda = formatearMoneda;
 
-  // Mensaje del backend si la carta no se pudo cargar (403, red, etc.).
-  readonly menuError = this.fichas.error;
-
   readonly mesa = computed(() => this.mesas.porId(this.mesaId) ?? null);
   readonly cuenta = computed(() => this.cuentas.cuentaDeMesa(this.mesaId) ?? null);
-
-  readonly categorias = computed<string[]>(() => {
-    const lista: string[] = [];
-    for (const plato of this.fichas.activos()) {
-      if (!lista.includes(plato.categoria)) {
-        lista.push(plato.categoria);
-      }
-    }
-    return lista;
-  });
 
   readonly numeroMesa = computed(() =>
     String(this.mesa()?.numero ?? 0).padStart(2, '0'),
@@ -120,17 +100,6 @@ export class PedidoLocalPage {
     const minutos = cuenta ? minutosEntre(cuenta.fechaApertura, this.ahora) : 0;
     const mozo = abreviarNombre(cuenta?.usuarioAperturaNombre ?? '');
     return `${rondas} rondas · ${total} · abierta ${minutos} min · Mozo ${mozo}`;
-  });
-
-  readonly platosVisibles = computed<Plato[]>(() => {
-    const categoria = this.categoriaActiva();
-    const termino = this.busqueda().trim().toLowerCase();
-    return this.fichas.activos().filter((plato) => {
-      const coincideCategoria = !categoria || plato.categoria === categoria;
-      const coincideTexto =
-        !termino || plato.nombre.toLowerCase().includes(termino);
-      return coincideCategoria && coincideTexto;
-    });
   });
 
   readonly totalRonda = computed(() =>
@@ -217,9 +186,6 @@ export class PedidoLocalPage {
     ) {
       tareas.push(this.inventario.cargar({ limit: 100 }));
     }
-    if (this.fichas.platos().length === 0) {
-      tareas.push(this.fichas.cargar());
-    }
     if (tareas.length > 0) {
       await Promise.all(tareas);
     }
@@ -230,38 +196,6 @@ export class PedidoLocalPage {
     }
     // Cuenta perezosa: no se crea aquí. Se crea al enviar la primera ronda,
     // así "Tomar pedido" por error no deja una mesa ocupada.
-    const primeraCategoria = this.categorias()[0];
-    if (primeraCategoria) {
-      this.categoriaActiva.set(primeraCategoria);
-    }
-  }
-
-  // El backend ya calcula si alcanza el stock para 1 unidad (`disponible`,
-  // misma cuenta que el descuento). Se usa eso; el inventario local solo es
-  // respaldo cuando el dato no viene (demo).
-  stockDe(plato: Plato): StockPlato {
-    if (plato.disponible === false) {
-      return { etiqueta: 'Sin stock', tono: 'warning' };
-    }
-    if (plato.disponible === true) {
-      return { etiqueta: 'Stock ok', tono: 'success' };
-    }
-    if (plato.disponible === null) {
-      return { etiqueta: 'Sin control de stock', tono: 'neutral' };
-    }
-    const insuficiente = plato.ingredientes.some((ingrediente) => {
-      const insumo = this.inventario.porId(ingrediente.insumoId);
-      return insumo ? insumo.stockActual < ingrediente.cantidad : false;
-    });
-    return insuficiente
-      ? { etiqueta: 'Sin stock', tono: 'warning' }
-      : { etiqueta: 'Stock ok', tono: 'success' };
-  }
-
-  cantidadEnRonda(platoId: number): number {
-    return this.items()
-      .filter((item) => item.platilloId === platoId)
-      .reduce((suma, item) => suma + item.cantidad, 0);
   }
 
   agregar(plato: Plato): void {
@@ -322,10 +256,6 @@ export class PedidoLocalPage {
     });
     this.claveRonda = nuevaClave();
     this.persistirBorrador();
-  }
-
-  onBusqueda(event: Event): void {
-    this.busqueda.set((event.target as HTMLInputElement).value);
   }
 
   onObservacion(event: Event): void {

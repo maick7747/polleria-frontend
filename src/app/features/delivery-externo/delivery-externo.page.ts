@@ -10,6 +10,7 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import type { DeliveryExternoVista } from '../../core/api/api.mappers';
 import { USE_API } from '../../core/api/api.config';
+import { AuthService } from '../../core/auth/auth.service';
 import {
   COMISION_PLATAFORMA,
   DeliveryService,
@@ -17,6 +18,7 @@ import {
   type LiquidacionesQuery,
   type PlataformaExterna,
 } from '../../core/data/delivery.service';
+import type { PedidoDetalle } from '../../core/models';
 import { formatearMoneda, hora, round2 } from '../../core/utils/format';
 import { iniciarRefresco } from '../../core/utils/refresco';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
@@ -25,6 +27,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { IconComponent } from '../../shared/components/icon/icon';
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
+import { SelectorPlatosComponent } from '../../shared/components/selector-platos/selector-platos';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 type VistaExterno = 'pedidos' | 'liquidaciones';
@@ -60,6 +63,10 @@ const HACE_SIETE = fechaLima(new Date(Date.now() - 6 * 86400000));
 const DESDE_INICIAL = USE_API ? HACE_SIETE : '';
 const HASTA_INICIAL = USE_API ? HOY : '';
 const FECHA_LIQUIDACION = HOY;
+// Misma regla que el backend (`igv_pct` / `igv_min_soles`): el preview es
+// estimado y la autoridad es el total que devuelve la API al crear el pedido.
+const IGV_PCT = 18;
+const IGV_MIN = 70;
 
 @Component({
   selector: 'app-delivery-externo-page',
@@ -73,6 +80,7 @@ const FECHA_LIQUIDACION = HOY;
     IconComponent,
     PaginadorComponent,
     PanelComponent,
+    SelectorPlatosComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './delivery-externo.page.html',
@@ -80,6 +88,7 @@ const FECHA_LIQUIDACION = HOY;
 })
 export class DeliveryExternoPage {
   private readonly delivery = inject(DeliveryService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -90,6 +99,10 @@ export class DeliveryExternoPage {
   readonly moneda = formatearMoneda;
   readonly estados = ESTADOS;
   readonly plataformas = PLATAFORMAS;
+  readonly comisiones = COMISION_PLATAFORMA;
+  // El menú exige `menu.gestionar`, `venta.registrar` o `cocina.kds`; Admin
+  // (solo lectura) no puede armar pedidos, así que se oculta el alta.
+  readonly puedeCrearPedidos = this.auth.hasPermission('venta.registrar');
 
   readonly vista = signal<VistaExterno>('pedidos');
   readonly plataforma = signal<PlataformaFiltro>('todas');
@@ -99,6 +112,15 @@ export class DeliveryExternoPage {
   readonly pagina = signal<number>(1);
   readonly limite = signal<number>(20);
   readonly seleccionId = signal<number | null>(null);
+
+  readonly mostrarAlta = signal<boolean>(false);
+  readonly guardando = signal<boolean>(false);
+  readonly altaPlataforma = signal<PlataformaExterna>('rappi');
+  readonly altaCliente = signal<string>('');
+  readonly altaDireccion = signal<string>('');
+  readonly altaReferencia = signal<string>('');
+  readonly altaObservaciones = signal<string>('');
+  readonly items = signal<PedidoDetalle[]>([]);
 
   readonly liqPagina = signal<number>(1);
   readonly liqLimite = signal<number>(20);
@@ -146,6 +168,42 @@ export class DeliveryExternoPage {
     const meta = this.meta();
     return `${meta.total} pedidos externos · página ${meta.page} de ${meta.pages || 1}`;
   });
+
+  readonly puedeCrear = computed<boolean>(() => {
+    const nombre = this.altaCliente().trim();
+    return (
+      nombre.length > 1 &&
+      this.altaDireccion().trim().length > 3 &&
+      this.items().length > 0 &&
+      !this.guardando()
+    );
+  });
+
+  readonly totalUnidades = computed<number>(() =>
+    this.items().reduce((suma, item) => suma + item.cantidad, 0),
+  );
+
+  readonly subtotalItems = computed<number>(() =>
+    round2(this.items().reduce((suma, item) => suma + item.subtotal, 0)),
+  );
+
+  readonly igvEstimado = computed<number>(() =>
+    this.subtotalItems() >= IGV_MIN && this.subtotalItems() > 0
+      ? round2((this.subtotalItems() * IGV_PCT) / 100)
+      : 0,
+  );
+
+  readonly totalEstimado = computed<number>(() =>
+    round2(this.subtotalItems() + this.igvEstimado()),
+  );
+
+  readonly comisionAlta = computed<number>(() =>
+    round2((this.totalEstimado() * COMISION_PLATAFORMA[this.altaPlataforma()]) / 100),
+  );
+
+  readonly netoAlta = computed<number>(() =>
+    round2(this.totalEstimado() - this.comisionAlta()),
+  );
 
   readonly comisionActual = computed<number>(() =>
     this.liqPlataforma() === 'rappi'
@@ -223,6 +281,7 @@ export class DeliveryExternoPage {
       return;
     }
     this.vista.set(vista);
+    this.mostrarAlta.set(false);
     if (vista === 'liquidaciones') {
       this.liqPagina.set(1);
       void this.cargarLiquidaciones();
@@ -304,6 +363,69 @@ export class DeliveryExternoPage {
     } else {
       void this.cargar();
     }
+  }
+
+  abrirAlta(): void {
+    this.mostrarAlta.set(true);
+    this.limpiarAlta();
+  }
+
+  cerrarAlta(): void {
+    this.mostrarAlta.set(false);
+  }
+
+  onAltaPlataforma(event: Event): void {
+    this.altaPlataforma.set(
+      (event.target as HTMLSelectElement).value as PlataformaExterna,
+    );
+  }
+
+  onAltaCliente(event: Event): void {
+    this.altaCliente.set((event.target as HTMLInputElement).value);
+  }
+
+  onAltaDireccion(event: Event): void {
+    this.altaDireccion.set((event.target as HTMLInputElement).value);
+  }
+
+  onAltaReferencia(event: Event): void {
+    this.altaReferencia.set((event.target as HTMLInputElement).value);
+  }
+
+  onAltaObservaciones(event: Event): void {
+    this.altaObservaciones.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  async crearPedido(): Promise<void> {
+    if (!this.puedeCrear()) {
+      this.avisar(
+        'Completa el cliente, la dirección y al menos un plato del pedido.',
+        true,
+      );
+      return;
+    }
+
+    this.guardando.set(true);
+    const creado = await this.delivery.crearExterno({
+      plataforma: this.altaPlataforma(),
+      clienteNombre: this.altaCliente().trim(),
+      direccionEntrega: this.altaDireccion().trim(),
+      referenciaEntrega: this.altaReferencia().trim() || undefined,
+      observaciones: this.altaObservaciones().trim() || undefined,
+      items: this.items(),
+    });
+    this.guardando.set(false);
+
+    if (!creado) {
+      this.avisar(this.error() ?? 'No se pudo crear el pedido.', true);
+      return;
+    }
+
+    this.mostrarAlta.set(false);
+    this.items.set([]);
+    this.seleccionId.set(creado.id);
+    this.avisar(`${creado.numero} creado en borrador · acéptalo para enviarlo a cocina`);
+    await this.cargar();
   }
 
   onLiqPlataforma(event: Event): void {
@@ -455,6 +577,15 @@ export class DeliveryExternoPage {
       },
       replaceUrl: true,
     });
+  }
+
+  private limpiarAlta(): void {
+    this.altaPlataforma.set('rappi');
+    this.altaCliente.set('');
+    this.altaDireccion.set('');
+    this.altaReferencia.set('');
+    this.altaObservaciones.set('');
+    this.items.set([]);
   }
 
   private avisar(mensaje: string, error = false): void {
