@@ -49,6 +49,16 @@
       >
         Entradas <span class="tab__count">{{ conteos().entradas }}</span>
       </button>
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        [class.is-active]="tab() === 'manual'"
+        [attr.aria-selected]="tab() === 'manual'"
+        (click)="cambiarTab('manual')"
+      >
+        Compra manual
+      </button>
     </div>
 
     <div class="toolbar__right">
@@ -80,7 +90,7 @@
     </div>
   </div>
 
-  @if (tab() !== 'sugerencia') {
+  @if (tab() === 'ordenes' || tab() === 'entradas') {
     <div class="filtros">
       @if (tab() === 'ordenes') {
         <label class="campo">
@@ -294,7 +304,7 @@
           </div>
         </div>
       </app-panel>
-    } @else {
+    } @else if (tab() === 'entradas') {
       <app-panel class="panel">
         <div class="panel__inner">
           <header class="panel__head">
@@ -354,9 +364,235 @@
           </div>
         </div>
       </app-panel>
+    } @else {
+      <app-panel class="panel">
+        <div class="panel__inner">
+          <header class="panel__head">
+            <div class="panel__title">
+              <span class="panel__bar"></span>
+              <h2>Compra manual</h2>
+            </div>
+            <span class="panel__meta">
+              @if (cargandoInsumos()) {
+                cargando insumos…
+              } @else {
+                {{ insumosDisponibles().length }} insumos disponibles
+              }
+            </span>
+          </header>
+
+          <div class="manual">
+            <section class="manual__bloque">
+              <label class="buscador manual__buscador">
+                <app-icon name="magnifying-glass" [size]="14" />
+                <input
+                  type="search"
+                  placeholder="Buscar insumo por nombre o código"
+                  aria-label="Buscar insumo"
+                  [value]="busquedaInsumo()"
+                  (input)="onBuscarInsumo($event)"
+                />
+              </label>
+
+              <div class="manual__resultados" role="listbox" aria-label="Insumos del inventario">
+                @for (insumo of insumosDisponibles(); track insumo.id) {
+                  <button
+                    type="button"
+                    class="manual__insumo"
+                    role="option"
+                    [class.is-active]="insumoSeleccionado()?.id === insumo.id"
+                    [attr.aria-selected]="insumoSeleccionado()?.id === insumo.id"
+                    (click)="elegirInsumo(insumo)"
+                  >
+                    <span class="manual__insumo-nombre">{{ insumo.nombre }}</span>
+                    <span class="manual__insumo-meta">
+                      {{ cantidad(insumo.stockActual, insumo.unidadMedida) }} ·
+                      {{ moneda(insumo.costoPromedio) }}
+                    </span>
+                  </button>
+                } @empty {
+                  <p class="manual__vacio">
+                    @if (cargandoInsumos()) {
+                      Cargando insumos…
+                    } @else if (errorInsumos()) {
+                      No se pudieron cargar los insumos: {{ errorInsumos() }}
+                    } @else {
+                      No hay insumos activos que coincidan con la búsqueda.
+                    }
+                  </p>
+                }
+              </div>
+            </section>
+
+            <section class="manual__captura">
+              <div class="manual__sel">
+                <span class="manual__sel-label">Insumo seleccionado</span>
+                <strong class="manual__sel-nombre">
+                  {{ insumoSeleccionado()?.nombre ?? 'Ninguno' }}
+                </strong>
+                <span class="manual__sel-meta">
+                  @if (insumoSeleccionado(); as insumo) {
+                    Stock {{ cantidad(insumo.stockActual, insumo.unidadMedida) }} · costo
+                    {{ moneda(insumo.costoPromedio) }}
+                  } @else {
+                    Elige un insumo de la lista para capturar la cantidad
+                  }
+                </span>
+              </div>
+              <label class="campo">
+                <span>Cantidad{{ unidadSeleccionada() ? ' (' + unidadSeleccionada() + ')' : '' }}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  [value]="cantidadManual()"
+                  (input)="onCantidadManual($event)"
+                />
+              </label>
+              <label class="campo">
+                <span>Precio unitario (S/)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [value]="precioManual()"
+                  (input)="onPrecioManual($event)"
+                />
+              </label>
+              <button type="button" class="manual__add" (click)="agregarLineaManual()">
+                <app-icon name="plus" [size]="14" />
+                Agregar
+              </button>
+            </section>
+
+            <section class="manual__lineas">
+              <div class="manual__linea manual__linea--head">
+                <span>INSUMO</span>
+                <span>CANTIDAD</span>
+                <span class="right">P. UNIT.</span>
+                <span class="right">SUBTOTAL</span>
+                <span></span>
+              </div>
+              @for (linea of lineasManuales(); track linea.insumoId) {
+                <div class="manual__linea">
+                  <div class="insumo">
+                    <span class="insumo__name">{{ linea.nombre }}</span>
+                    <span class="insumo__meta">{{ linea.unidad }}</span>
+                  </div>
+                  <span class="stock">{{ cantidad(linea.cantidad, linea.unidad) }}</span>
+                  <span class="price">{{ moneda(linea.precioUnitario) }}</span>
+                  <span class="subtotal">{{ moneda(linea.subtotal) }}</span>
+                  <button
+                    type="button"
+                    class="manual__quitar"
+                    [attr.aria-label]="'Quitar ' + linea.nombre"
+                    (click)="quitarLineaManual(linea.insumoId)"
+                  >
+                    <app-icon name="trash" [size]="14" />
+                  </button>
+                </div>
+              } @empty {
+                <p class="manual__vacio">
+                  Aún no hay insumos en esta orden. Selecciona uno y pulsa Agregar.
+                </p>
+              }
+            </section>
+
+            <section class="manual__pie">
+              <label class="campo manual__proveedor">
+                <span>Proveedor</span>
+                <select [value]="proveedorManual()" (change)="onProveedorManual($event)">
+                  <option value="">Selecciona proveedor</option>
+                  @for (proveedor of proveedoresApi(); track proveedor.id) {
+                    <option [value]="proveedor.id">{{ proveedor.razon_social }}</option>
+                  }
+                </select>
+              </label>
+              <button
+                type="button"
+                class="btn-primary manual__cta"
+                [disabled]="guardandoManual() || lineasManuales().length === 0"
+                (click)="generarOrdenManual()"
+              >
+                <app-icon name="clipboard-text" [size]="16" />
+                Generar OC manual
+              </button>
+            </section>
+          </div>
+
+          <div class="panel__foot">
+            <span>Precios sin IGV · el stock se actualiza al registrar la entrada</span>
+            <span>{{ lineasManuales().length }} ítem(s) · {{ moneda(totalManual()) }}</span>
+          </div>
+        </div>
+      </app-panel>
     }
 
     <app-dark-panel class="aside">
+      @if (tab() === 'manual') {
+        <div class="orden">
+          <header class="orden__head">
+            <h2>Orden manual</h2>
+            <span class="orden__code">{{ lineasManuales().length }} ítems</span>
+          </header>
+
+          <label class="orden__select">
+            <span>Proveedor</span>
+            <select [value]="proveedorManual()" (change)="onProveedorManual($event)">
+              <option value="">Selecciona proveedor</option>
+              @for (proveedor of proveedoresApi(); track proveedor.id) {
+                <option [value]="proveedor.id">{{ proveedor.razon_social }}</option>
+              }
+            </select>
+          </label>
+
+          <div class="orden__rows">
+            @for (linea of lineasManuales(); track linea.insumoId) {
+              <div class="orden__row">
+                <span>{{ linea.nombre }}</span>
+                <strong>{{ cantidad(linea.cantidad, linea.unidad) }}</strong>
+              </div>
+            } @empty {
+              <p class="orden__hint">Agrega insumos desde el panel izquierdo.</p>
+            }
+          </div>
+
+          <span class="orden__divider"></span>
+
+          <div class="totales">
+            <div><span>Subtotal</span><strong>{{ moneda(subtotalManual()) }}</strong></div>
+            <div><span>IGV (18%)</span><strong>{{ moneda(igvManual()) }}</strong></div>
+            <div class="totales__fuerte">
+              <span>Total</span><strong>{{ moneda(totalManual()) }}</strong>
+            </div>
+          </div>
+
+          <div class="orden__amount">
+            <span class="orden__label">Total de la compra manual</span>
+            <div class="orden__big">
+              <span class="orden__cur">S/</span>
+              <strong>{{ numero(totalManual()) }}</strong>
+            </div>
+            <span class="orden__hint">Incluye IGV · precios capturados por el usuario</span>
+          </div>
+
+          <span class="orden__grow"></span>
+
+          <button
+            type="button"
+            class="btn-primary"
+            [disabled]="guardandoManual() || lineasManuales().length === 0 || !proveedorManual()"
+            (click)="generarOrdenManual()"
+          >
+            <app-icon name="clipboard-text" [size]="16" />
+            Generar OC manual
+          </button>
+
+          <p class="orden__note">
+            La compra queda como orden enviada hasta registrar la entrada de mercadería.
+          </p>
+        </div>
+      } @else {
       <div class="orden">
         <header class="orden__head">
           <h2>Orden de compra</h2>
@@ -438,6 +674,7 @@
 
         <p class="orden__note">El stock se actualiza al registrar la entrada.</p>
       </div>
+      }
     </app-dark-panel>
   </div>
 

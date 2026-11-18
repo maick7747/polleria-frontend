@@ -143,6 +143,19 @@ export interface PedidoDto {
   idempotente?: boolean;
 }
 
+/** Cabecera liviana para selectores (sin `detalles`). */
+export interface PedidoSelectorDto {
+  id: number;
+  numero: string;
+  canal: string;
+  tipo_consumo: string;
+  total: number;
+  fecha_pedido: string;
+  cliente_nombre?: string | null;
+  mesa_numero?: number | null;
+  usuario_cajero_nombre?: string | null;
+}
+
 export interface PedidoListoDto {
   id: number;
   numero: string;

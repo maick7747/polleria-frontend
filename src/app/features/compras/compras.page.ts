@@ -16,7 +16,14 @@ import {
   type OrdenCompra,
 } from '../../core/data/compras.service';
 import { InventarioService } from '../../core/data/inventario.service';
-import { formatearMoneda, formatearNumero, turnoActual } from '../../core/utils/format';
+import type { Insumo } from '../../core/models';
+import {
+  formatearMoneda,
+  formatearNumero,
+  round2,
+  round3,
+  turnoActual,
+} from '../../core/utils/format';
 import { ChipComponent, type ChipVariant } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
@@ -25,9 +32,18 @@ import { PaginadorComponent } from '../../shared/components/paginador/paginador'
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
-type TabCompras = 'sugerencia' | 'ordenes' | 'entradas';
+type TabCompras = 'sugerencia' | 'ordenes' | 'entradas' | 'manual';
 
 type EstadoFiltro = 'todas' | EstadoCompraFiltro;
+
+interface LineaCompraManual {
+  insumoId: number;
+  nombre: string;
+  unidad: string;
+  cantidad: number;
+  precioUnitario: number;
+  subtotal: number;
+}
 
 const ESTADOS: readonly { valor: EstadoFiltro; texto: string }[] = [
   { valor: 'todas', texto: 'Todos los estados' },
@@ -76,6 +92,17 @@ export class ComprasPage {
   readonly proveedorOrden = signal<string>('');
   readonly toast = signal<string>('');
 
+  // Compra manual
+  readonly busquedaInsumo = signal<string>('');
+  readonly insumoSeleccionado = signal<Insumo | null>(null);
+  readonly cantidadManual = signal<string>('1');
+  readonly precioManual = signal<string>('');
+  readonly proveedorManual = signal<string>('');
+  readonly lineasManuales = signal<LineaCompraManual[]>([]);
+  readonly guardandoManual = signal<boolean>(false);
+  readonly cargandoInsumos = signal<boolean>(false);
+  readonly errorInsumos = this.inventario.error;
+
   readonly estados = ESTADOS;
   readonly usaApi = this.compras.usaApi;
   readonly turno = turnoActual();
@@ -121,6 +148,37 @@ export class ComprasPage {
 
   readonly filasOrdenes = computed<OrdenCompra[]>(() => this.ordenes());
 
+  /** Insumos activos del inventario filtrados por nombre o código. */
+  readonly insumosDisponibles = computed<Insumo[]>(() => {
+    const termino = this.busquedaInsumo().trim().toLowerCase();
+    return this.inventario
+      .insumos()
+      .filter((insumo) => insumo.activo)
+      .filter(
+        (insumo) =>
+          !termino ||
+          insumo.nombre.toLowerCase().includes(termino) ||
+          insumo.codigo.toLowerCase().includes(termino),
+      );
+  });
+
+  readonly unidadSeleccionada = computed<string>(
+    () => this.insumoSeleccionado()?.unidadMedida ?? '',
+  );
+
+  readonly subtotalManual = computed<number>(() =>
+    round2(this.lineasManuales().reduce((suma, linea) => suma + linea.subtotal, 0)),
+  );
+
+  // Misma regla que el backend: 18 % solo si el subtotal alcanza el mínimo (S/ 70).
+  readonly igvManual = computed<number>(() =>
+    this.subtotalManual() >= 70 && this.subtotalManual() > 0
+      ? round2(this.subtotalManual() * 0.18)
+      : 0,
+  );
+
+  readonly totalManual = computed<number>(() => round2(this.subtotalManual() + this.igvManual()));
+
   /**
    * Cobertura mínima de los insumos sugeridos: mínimo de
    * `stock / (consumo / 7)`. `null` si no hay consumo conocido.
@@ -157,7 +215,9 @@ export class ComprasPage {
   constructor() {
     const params = this.route.snapshot.queryParamMap;
     const tab = params.get('tab');
-    this.tab.set(tab === 'ordenes' || tab === 'entradas' ? tab : 'sugerencia');
+    this.tab.set(
+      tab === 'ordenes' || tab === 'entradas' || tab === 'manual' ? tab : 'sugerencia',
+    );
 
     const estado = params.get('estado');
     this.estadoFiltro.set(
@@ -171,6 +231,9 @@ export class ComprasPage {
     this.limite.set(LIMITES.includes(limite) ? limite : 20);
 
     void this.inicializar();
+    if (this.tab() === 'manual') {
+      void this.cargarInsumosManuales();
+    }
 
     this.destroyRef.onDestroy(() => {
       if (this.temporizador !== null) {
@@ -188,6 +251,11 @@ export class ComprasPage {
     }
     this.tab.set(tab);
     this.pagina.set(1);
+    if (tab === 'manual') {
+      this.sincronizarUrl();
+      void this.cargarInsumosManuales();
+      return;
+    }
     void this.cargarLista();
   }
 
@@ -271,6 +339,130 @@ export class ComprasPage {
     );
   }
 
+  onBuscarInsumo(event: Event): void {
+    this.busquedaInsumo.set((event.target as HTMLInputElement).value);
+  }
+
+  onProveedorManual(event: Event): void {
+    this.proveedorManual.set((event.target as HTMLSelectElement).value);
+  }
+
+  onCantidadManual(event: Event): void {
+    this.cantidadManual.set((event.target as HTMLInputElement).value);
+  }
+
+  onPrecioManual(event: Event): void {
+    this.precioManual.set((event.target as HTMLInputElement).value);
+  }
+
+  elegirInsumo(insumo: Insumo): void {
+    this.insumoSeleccionado.set(insumo);
+    this.cantidadManual.set('1');
+    this.precioManual.set(insumo.costoPromedio.toFixed(2));
+  }
+
+  agregarLineaManual(): void {
+    const insumo = this.insumoSeleccionado();
+    if (!insumo) {
+      this.mostrarToast('Selecciona un insumo de la lista');
+      return;
+    }
+
+    const cantidad = this.numeroDesde(this.cantidadManual());
+    const precio = this.numeroDesde(this.precioManual());
+
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      this.mostrarToast('La cantidad debe ser mayor a 0');
+      return;
+    }
+    if (!Number.isFinite(precio) || precio < 0) {
+      this.mostrarToast('El precio unitario no puede ser negativo');
+      return;
+    }
+
+    const existente = this.lineasManuales().find((linea) => linea.insumoId === insumo.id);
+    if (existente) {
+      const acumulada = round3(existente.cantidad + cantidad);
+      this.lineasManuales.update((lineas) =>
+        lineas.map((linea) =>
+          linea.insumoId === insumo.id
+            ? {
+                ...linea,
+                cantidad: acumulada,
+                subtotal: round2(acumulada * linea.precioUnitario),
+              }
+            : linea,
+        ),
+      );
+    } else {
+      this.lineasManuales.update((lineas) => [
+        ...lineas,
+        {
+          insumoId: insumo.id,
+          nombre: insumo.nombre,
+          unidad: insumo.unidadMedida,
+          cantidad: round3(cantidad),
+          precioUnitario: round2(precio),
+          subtotal: round2(cantidad * precio),
+        },
+      ]);
+    }
+
+    this.insumoSeleccionado.set(null);
+    this.cantidadManual.set('1');
+    this.precioManual.set('');
+  }
+
+  quitarLineaManual(insumoId: number): void {
+    this.lineasManuales.update((lineas) =>
+      lineas.filter((linea) => linea.insumoId !== insumoId),
+    );
+  }
+
+  async generarOrdenManual(): Promise<void> {
+    if (this.guardandoManual()) {
+      return;
+    }
+
+    const proveedorId = this.proveedorManualId();
+    if (proveedorId === null) {
+      this.mostrarToast('Selecciona un proveedor para la orden');
+      return;
+    }
+
+    const lineas = this.lineasManuales();
+    if (lineas.length === 0) {
+      this.mostrarToast('Agrega al menos un insumo a la orden');
+      return;
+    }
+
+    this.guardandoManual.set(true);
+    try {
+      const orden = await this.compras.crearOrdenManual({
+        proveedorId,
+        items: lineas.map((linea) => ({
+          insumoId: linea.insumoId,
+          cantidad: linea.cantidad,
+          precioUnitario: linea.precioUnitario,
+        })),
+      });
+
+      if (!orden) {
+        this.mostrarToast(this.compras.error() ?? 'No se pudo generar la orden de compra');
+        return;
+      }
+
+      this.tab.set('ordenes');
+      this.estadoFiltro.set('todas');
+      this.pagina.set(1);
+      this.reiniciarFormularioManual();
+      await this.cargarLista();
+      this.mostrarToast(`Orden ${orden.codigo} creada con ${orden.items} ítem(s)`);
+    } finally {
+      this.guardandoManual.set(false);
+    }
+  }
+
   async recibir(orden: OrdenCompra): Promise<void> {
     const ok = await this.compras.recibir(orden.id);
     this.mostrarToast(
@@ -346,6 +538,37 @@ export class ComprasPage {
       return 'danger';
     }
     return 'warning';
+  }
+
+  private reiniciarFormularioManual(): void {
+    this.lineasManuales.set([]);
+    this.insumoSeleccionado.set(null);
+    this.cantidadManual.set('1');
+    this.precioManual.set('');
+    this.proveedorManual.set('');
+    this.busquedaInsumo.set('');
+  }
+
+  private numeroDesde(texto: string): number {
+    const limpio = texto.trim().replace(',', '.');
+    return limpio === '' ? Number.NaN : Number(limpio);
+  }
+
+  private proveedorManualId(): number | null {
+    const valor = Number(this.proveedorManual());
+    return Number.isFinite(valor) && valor > 0 ? valor : null;
+  }
+
+  private async cargarInsumosManuales(): Promise<void> {
+    if (this.inventario.insumos().length > 0) {
+      return;
+    }
+    this.cargandoInsumos.set(true);
+    try {
+      await this.inventario.cargar({ limit: 100 });
+    } finally {
+      this.cargandoInsumos.set(false);
+    }
   }
 
   private async inicializar(): Promise<void> {

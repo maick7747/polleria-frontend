@@ -13,8 +13,10 @@ import {
   DevolucionesService,
   type DevolucionesQuery,
 } from '../../core/data/devoluciones.service';
-import { MOCK_USUARIOS } from '../../core/data/mock-data';
-import { PedidosService } from '../../core/data/pedidos.service';
+import {
+  PedidosService,
+  type PedidoSelector,
+} from '../../core/data/pedidos.service';
 import type {
   Devolucion,
   EstadoDevolucion,
@@ -116,7 +118,15 @@ export class DevolucionesPage {
   readonly estados = ESTADOS;
   readonly moneda = formatearMoneda;
 
-  readonly pedidoId = signal<number>(this.pedidos.pedidos()[0]?.id ?? 0);
+  readonly pedidoId = signal<number>(0);
+  readonly pedido = signal<Pedido | null>(null);
+  readonly pedidoResumen = signal<PedidoSelector | null>(null);
+  readonly resultadosPedido = signal<PedidoSelector[]>([]);
+  readonly busquedaPedido = signal<string>('');
+  readonly buscandoPedido = signal<boolean>(false);
+  readonly errorPedido = this.pedidos.error;
+  // Devolución pendiente que se está resolviendo desde la tabla (aprobación).
+  readonly devolucionEnEdicion = signal<Devolucion | null>(null);
   readonly motivo = signal<string>('Plato frío');
   readonly solucion = signal<ResolucionDevolucion>('re_preparar');
   readonly montoParcial = signal<string>('24.00');
@@ -136,20 +146,13 @@ export class DevolucionesPage {
   readonly cargando = this.devoluciones.cargando;
   readonly error = this.devoluciones.error;
 
-  readonly pedidosDisponibles = computed<Pedido[]>(() =>
-    this.pedidos.pedidos().filter((pedido) => pedido.estado !== 'cancelado'),
-  );
-
-  readonly pedido = computed<Pedido | null>(
-    () => this.pedidos.porId(this.pedidoId()) ?? null,
-  );
-
   readonly total = computed<number>(() => this.pedido()?.total ?? 0);
   readonly devolucionesTurno = this.devoluciones.devoluciones;
   readonly pendientes = this.devoluciones.pendientes;
 
+  // El rol `Admin` está excluido de M8 (ruta y permiso); solo Dueño/Admin aprueba.
   readonly esDueno = computed<boolean>(() =>
-    this.auth.hasAnyRole(['Dueño/Admin', 'Admin']),
+    this.auth.hasAnyRole(['Dueño/Admin']),
   );
 
   readonly esReembolso = computed<boolean>(() => {
@@ -202,10 +205,8 @@ export class DevolucionesPage {
   });
 
   readonly mozo = computed<string>(() => {
-    const usuario = MOCK_USUARIOS.find(
-      (candidato) => candidato.id === this.pedido()?.usuarioCajeroId,
-    );
-    return usuario ? abreviarNombre(usuario.nombre) : '—';
+    const nombre = this.pedidoResumen()?.mozoNombre;
+    return nombre ? abreviarNombre(nombre) : '—';
   });
 
   readonly devolucionCodigo = computed<string>(() =>
@@ -256,6 +257,7 @@ export class DevolucionesPage {
   private toastTimer: number | null = null;
   private navTimer: number | null = null;
   private buscarTimer: number | null = null;
+  private buscarPedidoTimer: number | null = null;
 
   constructor() {
     const params = this.route.snapshot.queryParamMap;
@@ -286,11 +288,27 @@ export class DevolucionesPage {
       if (this.buscarTimer !== null) {
         window.clearTimeout(this.buscarTimer);
       }
+      if (this.buscarPedidoTimer !== null) {
+        window.clearTimeout(this.buscarPedidoTimer);
+      }
     });
   }
 
-  onPedido(event: Event): void {
-    this.pedidoId.set(Number((event.target as HTMLSelectElement).value));
+  onBuscarPedido(event: Event): void {
+    const valor = (event.target as HTMLInputElement).value;
+    this.busquedaPedido.set(valor);
+    if (this.buscarPedidoTimer !== null) {
+      window.clearTimeout(this.buscarPedidoTimer);
+    }
+    this.buscarPedidoTimer = window.setTimeout(() => {
+      void this.buscarPedidos(valor);
+    }, 350);
+  }
+
+  async seleccionarPedido(item: PedidoSelector): Promise<void> {
+    this.pedidoId.set(item.id);
+    this.pedidoResumen.set(item);
+    this.pedido.set(await this.pedidos.obtenerPorId(item.id));
   }
 
   elegirMotivo(motivo: string): void {
@@ -365,6 +383,35 @@ export class DevolucionesPage {
       return;
     }
 
+    const pendiente = this.devolucionEnEdicion();
+
+    // Aprobar una devolución que ya estaba registrada y quedó pendiente.
+    if (pendiente) {
+      if (this.esReembolso()) {
+        this.irAReembolso(pendiente, pedido);
+        return;
+      }
+
+      this.guardando.set(true);
+      const ok = await this.devoluciones.resolver(
+        pendiente.id,
+        this.solucion(),
+        this.motivo(),
+      );
+      this.guardando.set(false);
+      if (!ok) {
+        this.avisar(
+          this.devoluciones.error() ?? 'No se pudo resolver la devolución.',
+          true,
+        );
+        return;
+      }
+      this.devolucionEnEdicion.set(null);
+      await this.cargarLista();
+      this.avisar(`Devolución ${pendiente.pedidoNumero} resuelta · ${this.tituloSolucion()}`);
+      return;
+    }
+
     this.guardando.set(true);
     const devolucion = await this.devoluciones.registrar({
       pedidoId: pedido.id,
@@ -383,15 +430,7 @@ export class DevolucionesPage {
 
     if (this.esReembolso()) {
       this.guardando.set(false);
-      void this.router.navigate(['/devoluciones/reembolso'], {
-        queryParams: {
-          devolucionId: devolucion.id,
-          monto: this.montoSolucion(),
-          pedido: pedido.numero,
-          motivo: this.motivo(),
-          tipo: this.solucion(),
-        },
-      });
+      this.irAReembolso(devolucion, pedido);
       return;
     }
 
@@ -409,6 +448,72 @@ export class DevolucionesPage {
     this.navTimer = window.setTimeout(() => {
       void this.router.navigate(['/comandas']);
     }, 1500);
+  }
+
+  async resolverFila(devolucion: Devolucion): Promise<void> {
+    if (devolucion.estado !== 'pendiente') {
+      return;
+    }
+    this.devolucionEnEdicion.set(devolucion);
+    this.pedidoId.set(devolucion.pedidoId);
+    this.pedidoResumen.set(
+      this.resultadosPedido().find((pedido) => pedido.id === devolucion.pedidoId) ?? null,
+    );
+    this.pedido.set(await this.pedidos.obtenerPorId(devolucion.pedidoId));
+    this.motivo.set(devolucion.motivo);
+    if (devolucion.resolucion) {
+      this.solucion.set(devolucion.resolucion);
+    }
+    if (devolucion.montoReembolsado > 0) {
+      this.montoParcial.set(devolucion.montoReembolsado.toFixed(2));
+    }
+    document.querySelector('.panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  async rechazarFila(devolucion: Devolucion): Promise<void> {
+    if (!this.esDueno() || devolucion.estado !== 'pendiente') {
+      return;
+    }
+    const motivo = window.prompt(
+      `Motivo del rechazo de ${devolucion.pedidoNumero}`,
+      'Rechazada por el dueño',
+    );
+    if (motivo === null) {
+      return;
+    }
+    const ok = await this.devoluciones.rechazar(
+      devolucion.id,
+      motivo.trim() || 'Sin detalle',
+    );
+    if (!ok) {
+      this.avisar(
+        this.devoluciones.error() ?? 'No se pudo rechazar la devolución.',
+        true,
+      );
+      return;
+    }
+    if (this.devolucionEnEdicion()?.id === devolucion.id) {
+      this.devolucionEnEdicion.set(null);
+    }
+    await this.cargarLista();
+    this.avisar(`Devolución ${devolucion.pedidoNumero} rechazada`);
+  }
+
+  cancelarEdicion(): void {
+    this.devolucionEnEdicion.set(null);
+    this.avisar('Resolución cancelada');
+  }
+
+  private irAReembolso(devolucion: Devolucion, pedido: Pedido): void {
+    void this.router.navigate(['/devoluciones/reembolso'], {
+      queryParams: {
+        devolucionId: devolucion.id,
+        monto: this.esReembolso() ? this.montoSolucion() : devolucion.montoReembolsado,
+        pedido: pedido.numero,
+        motivo: this.motivo(),
+        tipo: this.solucion(),
+      },
+    });
   }
 
   reembolsarFila(devolucion: Devolucion): void {
@@ -459,20 +564,26 @@ export class DevolucionesPage {
   }
 
   private async inicializar(): Promise<void> {
-    if (this.pedidos.pedidos().length === 0) {
-      await this.pedidos.cargar({ limit: 100 });
-    }
     await this.cargarLista();
-    this.elegirPrimerPedido();
+    await this.buscarPedidos('');
   }
 
-  private elegirPrimerPedido(): void {
-    if (this.pedidoId() > 0) {
+  private async buscarPedidos(q: string): Promise<void> {
+    this.buscandoPedido.set(true);
+    const resultados = await this.pedidos.buscarSelector(q, 10);
+    this.buscandoPedido.set(false);
+    this.resultadosPedido.set(resultados);
+
+    if (resultados.length === 0) {
+      this.pedidoId.set(0);
+      this.pedidoResumen.set(null);
+      this.pedido.set(null);
       return;
     }
-    const primero = this.pedidosDisponibles()[0];
-    if (primero) {
-      this.pedidoId.set(primero.id);
+
+    const actual = resultados.find((pedido) => pedido.id === this.pedidoId());
+    if (!actual) {
+      await this.seleccionarPedido(resultados[0]);
     }
   }
 

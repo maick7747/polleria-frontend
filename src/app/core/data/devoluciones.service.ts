@@ -242,6 +242,8 @@ export class DevolucionesService {
     try {
       const dto = await firstValueFrom(
         this.api.post<DevolucionDto>(`/devoluciones/${id}/resolver`, {
+          // El backend exige `estado`; sin él la resolución falla con 400.
+          estado: 'aceptada',
           resolucion,
           motivo: motivo?.trim() || undefined,
           monto_reembolsado: montoReembolsado,
@@ -249,6 +251,47 @@ export class DevolucionesService {
       );
       const devolucion = toDevolucion(dto);
       this.detalle.set(devolucion);
+      await this.cargar(this.ultimaConsulta);
+      return true;
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return false;
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  /** Rechaza una devolución pendiente (solo Dueño/Admin en la UI). */
+  async rechazar(id: number, motivo: string): Promise<boolean> {
+    const detalle = motivo.trim() || 'Sin detalle';
+
+    if (!USE_API) {
+      this.todosMock.update((lista) =>
+        lista.map((actual) =>
+          actual.id === id
+            ? {
+                ...actual,
+                estado: 'rechazada',
+                fechaResolucion: new Date().toISOString(),
+              }
+            : actual,
+        ),
+      );
+      this.cargarMock(this.ultimaConsulta);
+      return true;
+    }
+
+    this.cargando.set(true);
+    this.error.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.post<DevolucionDto>(`/devoluciones/${id}/resolver`, {
+          estado: 'rechazada',
+          motivo: detalle,
+          detalle_resolucion: detalle,
+        }),
+      );
+      this.detalle.set(toDevolucion(dto));
       await this.cargar(this.ultimaConsulta);
       return true;
     } catch (error) {

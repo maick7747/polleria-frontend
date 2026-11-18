@@ -83,6 +83,19 @@ export interface CrearOrdenOpciones {
   notas?: string;
 }
 
+export interface ItemCompraManual {
+  insumoId: number;
+  cantidad: number;
+  precioUnitario: number;
+}
+
+export interface CrearOrdenManualOpciones {
+  proveedorId: number;
+  fecha?: string;
+  notas?: string;
+  items: ItemCompraManual[];
+}
+
 export interface RegistrarPagoCompra {
   metodo: string;
   monto: number;
@@ -204,6 +217,25 @@ const MOCK_SUGERENCIAS: readonly SugerenciaCompra[] = [
   },
 ];
 
+/** Proveedores del modo demo, derivados de las sugerencias sembradas. */
+const MOCK_PROVEEDORES: readonly ProveedorDto[] = [
+  ...new Set(MOCK_SUGERENCIAS.map((sugerencia) => sugerencia.proveedor)),
+].map((nombre, indice) => ({
+  id: indice + 1,
+  ruc: '',
+  razon_social: nombre,
+  contacto_nombre: null,
+  telefono: null,
+  direccion: null,
+  email: null,
+  activo: true,
+}));
+
+/** Fecha de hoy en la zona del restaurante (`YYYY-MM-DD`). */
+function fechaHoyLima(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+}
+
 const MOCK_ORDENES: readonly OrdenCompra[] = [
   {
     id: 148,
@@ -281,6 +313,8 @@ export class ComprasService {
 
   private secuenciaOrden = 148;
   private ultimaConsulta: ComprasQuery = {};
+  /** Órdenes del modo demo (las nuevas sobreviven a un recargar de la lista). */
+  private readonly ordenesDemo: OrdenCompra[] = MOCK_ORDENES.map((orden) => ({ ...orden }));
 
   readonly usaApi = USE_API;
   readonly cargando = signal<boolean>(false);
@@ -333,7 +367,12 @@ export class ComprasService {
     ),
   );
 
-  readonly igv = computed<number>(() => round2(this.subtotal() * 0.18));
+  // El backend aplica IGV solo si el subtotal alcanza `igv_min_soles` (S/ 70).
+  readonly igv = computed<number>(() =>
+    this.subtotal() >= 70 && this.subtotal() > 0
+      ? round2(this.subtotal() * 0.18)
+      : 0,
+  );
 
   readonly total = computed<number>(() => round2(this.subtotal() + this.igv()));
 
@@ -465,7 +504,8 @@ export class ComprasService {
 
   async cargarProveedores(): Promise<boolean> {
     if (!USE_API) {
-      return false;
+      this.proveedoresLista.set(MOCK_PROVEEDORES.map((proveedor) => ({ ...proveedor })));
+      return true;
     }
     try {
       const lista = await firstValueFrom(
@@ -534,6 +574,40 @@ export class ComprasService {
     } catch (error) {
       this.error.set(mensajeError(error));
       return creadas;
+    } finally {
+      this.cargando.set(false);
+    }
+  }
+
+  /**
+   * Compra manual: el usuario elige los insumos, la cantidad y el precio.
+   * El backend exige un proveedor y no acepta el mismo insumo dos veces.
+   */
+  async crearOrdenManual(opciones: CrearOrdenManualOpciones): Promise<OrdenCompra | null> {
+    if (!USE_API) {
+      return this.crearOrdenManualDemo(opciones);
+    }
+
+    this.cargando.set(true);
+    this.error.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.post<CompraDto>('/compras', {
+          proveedor_id: opciones.proveedorId,
+          fecha: opciones.fecha || undefined,
+          notas: opciones.notas || undefined,
+          items: opciones.items.map((item) => ({
+            insumo_id: item.insumoId,
+            cantidad: item.cantidad,
+            precio_unitario: item.precioUnitario,
+          })),
+        }),
+      );
+      await this.recargar();
+      return toCompra(dto);
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return null;
     } finally {
       this.cargando.set(false);
     }
@@ -658,7 +732,7 @@ export class ComprasService {
       return estado === 'cancelada';
     };
 
-    const filtradas = MOCK_ORDENES.filter(
+    const filtradas = this.ordenesDemo.filter(
       (orden) =>
         coincideEstado(orden.estado) &&
         enRango(orden.fecha) &&
@@ -689,6 +763,37 @@ export class ComprasService {
       total: this.total(),
     };
     this.ordenes.update((lista) => [orden, ...lista]);
+    this.ordenesDemo.unshift(orden);
+    this.totales.update((totales) => ({ ...totales, ordenes: totales.ordenes + 1 }));
+    return orden;
+  }
+
+  private crearOrdenManualDemo(opciones: CrearOrdenManualOpciones): OrdenCompra {
+    const proveedor = this.proveedoresLista().find(
+      (actual) => actual.id === opciones.proveedorId,
+    );
+    const total = round2(
+      opciones.items.reduce(
+        (suma, item) => suma + item.cantidad * item.precioUnitario,
+        0,
+      ),
+    );
+    this.secuenciaOrden += 1;
+    const orden: OrdenCompra = {
+      id: this.secuenciaOrden,
+      codigo: `OC-${String(this.secuenciaOrden).padStart(4, '0')}`,
+      proveedor: proveedor?.razon_social ?? `Proveedor ${opciones.proveedorId}`,
+      proveedorId: opciones.proveedorId,
+      fecha: opciones.fecha || fechaHoyLima(),
+      entrega: 'Entrega pendiente',
+      condicion: opciones.notas?.trim() || '—',
+      estado: 'enviada',
+      items: opciones.items.length,
+      total,
+      notas: opciones.notas,
+    };
+    this.ordenes.update((lista) => [orden, ...lista]);
+    this.ordenesDemo.unshift(orden);
     this.totales.update((totales) => ({ ...totales, ordenes: totales.ordenes + 1 }));
     return orden;
   }
@@ -700,6 +805,7 @@ export class ComprasService {
         actual.id === id ? { ...actual, estado: 'recibida', entrega: 'Recibida' } : actual,
       ),
     );
+    this.mutarOrdenDemo(id, { estado: 'recibida', entrega: 'Recibida' });
     if (!orden) {
       return;
     }
@@ -728,5 +834,18 @@ export class ComprasService {
           : actual,
       ),
     );
+    this.mutarOrdenDemo(id, {
+      estado: 'cancelada',
+      entrega: 'Cancelada',
+      motivoCancelacion: motivo || null,
+    });
+  }
+
+  private mutarOrdenDemo(id: number, cambios: Partial<OrdenCompra>): void {
+    const indice = this.ordenesDemo.findIndex((orden) => orden.id === id);
+    if (indice < 0) {
+      return;
+    }
+    this.ordenesDemo[indice] = { ...this.ordenesDemo[indice], ...cambios };
   }
 }

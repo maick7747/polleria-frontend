@@ -23,6 +23,7 @@ import type {
   KdsPedidoDto,
   PageMeta,
   PedidoDto,
+  PedidoSelectorDto,
 } from '../api/api.types';
 import { toPedido, toPedidoKds } from '../api/api.mappers';
 import { MOCK_PEDIDOS } from './mock-data';
@@ -44,6 +45,19 @@ export interface PedidosMeta extends PageMeta {
 export interface CancelacionPedido {
   pedido: Pedido;
   resultado: ResultadoCancelacion;
+}
+
+/** Cabecera liviana para selectores (sin líneas del pedido). */
+export interface PedidoSelector {
+  id: number;
+  numero: string;
+  canal: CanalPedido;
+  tipoConsumo: TipoConsumo;
+  total: number;
+  fecha: string;
+  clienteNombre?: string;
+  mesaNumero?: number | null;
+  mozoNombre?: string;
 }
 
 export interface NuevoPedido {
@@ -115,6 +129,62 @@ export class PedidosService {
     const pedido = toPedido(dto);
     this.guardarEnLista(pedido);
     return pedido;
+  }
+
+  /**
+   * Busca pedidos para un selector sin traer sus líneas.
+   * `GET /api/pedidos/selector?q=&limit=` devuelve solo cabecera + nombres.
+   */
+  async buscarSelector(q: string, limit = 10): Promise<PedidoSelector[]> {
+    const termino = q.trim();
+
+    if (!USE_API) {
+      const buscado = termino.toLowerCase();
+      return this.pedidos()
+        .filter((pedido) => pedido.estado !== 'cancelado')
+        .filter(
+          (pedido) =>
+            !buscado ||
+            pedido.numero.toLowerCase().includes(buscado) ||
+            String(pedido.clienteNombre || '').toLowerCase().includes(buscado),
+        )
+        .slice(0, limit)
+        .map((pedido) => ({
+          id: pedido.id,
+          numero: pedido.numero,
+          canal: pedido.canal,
+          tipoConsumo: pedido.tipoConsumo,
+          total: pedido.total,
+          fecha: pedido.fechaPedido,
+          clienteNombre: pedido.clienteNombre,
+          mesaNumero: pedido.mesaNumero ?? null,
+          mozoNombre: undefined,
+        }));
+    }
+
+    this.error.set(null);
+    try {
+      const lista = await firstValueFrom(
+        this.api.get<ApiList<PedidoSelectorDto>>('/pedidos/selector', {
+          q: termino || undefined,
+          limit,
+        }),
+      );
+      return lista.data.map((dto) => ({
+        id: dto.id,
+        numero: dto.numero,
+        canal: dto.canal as CanalPedido,
+        tipoConsumo: dto.tipo_consumo as TipoConsumo,
+        total: Number(dto.total),
+        fecha: dto.fecha_pedido,
+        clienteNombre: dto.cliente_nombre ?? undefined,
+        mesaNumero: dto.mesa_numero ?? null,
+        mozoNombre: dto.usuario_cajero_nombre ?? undefined,
+      }));
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return [];
+    }
   }
 
   /**

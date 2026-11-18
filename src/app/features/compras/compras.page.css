@@ -866,3 +866,238 @@ app-paginador {
     flex-wrap: wrap;
   }
 }
+
+/* ---------- Compra manual ---------- */
+
+.manual {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 24px;
+}
+
+.manual__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.manual__buscador {
+  width: 100%;
+}
+
+.manual__resultados {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.manual__insumo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 9px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-white);
+  text-align: left;
+  font-family: var(--font-body);
+  transition:
+    border-color var(--dur) var(--ease),
+    background var(--dur) var(--ease);
+}
+
+.manual__insumo:hover {
+  border-color: #d8d8df;
+}
+
+.manual__insumo.is-active {
+  border-color: var(--c-brand);
+  background: var(--c-brand-soft);
+}
+
+.manual__insumo-nombre {
+  max-width: 100%;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manual__insumo-meta {
+  font-size: 10.5px;
+  color: var(--c-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manual__vacio {
+  padding: 10px 2px;
+  font-size: 11.5px;
+  color: var(--c-text-3);
+}
+
+.manual__captura {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-sep);
+  border-radius: var(--r-md);
+  background: var(--c-neutral-soft);
+}
+
+.manual__sel {
+  flex: 1 1 200px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.manual__sel-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--c-text-3);
+}
+
+.manual__sel-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manual__sel-meta {
+  font-size: 10.5px;
+  color: var(--c-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manual__captura .campo input {
+  width: 120px;
+  background: var(--c-white);
+}
+
+.manual__add {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--c-ink);
+  border-radius: var(--r-pill);
+  background: var(--c-ink);
+  color: var(--c-white);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: filter var(--dur) var(--ease);
+}
+
+.manual__add:hover {
+  filter: brightness(1.15);
+}
+
+.manual__lineas {
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.manual__linea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 110px 110px 34px;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--c-sep);
+}
+
+.manual__linea:last-child {
+  border-bottom: 0;
+}
+
+.manual__linea--head {
+  min-height: 34px;
+  background: #fafafc;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  color: var(--c-text-3);
+  white-space: nowrap;
+}
+
+.manual__linea--head .right {
+  text-align: right;
+}
+
+.manual__quitar {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-sm);
+  background: var(--c-white);
+  color: var(--c-text-2);
+  transition:
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.manual__quitar:hover {
+  border-color: var(--c-brand);
+  color: var(--c-brand-text);
+}
+
+.manual__pie {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.manual__proveedor select {
+  min-width: 240px;
+}
+
+.manual__cta {
+  min-width: 210px;
+}
+
+@media (max-width: 1180px) {
+  .manual__linea {
+    grid-template-columns: minmax(0, 1fr) 84px 90px 90px 34px;
+  }
+
+  .manual__pie {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .manual__proveedor select,
+  .manual__cta {
+    width: 100%;
+  }
+}
