@@ -193,6 +193,16 @@ export class ApiClient {
       .pipe(timeout(REQUEST_TIMEOUT_MS), catchError((error: unknown) => this.fail(error)));
   }
 
+  /**
+   * POST multipart/form-data (subida de archivos). No se fija Content-Type:
+   * el navegador agrega el boundary automáticamente.
+   */
+  postFormData<T>(path: string, formData: FormData): Observable<T> {
+    return this.http
+      .post<T>(this.url(path), formData, { headers: this.headers() })
+      .pipe(timeout(REQUEST_TIMEOUT_MS), catchError((error: unknown) => this.fail(error)));
+  }
+
   private url(path: string): string {
     const limpio = path.startsWith('/') ? path : `/${path}`;
     return `${this.baseUrl}${limpio}`;

@@ -53,6 +53,18 @@
     <div class="menu__grid">
       @for (plato of platosVisibles(); track plato.id) {
         <article class="plato">
+          @if (plato.imagenUrl) {
+            <img
+              class="plato__img"
+              [src]="plato.imagenUrl"
+              [alt]="plato.nombre"
+              loading="lazy"
+            />
+          } @else {
+            <div class="plato__img plato__img--vacio" aria-hidden="true">
+              <app-icon name="fork-knife" [size]="22" />
+            </div>
+          }
           <div class="plato__top">
             <h3 class="plato__name">{{ plato.nombre }}</h3>
             <div class="plato__tags">

@@ -196,6 +196,7 @@ export class FichasService {
           nombre: plato.nombre.trim(),
           descripcion: plato.descripcion.trim(),
           precio_venta: plato.precioVenta,
+          imagen_url: plato.imagenUrl || undefined,
         }),
       );
       platilloId = creado.id;
@@ -234,6 +235,9 @@ export class FichasService {
     }
     if (!previo || Number(previo.precioVenta) !== plato.precioVenta) {
       cambios['precio_venta'] = plato.precioVenta;
+    }
+    if ((previo?.imagenUrl ?? null) !== (plato.imagenUrl ?? null)) {
+      cambios['imagen_url'] = plato.imagenUrl || null;
     }
     return cambios;
   }

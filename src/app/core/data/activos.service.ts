@@ -48,6 +48,7 @@ export interface ActivoEntrada {
   proveedor?: string;
   garantiaMeses?: number;
   observaciones?: string;
+  imagenUrl?: string;
 }
 
 export interface MantenimientoEntrada {
@@ -217,6 +218,7 @@ export class ActivosService {
         proveedor: entrada.proveedor,
         garantiaMeses: entrada.garantiaMeses,
         observaciones: entrada.observaciones,
+        imagenUrl: entrada.imagenUrl,
         usuarioId: 0,
       };
       this.activos.update((lista) => [nuevo, ...lista]);
@@ -596,6 +598,9 @@ export class ActivosService {
     }
     if (entrada.observaciones !== undefined) {
       cuerpo['observaciones'] = entrada.observaciones;
+    }
+    if (entrada.imagenUrl !== undefined) {
+      cuerpo['imagen_url'] = entrada.imagenUrl || null;
     }
     return cuerpo;
   }

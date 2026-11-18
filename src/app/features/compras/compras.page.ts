@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import type { ProveedorDto } from '../../core/api/api.types';
 import {
   ComprasService,
   type EstadoCompraFiltro,
@@ -28,6 +29,7 @@ import { ChipComponent, type ChipVariant } from '../../shared/components/chip/ch
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { ImageUploadComponent } from '../../shared/components/image-upload/image-upload';
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
@@ -64,6 +66,7 @@ const LIMITES = [10, 20, 50, 100];
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    ImageUploadComponent,
     PaginadorComponent,
     PanelComponent,
   ],
@@ -165,6 +168,22 @@ export class ComprasPage {
   readonly unidadSeleccionada = computed<string>(
     () => this.insumoSeleccionado()?.unidadMedida ?? '',
   );
+
+  /** Proveedor elegido en la compra manual (logo + cambio de imagen). */
+  readonly proveedorManualSeleccionado = computed<ProveedorDto | null>(() => {
+    const id = this.proveedorManualId();
+    return id === null
+      ? null
+      : (this.proveedoresApi().find((proveedor) => proveedor.id === id) ?? null);
+  });
+
+  /** Proveedor de la orden: el elegido en el selector o el de la orden activa. */
+  readonly proveedorOrdenSeleccionado = computed<ProveedorDto | null>(() => {
+    const id = this.proveedorOrdenId() ?? this.ordenActiva()?.proveedorId ?? null;
+    return id === null
+      ? null
+      : (this.proveedoresApi().find((proveedor) => proveedor.id === id) ?? null);
+  });
 
   readonly subtotalManual = computed<number>(() =>
     round2(this.lineasManuales().reduce((suma, linea) => suma + linea.subtotal, 0)),
@@ -461,6 +480,16 @@ export class ComprasPage {
     } finally {
       this.guardandoManual.set(false);
     }
+  }
+
+  /** Sube o quita el logo del proveedor y refresca la lista local. */
+  async cambiarLogoProveedor(proveedorId: number, url: string | null): Promise<void> {
+    const ok = await this.compras.actualizarProveedorImagen(proveedorId, url);
+    if (!ok) {
+      this.mostrarToast(this.compras.error() ?? 'No se pudo actualizar el logo del proveedor');
+      return;
+    }
+    this.mostrarToast('Logo del proveedor actualizado');
   }
 
   async recibir(orden: OrdenCompra): Promise<void> {

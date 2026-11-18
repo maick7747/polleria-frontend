@@ -14,6 +14,7 @@ import { formatearMoneda, round2 } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { ImageUploadComponent } from '../../shared/components/image-upload/image-upload';
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
@@ -30,6 +31,7 @@ interface FilaFicha {
   margen: number;
   foodCost: number;
   ingredientes: number;
+  imagenUrl?: string;
 }
 
 interface IngredienteVista {
@@ -60,6 +62,7 @@ const LIMITES = [10, 20, 50, 100];
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    ImageUploadComponent,
     PaginadorComponent,
     PanelComponent,
   ],
@@ -82,6 +85,7 @@ export class FichasPage {
   readonly editando = signal<boolean>(false);
   readonly formNombre = signal<string>('');
   readonly formPrecio = signal<number>(0);
+  readonly formImagenUrl = signal<string | null>(null);
   readonly toast = signal<string>('');
   readonly pagina = signal<number>(1);
   readonly limite = signal<number>(20);
@@ -206,6 +210,12 @@ export class FichasPage {
 
   readonly precioVista = computed<number>(() =>
     this.editando() ? round2(this.formPrecio()) : (this.seleccionado()?.precio ?? 0),
+  );
+
+  readonly imagenVista = computed<string | null>(() =>
+    this.editando()
+      ? this.formImagenUrl()
+      : (this.seleccionado()?.imagenUrl ?? null),
   );
 
   readonly margenVista = computed<number>(() => {
@@ -365,11 +375,13 @@ export class FichasPage {
     }
     this.formNombre.set(fila.nombre);
     this.formPrecio.set(fila.precio);
+    this.formImagenUrl.set(fila.imagenUrl ?? null);
     this.editando.set(true);
   }
 
   cancelarEdicion(): void {
     this.editando.set(false);
+    this.formImagenUrl.set(null);
   }
 
   onFormNombre(event: Event): void {
@@ -392,7 +404,12 @@ export class FichasPage {
       this.mostrarToast('Ingresa un nombre y un precio mayor a 0');
       return;
     }
-    const ok = await this.fichas.guardar({ ...plato, nombre, precioVenta: precio });
+    const ok = await this.fichas.guardar({
+      ...plato,
+      nombre,
+      precioVenta: precio,
+      imagenUrl: this.formImagenUrl() ?? undefined,
+    });
     if (!ok) {
       // El modal de edición queda abierto; el error se muestra en el banner.
       return;
@@ -420,6 +437,7 @@ export class FichasPage {
       margen,
       foodCost: plato.precioVenta > 0 ? round2((costo / plato.precioVenta) * 100) : 0,
       ingredientes: plato.ingredientes.length,
+      imagenUrl: plato.imagenUrl,
     };
   }
 

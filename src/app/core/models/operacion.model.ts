@@ -103,6 +103,7 @@ export interface Activo {
   vidaUtilMeses: number;
   fechaAdquisicion: string;
   estado: EstadoActivo;
+  imagenUrl?: string;
   ultimoMantenimiento?: string;
   proximoMantenimiento?: string;
   proveedor?: string;

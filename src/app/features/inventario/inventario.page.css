@@ -314,6 +314,24 @@
   text-overflow: ellipsis;
 }
 
+/* Miniatura + subida de imagen del insumo */
+.insumo--imagen {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.insumo--imagen app-image-upload {
+  flex: 0 0 auto;
+}
+
+.insumo__texto {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .stock {
   font-family: var(--font-display);
   font-size: 13px;

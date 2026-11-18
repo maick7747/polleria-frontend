@@ -147,6 +147,14 @@
           ></textarea>
         </label>
 
+        <div class="campo-imagen">
+          <app-image-upload
+            [(imagenUrl)]="imagenUrl"
+            carpeta="activos"
+            etiqueta="Foto del activo"
+          />
+        </div>
+
         <div class="form__grow"></div>
 
         <span class="hairline"></span>

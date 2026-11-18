@@ -366,6 +366,7 @@ export interface InsumoDto {
   umbral_merma_pct: number;
   costo_promedio: number;
   activo: boolean;
+  imagen_url?: string | null;
 }
 
 export interface MovimientoDto {
@@ -485,6 +486,7 @@ export interface ProveedorDto {
   direccion: string | null;
   email: string | null;
   activo: boolean;
+  imagen_url?: string | null;
 }
 
 export type EstadoCompraDto = 'ordenada' | 'recibida' | 'cancelada';
@@ -594,6 +596,7 @@ export interface PlatoDto {
   precio_venta: number;
   activo: boolean;
   categoria?: string | null;
+  imagen_url?: string | null;
   ingredientes?: IngredientePlatoDto[] | null;
   disponible?: boolean | null;
 }
@@ -614,6 +617,7 @@ export interface ActivoDto {
   vida_util_meses: number | null;
   fecha_adquisicion: string;
   estado: string;
+  imagen_url?: string | null;
   fecha_baja?: string | null;
   motivo_baja?: string | null;
   usuario_id?: number;

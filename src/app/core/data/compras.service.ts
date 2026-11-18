@@ -519,6 +519,38 @@ export class ComprasService {
     }
   }
 
+  async actualizarProveedorImagen(
+    proveedorId: number,
+    imagenUrl: string | null,
+  ): Promise<boolean> {
+    if (!USE_API) {
+      this.proveedoresLista.update((lista) =>
+        lista.map((proveedor) =>
+          proveedor.id === proveedorId
+            ? { ...proveedor, imagen_url: imagenUrl }
+            : proveedor,
+        ),
+      );
+      return true;
+    }
+
+    this.error.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.patch<ProveedorDto>(`/compras/proveedores/${proveedorId}`, {
+          imagen_url: imagenUrl,
+        }),
+      );
+      this.proveedoresLista.update((lista) =>
+        lista.map((proveedor) => (proveedor.id === proveedorId ? dto : proveedor)),
+      );
+      return true;
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return false;
+    }
+  }
+
   async crearOrden(opciones: CrearOrdenOpciones = {}): Promise<OrdenCompra[]> {
     this.avisos.set([]);
     const seleccionadas = this.seleccionadas();

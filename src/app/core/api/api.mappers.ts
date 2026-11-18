@@ -366,6 +366,7 @@ export function toInsumo(dto: InsumoDto): Insumo {
     umbralMermaPct: dto.umbral_merma_pct,
     costoPromedio: dto.costo_promedio,
     activo: dto.activo,
+    imagenUrl: dto.imagen_url ?? undefined,
   };
 }
 
@@ -512,6 +513,7 @@ export function toPlato(dto: PlatoDto): Plato {
     categoria: (dto.categoria ?? 'Pollos') as CategoriaPlatillo,
     precioVenta: Number(dto.precio_venta),
     activo: Boolean(dto.activo),
+    imagenUrl: dto.imagen_url ?? undefined,
     ingredientes: (dto.ingredientes ?? []).map((ingrediente) => ({
       insumoId: ingrediente.insumo_id,
       nombre: ingrediente.insumo ?? '',
@@ -681,6 +683,7 @@ export function toActivo(dto: ActivoDto): ActivoVista {
     vidaUtilMeses: Number(dto.vida_util_meses ?? 0),
     fechaAdquisicion: (dto.fecha_adquisicion ?? '').slice(0, 10),
     estado: ESTADOS_ACTIVO.find((valor) => valor === dto.estado) ?? 'activo',
+    imagenUrl: dto.imagen_url ?? undefined,
     ultimoMantenimiento: fechaDeUltimo(dto),
     proximoMantenimiento: dto.proximo_mantenimiento?.slice(0, 10) ?? undefined,
     proveedor: dto.proveedor ?? undefined,

@@ -69,9 +69,23 @@
                 (click)="seleccionar(fila.id)"
               >
                 <span class="plato">
-                  <span class="plato__name">{{ fila.nombre }}</span>
-                  <span class="plato__meta">
-                    {{ fila.categoria }} · {{ fila.ingredientes }} ingredientes
+                  @if (fila.imagenUrl) {
+                    <img
+                      class="plato__thumb"
+                      [src]="fila.imagenUrl"
+                      [alt]="fila.nombre"
+                      loading="lazy"
+                    />
+                  } @else {
+                    <span class="plato__thumb plato__thumb--vacio" aria-hidden="true">
+                      <app-icon name="fork-knife" [size]="16" />
+                    </span>
+                  }
+                  <span class="plato__texto">
+                    <span class="plato__name">{{ fila.nombre }}</span>
+                    <span class="plato__meta">
+                      {{ fila.categoria }} · {{ fila.ingredientes }} ingredientes
+                    </span>
                   </span>
                 </span>
                 <span class="monto">{{ moneda(fila.costo) }}</span>
@@ -135,6 +149,12 @@
                     (input)="onFormPrecio($event)"
                   />
                 </label>
+                <app-image-upload
+                  [(imagenUrl)]="formImagenUrl"
+                  carpeta="platillos"
+                  etiqueta="Imagen del plato"
+                  [deshabilitado]="guardando()"
+                />
               </div>
             } @else {
               <h2 class="detalle__title">{{ fila.nombre }}</h2>
@@ -143,6 +163,19 @@
             <span class="detalle__meta">
               {{ fila.categoria }} · {{ fila.ingredientes }} ingredientes · act. 12 oct
             </span>
+
+            <span class="hr"></span>
+
+            <div class="detalle__media">
+              @if (imagenVista(); as imagen) {
+                <img class="detalle__img" [src]="imagen" [alt]="fila.nombre" />
+              } @else {
+                <div class="detalle__img detalle__img--vacio">
+                  <app-icon name="fork-knife" [size]="26" />
+                  <span>Sin imagen del plato</span>
+                </div>
+              }
+            </div>
 
             <span class="hr"></span>
 

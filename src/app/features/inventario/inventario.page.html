@@ -58,7 +58,12 @@
     </label>
   </div>
 
-  @if (error()) {
+  @if (errorImagen()) {
+    <div class="error-banner" role="alert">
+      <span>{{ errorImagen() }}</span>
+      <button type="button" (click)="cerrarErrorImagen()">Cerrar</button>
+    </div>
+  } @else if (error()) {
     <div class="error-banner" role="alert">
       <span>{{ error() }}</span>
       <button type="button" (click)="recargar()">Reintentar</button>
@@ -90,9 +95,18 @@
         <div class="rows">
           @for (fila of visibles(); track fila.insumoId) {
             <div class="grid row" [class.row--alert]="fila.estado === 'critico'">
-              <div class="insumo">
-                <span class="insumo__name">{{ fila.nombre }}</span>
-                <span class="insumo__meta">{{ fila.categoria }} · unidad {{ fila.unidad }}</span>
+              <div class="insumo insumo--imagen">
+                <app-image-upload
+                  [imagenUrl]="fila.imagenUrl ?? null"
+                  (imagenUrlChange)="cambiarImagen(fila.insumoId, $event)"
+                  carpeta="insumos"
+                  etiqueta="Imagen del insumo"
+                  [compacto]="true"
+                />
+                <div class="insumo__texto">
+                  <span class="insumo__name">{{ fila.nombre }}</span>
+                  <span class="insumo__meta">{{ fila.categoria }} · unidad {{ fila.unidad }}</span>
+                </div>
               </div>
               <span class="stock">{{ cantidad(fila.stock, fila.unidad) }}</span>
               <span class="minimo">{{ cantidad(fila.minimo, fila.unidad) }}</span>

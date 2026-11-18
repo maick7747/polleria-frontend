@@ -107,8 +107,12 @@
               (click)="seleccionar(activo)"
             >
               <span class="col-activo fila__activo">
-                <span class="fila__icon">
-                  <app-icon [name]="categoria(activo).icono" [size]="16" />
+                <span class="fila__thumb">
+                  @if (activo.imagenUrl) {
+                    <img [src]="activo.imagenUrl" [alt]="activo.nombre" loading="lazy" />
+                  } @else {
+                    <app-icon [name]="categoria(activo).icono" [size]="16" />
+                  }
                 </span>
                 <span class="fila__text">
                   <span class="fila__name">{{ activo.nombre }}</span>
@@ -184,6 +188,14 @@
               placeholder="Ej. Horno a la brasa"
             />
           </label>
+
+          <div class="campo-dark">
+            <app-image-upload
+              [(imagenUrl)]="fImagenUrl"
+              carpeta="activos"
+              etiqueta="Foto del activo"
+            />
+          </div>
 
           <span class="campo-dark__label">Categoría</span>
           <div class="dchips">
@@ -326,6 +338,20 @@
               <span class="dchip">{{ edadMeses(activo) }} meses de uso</span>
             }
           </div>
+
+          @if (activo.imagenUrl) {
+            <img
+              class="detalle__img"
+              [src]="activo.imagenUrl"
+              [alt]="activo.nombre"
+              loading="lazy"
+            />
+          } @else {
+            <div class="detalle__img detalle__img--vacio">
+              <app-icon name="package" [size]="22" />
+              <span>Sin foto del activo</span>
+            </div>
+          }
 
           <span class="dark-sep"></span>
 

@@ -577,6 +577,39 @@ export class InventarioService {
     return true;
   }
 
+  async actualizarImagen(
+    insumoId: number,
+    imagenUrl: string | null,
+  ): Promise<boolean> {
+    if (!USE_API) {
+      this.insumos.update((lista) =>
+        lista.map((actual) =>
+          actual.id === insumoId
+            ? { ...actual, imagenUrl: imagenUrl ?? undefined }
+            : actual,
+        ),
+      );
+      return true;
+    }
+
+    this.error.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.patch<InsumoDto>(`/inventario/${insumoId}/imagen`, {
+          imagen_url: imagenUrl,
+        }),
+      );
+      const normalizado = toInsumo(dto);
+      this.insumos.update((lista) =>
+        lista.map((actual) => (actual.id === insumoId ? normalizado : actual)),
+      );
+      return true;
+    } catch (error) {
+      this.error.set(mensajeError(error));
+      return false;
+    }
+  }
+
   private aplicarStock(insumoId: number, stockResultante: number): void {
     this.insumos.update((lista) =>
       lista.map((actual) =>

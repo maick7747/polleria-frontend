@@ -1,0 +1,54 @@
+<div
+  class="imagen"
+  [class.imagen--compacta]="compacto()"
+  [class.imagen--cuadrada]="aspecto() === 'cuadrado'"
+>
+  <div class="imagen__preview">
+    @if (imagenUrl()) {
+      <img [src]="imagenUrl() ?? ''" [alt]="etiqueta()" loading="lazy" />
+    } @else {
+      <span class="imagen__placeholder">
+        <app-icon name="upload" [size]="compacto() ? 14 : 20" />
+      </span>
+    }
+  </div>
+
+  @if (!compacto()) {
+    <span class="imagen__label">{{ etiqueta() }}</span>
+  }
+
+  <div class="imagen__actions">
+    <button
+      type="button"
+      class="imagen__btn"
+      [disabled]="deshabilitado() || subiendo()"
+      (click)="fileInput.click()"
+    >
+      <app-icon name="upload" [size]="12" />
+      {{ subiendo() ? 'Subiendo…' : imagenUrl() ? 'Cambiar' : 'Subir' }}
+    </button>
+    @if (imagenUrl()) {
+      <button
+        type="button"
+        class="imagen__btn imagen__btn--danger"
+        [disabled]="deshabilitado() || subiendo()"
+        (click)="quitar()"
+      >
+        <app-icon name="trash" [size]="12" />
+        Quitar
+      </button>
+    }
+  </div>
+
+  <input
+    #fileInput
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+    hidden
+    (change)="onFile($event)"
+  />
+
+  @if (error()) {
+    <span class="imagen__error">{{ error() }}</span>
+  }
+</div>

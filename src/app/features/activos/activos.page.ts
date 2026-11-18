@@ -25,6 +25,7 @@ import { ChipComponent, type ChipVariant } from '../../shared/components/chip/ch
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent, type IconName } from '../../shared/components/icon/icon';
+import { ImageUploadComponent } from '../../shared/components/image-upload/image-upload';
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
@@ -138,6 +139,7 @@ const hoyIso = (): string => new Date().toISOString().slice(0, 10);
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    ImageUploadComponent,
     PaginadorComponent,
     PanelComponent,
   ],
@@ -189,6 +191,7 @@ export class ActivosPage {
   readonly fGarantia = signal<string>('12');
   readonly fObservaciones = signal<string>('');
   readonly fEstado = signal<EstadoActivo>('activo');
+  readonly fImagenUrl = signal<string | null>(null);
 
   readonly mTipo = signal<TipoMantenimiento>('preventivo');
   readonly mFecha = signal<string>(hoyIso());
@@ -418,6 +421,7 @@ export class ActivosPage {
     this.fGarantia.set('12');
     this.fObservaciones.set('');
     this.fEstado.set('activo');
+    this.fImagenUrl.set(null);
   }
 
   abrirEdicion(): void {
@@ -436,6 +440,7 @@ export class ActivosPage {
     this.fGarantia.set(String(activo.garantiaMeses ?? 12));
     this.fObservaciones.set(activo.observaciones ?? '');
     this.fEstado.set(activo.estado);
+    this.fImagenUrl.set(activo.imagenUrl ?? null);
   }
 
   abrirMantenimiento(): void {
@@ -508,6 +513,7 @@ export class ActivosPage {
       proveedor: this.fProveedor().trim() || undefined,
       garantiaMeses: Math.max(0, Number(this.fGarantia()) || 0),
       observaciones: this.fObservaciones().trim() || undefined,
+      imagenUrl: this.fImagenUrl() ?? undefined,
     };
 
     const editando = this.seleccionadoId();

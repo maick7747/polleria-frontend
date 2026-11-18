@@ -12,6 +12,7 @@ import type { CategoriaActivo } from '../../core/models';
 import { formatearMoneda, round2 } from '../../core/utils/format';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { ImageUploadComponent } from '../../shared/components/image-upload/image-upload';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
@@ -77,6 +78,7 @@ const fechaLarga = (fecha: string): string => {
     AppShellComponent,
     DarkPanelComponent,
     IconComponent,
+    ImageUploadComponent,
     PanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -102,6 +104,7 @@ export class ActivosRegistrarPage {
   readonly fechaAdquisicion = signal<string>('2026-10-14');
   readonly garantiaMeses = signal<string>('24');
   readonly observaciones = signal<string>('Ubicada en cocina · uso intensivo en turno tarde');
+  readonly imagenUrl = signal<string | null>(null);
 
   readonly mostrarErrores = signal<boolean>(false);
   readonly toast = signal<string>('');
@@ -225,6 +228,7 @@ export class ActivosRegistrarPage {
       proveedor: this.proveedor().trim() || undefined,
       garantiaMeses: this.garantiaNumero(),
       observaciones: this.observaciones().trim() || undefined,
+      imagenUrl: this.imagenUrl() ?? undefined,
     });
 
     if (!activo) {

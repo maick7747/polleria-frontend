@@ -404,10 +404,20 @@
                     [attr.aria-selected]="insumoSeleccionado()?.id === insumo.id"
                     (click)="elegirInsumo(insumo)"
                   >
-                    <span class="manual__insumo-nombre">{{ insumo.nombre }}</span>
-                    <span class="manual__insumo-meta">
-                      {{ cantidad(insumo.stockActual, insumo.unidadMedida) }} ·
-                      {{ moneda(insumo.costoPromedio) }}
+                    @if (insumo.imagenUrl) {
+                      <img
+                        class="manual__insumo-img"
+                        [src]="insumo.imagenUrl"
+                        [alt]="insumo.nombre"
+                        loading="lazy"
+                      />
+                    }
+                    <span class="manual__insumo-texto">
+                      <span class="manual__insumo-nombre">{{ insumo.nombre }}</span>
+                      <span class="manual__insumo-meta">
+                        {{ cantidad(insumo.stockActual, insumo.unidadMedida) }} ·
+                        {{ moneda(insumo.costoPromedio) }}
+                      </span>
                     </span>
                   </button>
                 } @empty {
@@ -499,15 +509,26 @@
             </section>
 
             <section class="manual__pie">
-              <label class="campo manual__proveedor">
-                <span>Proveedor</span>
-                <select [value]="proveedorManual()" (change)="onProveedorManual($event)">
-                  <option value="">Selecciona proveedor</option>
-                  @for (proveedor of proveedoresApi(); track proveedor.id) {
-                    <option [value]="proveedor.id">{{ proveedor.razon_social }}</option>
-                  }
-                </select>
-              </label>
+              <div class="manual__proveedor-bloque">
+                <label class="campo manual__proveedor">
+                  <span>Proveedor</span>
+                  <select [value]="proveedorManual()" (change)="onProveedorManual($event)">
+                    <option value="">Selecciona proveedor</option>
+                    @for (proveedor of proveedoresApi(); track proveedor.id) {
+                      <option [value]="proveedor.id">{{ proveedor.razon_social }}</option>
+                    }
+                  </select>
+                </label>
+                @if (proveedorManualSeleccionado(); as proveedor) {
+                  <app-image-upload
+                    [imagenUrl]="proveedor.imagen_url ?? null"
+                    (imagenUrlChange)="cambiarLogoProveedor(proveedor.id, $event)"
+                    carpeta="proveedores"
+                    etiqueta="Logo del proveedor"
+                    [compacto]="true"
+                  />
+                }
+              </div>
               <button
                 type="button"
                 class="btn-primary manual__cta"
@@ -609,6 +630,19 @@
               }
             </select>
           </label>
+        }
+
+        @if (proveedorOrdenSeleccionado(); as proveedor) {
+          <div class="orden__logo">
+            <app-image-upload
+              [imagenUrl]="proveedor.imagen_url ?? null"
+              (imagenUrlChange)="cambiarLogoProveedor(proveedor.id, $event)"
+              carpeta="proveedores"
+              etiqueta="Logo del proveedor"
+              [compacto]="true"
+            />
+            <span class="orden__logo-nombre">{{ proveedor.razon_social }}</span>
+          </div>
         }
 
         <div class="orden__rows">

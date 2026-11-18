@@ -16,6 +16,7 @@ import { ChipComponent, type ChipVariant } from '../../shared/components/chip/ch
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { ImageUploadComponent } from '../../shared/components/image-upload/image-upload';
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
@@ -35,6 +36,7 @@ interface FilaInventario {
   porcentaje: number;
   barra: number;
   estado: EstadoInventario;
+  imagenUrl?: string;
 }
 
 const CATEGORIAS: Readonly<Record<Insumo['categoria'], string>> = {
@@ -57,6 +59,7 @@ const LIMITES = [10, 20, 50, 100];
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    ImageUploadComponent,
     PaginadorComponent,
     PanelComponent,
   ],
@@ -84,6 +87,7 @@ export class InventarioPage {
   readonly cargando = this.inventario.cargando;
   readonly error = this.inventario.error;
   readonly consumoError = this.inventario.consumoError;
+  readonly errorImagen = signal<string | null>(null);
 
   readonly filas = computed<FilaInventario[]>(() =>
     this.inventario.insumos().map((insumo) => this.fila(insumo)),
@@ -198,6 +202,22 @@ export class InventarioPage {
     void this.inventario.cargarConsumo(7);
   }
 
+  /** Cambia la imagen del insumo desde la fila (componente compacto). */
+  async cambiarImagen(insumoId: number, url: string | null): Promise<void> {
+    this.errorImagen.set(null);
+    const ok = await this.inventario.actualizarImagen(insumoId, url);
+    if (!ok) {
+      this.errorImagen.set(
+        this.inventario.error() ?? 'No se pudo actualizar la imagen del insumo',
+      );
+    }
+  }
+
+  cerrarErrorImagen(): void {
+    this.errorImagen.set(null);
+    this.error.set(null);
+  }
+
   cantidad(valor: number, unidad: string): string {
     const redondeado = Math.round(valor * 10) / 10;
     const texto = Number.isInteger(redondeado) ? String(redondeado) : redondeado.toFixed(1);
@@ -279,6 +299,7 @@ export class InventarioPage {
       porcentaje: Math.round(ratio * 100),
       barra: Math.min(100, Math.round(ratio * 100)),
       estado,
+      imagenUrl: insumo.imagenUrl,
     };
   }
 }

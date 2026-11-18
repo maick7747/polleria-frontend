@@ -28,6 +28,7 @@ export interface Insumo {
   umbralMermaPct: number;
   costoPromedio: number;
   activo: boolean;
+  imagenUrl?: string;
 }
 
 export interface MovimientoStock {
@@ -58,6 +59,7 @@ export interface Plato {
   categoria: CategoriaPlatillo;
   precioVenta: number;
   activo: boolean;
+  imagenUrl?: string;
   ingredientes: IngredienteFicha[];
   /** Stock suficiente para 1 unidad. `null` = sin ficha activa (no se controla). */
   disponible?: boolean | null;
