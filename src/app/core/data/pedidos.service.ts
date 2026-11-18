@@ -4,6 +4,7 @@ import type {
   CanalPedido,
   EstadoPago,
   EstadoPedido,
+  MetodoPago,
   Pedido,
   PedidoDetalle,
   TipoConsumo,
@@ -18,10 +19,13 @@ import {
 } from '../api/cancelacion.helpers';
 import type {
   ApiList,
+  CobroPedidoResponseDto,
+  ComprobanteDto,
   KdsEstadoLineaDto,
   KdsEstadoResponseDto,
   KdsPedidoDto,
   PageMeta,
+  PagoDto,
   PedidoDto,
   PedidoSelectorDto,
 } from '../api/api.types';
@@ -77,6 +81,70 @@ export interface NuevoPedido {
   totalFinal?: number;
 }
 
+/** Alta de un pedido de mostrador (sin mesa ni cuenta). */
+export interface NuevoPedidoParaLlevar {
+  items: PedidoDetalle[];
+  clienteNombre?: string;
+  observaciones?: string;
+}
+
+/**
+ * Modo demo: `CobroPedidoResponseDto` habla en DTOs porque es la forma del
+ * backend. El servicio solo lo usa para mantener las listas al día, pero el
+ * objeto debe ser coherente para que la pantalla muestre comprobante y vuelto.
+ */
+function pedidoADto(
+  pedido: Pedido,
+  metodo: MetodoPago,
+  comprobanteNumero: string,
+): PedidoDto {
+  return {
+    id: pedido.id,
+    numero: pedido.numero,
+    fecha_pedido: pedido.fechaPedido,
+    canal: pedido.canal,
+    tipo_consumo: pedido.tipoConsumo,
+    mesa_id: pedido.mesaId,
+    cuenta_id: pedido.cuentaId,
+    cliente_id: null,
+    repartidor_id: pedido.repartidorId ?? null,
+    usuario_cajero_id: pedido.usuarioCajeroId,
+    estado: pedido.estado,
+    estado_pago: pedido.estadoPago,
+    metodo_pago: metodo,
+    subtotal: pedido.subtotal,
+    igv: pedido.igv,
+    total: pedido.total,
+    comision_plataforma: pedido.comisionPlataforma,
+    costo_delivery: pedido.costoDelivery,
+    direccion_entrega: pedido.direccionEntrega ?? null,
+    referencia_entrega: pedido.referenciaEntrega ?? null,
+    observaciones: pedido.observaciones ?? null,
+    comprobante_tipo: pedido.comprobanteTipo,
+    comprobante_numero: comprobanteNumero,
+    cliente_nombre: pedido.clienteNombre ?? null,
+    fecha_entrega: pedido.fechaEntrega ?? null,
+    estado_entrega: pedido.estadoEntrega ?? null,
+    detalles: pedido.items.map((item) => ({
+      id: item.id,
+      pedido_id: pedido.id,
+      platillo_id: item.platilloId,
+      cantidad: item.cantidad,
+      precio_unitario: item.precioUnitario,
+      subtotal: item.subtotal,
+      notas: item.notas ?? null,
+      estado_preparacion: item.estadoPreparacion,
+      fecha_inicio_prep: item.fechaInicioPrep ?? null,
+      fecha_listo: item.fechaListo ?? null,
+      platillo_nombre: item.nombre,
+      estacion: item.estacion ?? null,
+      curso: item.curso ?? null,
+      prep_min: item.prepMin ?? null,
+      entregado_en: item.entregadoEn ?? null,
+    })),
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class PedidosService {
   private readonly api = inject(ApiClient);
@@ -95,6 +163,12 @@ export class PedidosService {
           items: pedido.items.map((item) => ({ ...item })),
         })),
   );
+
+  // Mostrador / para llevar: pedidos sin mesa ni cuenta. Lista propia porque
+  // el backend los pagina y filtra por `tipo_consumo`.
+  readonly paraLLevar = signal<Pedido[]>([]);
+  readonly paraLLevarCargando = signal<boolean>(false);
+  readonly paraLLevarError = signal<string | null>(null);
 
   // Si el KDS ya se aplicó (permite hidratarse con el cuerpo de un 304).
   private hidratadoKds = false;
@@ -217,6 +291,202 @@ export class PedidosService {
 
   private guardarEnLista(pedido: Pedido): void {
     this.pedidos.update((lista) =>
+      lista.some((actual) => actual.id === pedido.id)
+        ? lista.map((actual) => (actual.id === pedido.id ? pedido : actual))
+        : [pedido, ...lista],
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Mostrador / para llevar (pedidos sin mesa ni cuenta)
+  // -------------------------------------------------------------------------
+
+  /** `GET /api/pedidos?tipo_consumo=para_llevar&limit=100`. */
+  async cargarParaLlevar(silencioso = false): Promise<boolean> {
+    if (!USE_API) {
+      this.paraLLevar.set(
+        this.pedidos().filter((pedido) => pedido.tipoConsumo === 'para_llevar'),
+      );
+      this.paraLLevarError.set(null);
+      return true;
+    }
+
+    if (!silencioso) {
+      this.paraLLevarCargando.set(true);
+      this.paraLLevarError.set(null);
+    }
+    try {
+      const respuesta = await firstValueFrom(
+        this.api.get<ApiList<PedidoDto>>('/pedidos', {
+          tipo_consumo: 'para_llevar',
+          limit: 100,
+        }),
+      );
+      this.paraLLevar.set(respuesta.data.map(toPedido));
+      return true;
+    } catch (error) {
+      if (!silencioso || this.paraLLevar().length === 0) {
+        this.paraLLevarError.set(mensajeError(error));
+      }
+      return false;
+    } finally {
+      if (!silencioso) {
+        this.paraLLevarCargando.set(false);
+      }
+    }
+  }
+
+  /**
+   * `POST /api/pedidos` con `tipo_consumo='para_llevar'` y `enviar_cocina`.
+   * El backend descuenta stock y deja el pedido en cocina en una sola llamada.
+   */
+  async crearParaLlevar(entrada: NuevoPedidoParaLlevar): Promise<Pedido | null> {
+    const clienteNombre = entrada.clienteNombre?.trim() || undefined;
+    const observaciones = entrada.observaciones?.trim() || undefined;
+
+    if (!USE_API) {
+      const pedido = this.crear({
+        canal: 'local',
+        tipoConsumo: 'para_llevar',
+        mesaId: null,
+        cuentaId: null,
+        rondaId: null,
+        items: entrada.items,
+        clienteNombre,
+        observaciones,
+        estadoPago: 'pendiente',
+      });
+      this.paraLLevar.update((lista) => [pedido, ...lista]);
+      return pedido;
+    }
+
+    this.paraLLevarError.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.post<PedidoDto>('/pedidos', {
+          canal: 'local',
+          tipo_consumo: 'para_llevar',
+          mesa_id: null,
+          cuenta_id: null,
+          cliente_nombre: clienteNombre,
+          observaciones,
+          enviar_cocina: true,
+          items: entrada.items.map((item) => ({
+            platillo_id: item.platilloId,
+            cantidad: item.cantidad,
+            notas: item.notas ?? undefined,
+          })),
+        }),
+      );
+      const pedido = toPedido(dto);
+      this.actualizarParaLlevar(pedido);
+      this.guardarEnLista(pedido);
+      return pedido;
+    } catch (error) {
+      this.paraLLevarError.set(mensajeError(error));
+      return null;
+    }
+  }
+
+  /** `POST /api/pedidos/:id/enviar-cocina` (reintento de un borrador). */
+  async enviarCocinaPedido(id: number): Promise<Pedido | null> {
+    if (!USE_API) {
+      this.cambiarEstado(id, 'en_cocina');
+      const pedido = this.porId(id) ?? null;
+      if (pedido) {
+        this.actualizarParaLlevar(pedido);
+      }
+      return pedido;
+    }
+
+    this.paraLLevarError.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.post<PedidoDto>(`/pedidos/${id}/enviar-cocina`),
+      );
+      const pedido = toPedido(dto);
+      this.actualizarParaLlevar(pedido);
+      this.guardarEnLista(pedido);
+      return pedido;
+    } catch (error) {
+      this.paraLLevarError.set(mensajeError(error));
+      return null;
+    }
+  }
+
+  /**
+   * `POST /api/pedidos/:id/cobrar`: pago de un pedido sin cuenta.
+   * Devuelve el pedido, el pago y el ticket (`T001-…`) con el vuelto.
+   */
+  async cobrarPedido(
+    id: number,
+    metodo: MetodoPago,
+    monto?: number,
+  ): Promise<CobroPedidoResponseDto | null> {
+    if (!USE_API) {
+      const actual =
+        this.paraLLevar().find((pedido) => pedido.id === id) ?? this.porId(id);
+      if (!actual) {
+        this.paraLLevarError.set('No se encontró el pedido para cobrar.');
+        return null;
+      }
+      const recibido =
+        monto !== undefined && Number.isFinite(monto)
+          ? round2(Math.max(0, monto))
+          : actual.total;
+      const fecha = new Date().toISOString();
+      const comprobante: ComprobanteDto = {
+        tipo: 'ticket',
+        numero: `T001-${String(actual.id).padStart(8, '0')}`,
+        total: actual.total,
+        fecha,
+      };
+      const actualizado: Pedido = {
+        ...actual,
+        estado: 'cobrado',
+        estadoPago: 'pagado',
+        metodoPago: metodo,
+      };
+      this.actualizarParaLlevar(actualizado);
+      this.guardarEnLista(actualizado);
+      const pago: PagoDto = {
+        id: actual.id,
+        pedido_id: actual.id,
+        cuenta_id: null,
+        metodo,
+        monto: recibido,
+        es_contraentrega: false,
+        fecha,
+        usuario_id: 0,
+      };
+      return {
+        pedido: pedidoADto(actualizado, metodo, comprobante.numero),
+        pago,
+        comprobante,
+        vuelto: round2(Math.max(0, recibido - actual.total)),
+      };
+    }
+
+    this.paraLLevarError.set(null);
+    try {
+      const respuesta = await firstValueFrom(
+        this.api.post<CobroPedidoResponseDto>(`/pedidos/${id}/cobrar`, {
+          metodo,
+          monto: monto !== undefined ? round2(monto) : undefined,
+        }),
+      );
+      const pedido = toPedido(respuesta.pedido);
+      this.actualizarParaLlevar(pedido);
+      this.guardarEnLista(pedido);
+      return respuesta;
+    } catch (error) {
+      this.paraLLevarError.set(mensajeError(error));
+      return null;
+    }
+  }
+
+  private actualizarParaLlevar(pedido: Pedido): void {
+    this.paraLLevar.update((lista) =>
       lista.some((actual) => actual.id === pedido.id)
         ? lista.map((actual) => (actual.id === pedido.id ? pedido : actual))
         : [pedido, ...lista],

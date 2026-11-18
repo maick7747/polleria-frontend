@@ -26,6 +26,14 @@ export const routes: Routes = [
   },
 
   {
+    path: 'venta-local/para-llevar',
+    title: "Para llevar · Fratelli's",
+    canActivate: [roleGuard],
+    data: { roles: roles('Mozo', 'Cajero', 'Dueño/Admin') },
+    loadComponent: () =>
+      import('./features/venta-local/para-llevar.page').then((m) => m.ParaLlevarPage),
+  },
+  {
     path: 'venta-local/pedido/:mesaId',
     title: "Pedido Local · Fratelli's",
     canActivate: [roleGuard],

@@ -1,0 +1,336 @@
+<app-shell title="Para llevar" subtitle="Mostrador · pedidos sin mesa">
+  <div actions class="header-actions">
+    @if (cajaVerificando()) {
+      <app-chip variant="neutral" [dot]="true">Caja · verificando</app-chip>
+    } @else if (cajaAbierta()) {
+      <app-chip variant="success" [dot]="true">Caja abierta · {{ turno }}</app-chip>
+    } @else {
+      <app-chip variant="warning" [dot]="true">Caja cerrada</app-chip>
+    }
+    <a class="ghost-link" routerLink="/venta-local">
+      <app-icon name="arrow-left" [size]="14" />
+      Volver a mesas
+    </a>
+  </div>
+
+  @if (!cajaAbierta() && !cajaVerificando()) {
+    <div class="banner" role="alert">
+      <app-icon name="warning-circle" [size]="18" />
+      <div class="banner__texto">
+        <strong>
+          {{ cajaError() ? 'No se pudo verificar la caja' : 'La caja está cerrada' }}
+        </strong>
+        <span>
+          {{
+            cajaError() ||
+              'Abre la caja del día para registrar y cobrar pedidos para llevar.'
+          }}
+        </span>
+      </div>
+      @if (cajaError()) {
+        <button type="button" class="banner__btn" (click)="reintentarCaja()">
+          Reintentar
+        </button>
+      } @else {
+        <a class="banner__btn" routerLink="/cuadre-caja/apertura">Abrir caja</a>
+      }
+    </div>
+  }
+
+  @if (error(); as mensaje) {
+    <div class="error-banner" role="alert">
+      <span>{{ mensaje }}</span>
+      <button type="button" (click)="reintentar()">Reintentar</button>
+    </div>
+  }
+
+  <div class="board">
+    <app-panel class="menu">
+      <div class="menu__inner">
+        <app-selector-platos
+          [(items)]="items"
+          [bloqueado]="!cajaAbierta() || enviando()"
+          titulo="Productos para llevar"
+          descripcion="Selecciona los platos; se envían a cocina al crear el pedido."
+        />
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="resumen">
+      @if (seleccionado(); as pedido) {
+        <div class="resumen__inner">
+          <header class="resumen__head">
+            <div>
+              <h2 class="resumen__title">Cobrar pedido</h2>
+              <p class="resumen__sub">{{ pedido.numero }} · {{ horaPedido(pedido) }}</p>
+            </div>
+            <app-chip variant="neutral">Sin mesa</app-chip>
+          </header>
+
+          <span class="resumen__sep"></span>
+
+          <div class="detalle">
+            <div class="detalle__row">
+              <span>Cliente</span>
+              <strong>{{ pedido.clienteNombre || 'Mostrador' }}</strong>
+            </div>
+            <div class="detalle__row">
+              <span>Ítems</span>
+              <strong>{{ totalUnidades(pedido) }} und. · {{ pedido.items.length }} líneas</strong>
+            </div>
+          </div>
+
+          <span class="resumen__sep"></span>
+
+          <div class="resumen__rows">
+            <div>
+              <span>Subtotal</span>
+              <strong>{{ moneda(pedido.subtotal) }}</strong>
+            </div>
+            <div>
+              <span>IGV 18%</span>
+              <strong>{{ moneda(pedido.igv) }}</strong>
+            </div>
+          </div>
+
+          <div class="resumen__total">
+            <span class="resumen__label">Total a cobrar</span>
+            <div class="resumen__amount">
+              <span class="cur">S/</span>
+              <span class="big">{{ pedido.total.toFixed(2) }}</span>
+            </div>
+          </div>
+
+          <span class="resumen__sep"></span>
+
+          <span class="detalle__label">Método de pago</span>
+          <div class="pagos__chips">
+            @for (item of metodos; track item.valor) {
+              <button
+                type="button"
+                class="pago"
+                [class.pago--active]="metodo() === item.valor"
+                [attr.aria-pressed]="metodo() === item.valor"
+                (click)="metodo.set(item.valor)"
+              >
+                {{ item.texto }}
+              </button>
+            }
+          </div>
+
+          <label class="campo">
+            <span class="campo__label">Monto recibido</span>
+            <input
+              class="input input--dark"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              [value]="montoRecibido()"
+              (input)="onMonto($event)"
+            />
+          </label>
+
+          <div class="detalle__row detalle__row--vuelto">
+            <span>Vuelto</span>
+            <strong>{{ moneda(vuelto()) }}</strong>
+          </div>
+
+          <div class="resumen__grow"></div>
+
+          <div class="accion-linea accion-linea--split">
+            <button type="button" class="btn-ghost-dark" (click)="cancelarSeleccion()">
+              Volver
+            </button>
+            @if (puedeCobrar) {
+              <button
+                type="button"
+                class="enviar"
+                [disabled]="!cobroValido()"
+                (click)="confirmarCobro()"
+              >
+                <app-icon name="cash-register" [size]="15" />
+                {{ cobrando() ? 'Cobrando…' : 'Confirmar cobro' }}
+              </button>
+            }
+          </div>
+
+          @if (!puedeCobrar) {
+            <p class="detalle__vacio">Tu rol no tiene permiso para cobrar pedidos.</p>
+          }
+        </div>
+      } @else {
+        <div class="resumen__inner">
+          <header class="resumen__head">
+            <div>
+              <h2 class="resumen__title">Nuevo para llevar</h2>
+              <p class="resumen__sub">Mostrador · pedido sin mesa</p>
+            </div>
+          </header>
+
+          <span class="resumen__sep"></span>
+
+          <label class="campo">
+            <span class="campo__label">Cliente (opcional)</span>
+            <input
+              class="input input--dark"
+              type="text"
+              maxlength="120"
+              placeholder="Nombre para llamar al cliente"
+              [value]="cliente()"
+              (input)="onCliente($event)"
+            />
+          </label>
+
+          <label class="campo">
+            <span class="campo__label">Observaciones</span>
+            <textarea
+              class="input input--dark input--area"
+              maxlength="300"
+              placeholder="Indicaciones para cocina"
+              [value]="observaciones()"
+              (input)="onObservaciones($event)"
+            ></textarea>
+          </label>
+
+          <span class="resumen__sep"></span>
+
+          <div class="resumen__rows">
+            <div>
+              <span>Subtotal</span>
+              <strong>{{ moneda(subtotal()) }}</strong>
+            </div>
+            <div>
+              <span>IGV 18%</span>
+              <strong>{{ moneda(igv()) }}</strong>
+            </div>
+          </div>
+
+          <div class="resumen__total">
+            <span class="resumen__label">Total</span>
+            <div class="resumen__amount">
+              <span class="cur">S/</span>
+              <span class="big">{{ total().toFixed(2) }}</span>
+            </div>
+          </div>
+
+          <div class="resumen__grow"></div>
+
+          <button
+            type="button"
+            class="enviar enviar--bloque"
+            [disabled]="!puedeEnviar()"
+            (click)="enviar()"
+          >
+            <app-icon name="flame" [size]="15" />
+            {{ enviando() ? 'Enviando…' : 'Enviar a cocina' }}
+          </button>
+          <p class="detalle__vacio">
+            El pedido se cobra en mostrador con su ticket; el stock se descuenta al
+            enviarlo a cocina.
+          </p>
+
+          @if (ultimoComprobante(); as comprobante) {
+            <div class="comprobante">
+              <span class="comprobante__label">Último cobro</span>
+              <strong>{{ comprobante.numero }}</strong>
+              <span>{{ moneda(comprobante.total) }} · {{ hora(comprobante.fecha) }}</span>
+            </div>
+          }
+        </div>
+      }
+    </app-dark-panel>
+  </div>
+
+  <app-panel class="cola">
+    <div class="cola__inner">
+      <header class="panel-head">
+        <div class="panel-title">
+          <span class="bar"></span>
+          <h2>Mostrador</h2>
+        </div>
+        <span class="panel-meta">
+          {{ cola().length }} {{ cola().length === 1 ? 'pedido' : 'pedidos' }} en curso ·
+          {{ moneda(totalEnCurso()) }}
+        </span>
+      </header>
+
+      @if (cargandoCola() && cola().length === 0) {
+        <p class="cola__estado" role="status">Cargando pedidos para llevar…</p>
+      } @else if (cola().length === 0) {
+        <app-empty-state
+          icon="package"
+          title="Sin pedidos para llevar"
+          description="Arma un pedido con el menú y envíalo a cocina; aparecerá aquí hasta que se cobre."
+        />
+      } @else {
+        <div class="lista">
+          <div class="fila fila--head">
+            <span>PEDIDO</span>
+            <span>CLIENTE</span>
+            <span>HORA</span>
+            <span>ESTADO</span>
+            <span>ÍTEMS</span>
+            <span class="right">TOTAL</span>
+            <span class="right">ACCIONES</span>
+          </div>
+
+          @for (pedido of cola(); track pedido.id) {
+            <div class="fila">
+              <span class="fila__numero">{{ pedido.numero }}</span>
+              <span class="fila__cliente">{{ pedido.clienteNombre || 'Mostrador' }}</span>
+              <span class="fila__hora">
+                <strong>{{ horaPedido(pedido) }}</strong>
+                <small>{{ espera(pedido) }}</small>
+              </span>
+              <span class="fila__estado">
+                <app-chip [variant]="estadoTono(pedido.estado)">
+                  {{ estadoTexto(pedido.estado) }}
+                </app-chip>
+              </span>
+              <span class="fila__meta">{{ totalUnidades(pedido) }} und.</span>
+              <span class="fila__total">{{ moneda(pedido.total) }}</span>
+              <span class="fila__acciones">
+                @if (pedido.estado === 'borrador') {
+                  <button
+                    type="button"
+                    class="mini-btn"
+                    (click)="reintentarEnvio(pedido)"
+                  >
+                    <app-icon name="flame" [size]="13" />
+                    Enviar a cocina
+                  </button>
+                }
+                @if (puedeCobrar) {
+                  <button
+                    type="button"
+                    class="mini-btn mini-btn--brand"
+                    (click)="cobrar(pedido)"
+                  >
+                    <app-icon name="cash-register" [size]="13" />
+                    Cobrar
+                  </button>
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </app-panel>
+
+  <div class="pie">
+    <span class="pie__note">
+      <app-icon name="warning-circle" [size]="12" />
+      Cobra en mostrador: el pedido sale de la cola al generar su ticket.
+    </span>
+    <span class="pie__note">Para llevar · sin mesa ni cuenta</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>

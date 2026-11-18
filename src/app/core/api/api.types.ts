@@ -260,6 +260,18 @@ export interface CobroResponseDto {
   vuelto: number;
 }
 
+/**
+ * Cobro de un pedido sin cuenta (para llevar / mostrador).
+ * `POST /api/pedidos/:id/cobrar` inserta el pago con `pedido_id`, marca el
+ * pedido como `cobrado/pagado` y devuelve el ticket generado.
+ */
+export interface CobroPedidoResponseDto {
+  pedido: PedidoDto;
+  pago: PagoDto;
+  comprobante: ComprobanteDto;
+  vuelto: number;
+}
+
 export interface KdsPedidoDto {
   id: number;
   numero: string;
