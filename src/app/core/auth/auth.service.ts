@@ -80,7 +80,7 @@ export class AuthService {
       return '/venta-local';
     }
     if (roles.includes('Repartidor')) {
-      return '/delivery-propio';
+      return '/pedidos';
     }
     return '/login';
   });

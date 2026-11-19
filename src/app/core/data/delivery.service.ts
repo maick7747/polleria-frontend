@@ -16,6 +16,7 @@ import type {
   EntregaResponseDto,
   LiquidacionDeliveryDto,
   PageMeta,
+  PendientesLiquidarMetaDto,
 } from '../api/api.types';
 import {
   toDeliveryExterno,
@@ -84,6 +85,26 @@ export interface LiquidacionesQuery {
   plataforma?: string;
   desde?: string;
   hasta?: string;
+}
+
+export interface PendientesLiquidarQuery {
+  plataforma?: PlataformaExterna;
+  desde?: string;
+  hasta?: string;
+}
+
+export interface PendientesLiquidarMeta extends PageMeta {
+  bruto: number;
+  comision: number;
+  neto: number;
+}
+
+export interface LiquidarPedidosEntrada {
+  plataforma: PlataformaExterna;
+  fecha: string;
+  pedidoIds: number[];
+  montoDepositado: number;
+  referencia?: string;
 }
 
 const META_INICIAL: PageMeta = { page: 1, limit: 20, total: 0, pages: 0 };
@@ -161,9 +182,9 @@ const externoDesdePedido = (pedido: Pedido): DeliveryExternoVista => {
 };
 
 const LIQUIDACIONES_DEMO: readonly LiquidacionVista[] = [
-  { id: 1, plataforma: 'rappi', fecha: '2026-10-14', montoBruto: 186.4, comision: 46.6, montoNeto: 139.8, pedidos: 4, referencia: 'Depósito 24 h', origen: 'demo' },
-  { id: 2, plataforma: 'llamafood', fecha: '2026-10-14', montoBruto: 92.5, comision: 18.5, montoNeto: 74, pedidos: 2, referencia: 'Depósito 24 h', origen: 'demo' },
-  { id: 3, plataforma: 'rappi', fecha: '2026-10-13', montoBruto: 152.8, comision: 38.2, montoNeto: 114.6, pedidos: 3, referencia: 'Depósito 24 h', origen: 'demo' },
+  { id: 1, plataforma: 'rappi', fecha: '2026-10-14', montoBruto: 186.4, comision: 46.6, montoNeto: 139.8, montoDepositado: 139.8, diferencia: 0, estado: 'conciliada', pedidos: 4, referencia: 'Depósito 24 h', origen: 'demo' },
+  { id: 2, plataforma: 'llamafood', fecha: '2026-10-14', montoBruto: 92.5, comision: 18.5, montoNeto: 74, montoDepositado: 74, diferencia: 0, estado: 'conciliada', pedidos: 2, referencia: 'Depósito 24 h', origen: 'demo' },
+  { id: 3, plataforma: 'rappi', fecha: '2026-10-13', montoBruto: 152.8, comision: 38.2, montoNeto: 114.6, montoDepositado: 114.6, diferencia: 0, estado: 'conciliada', pedidos: 3, referencia: 'Depósito 24 h', origen: 'demo' },
 ];
 
 @Injectable({ providedIn: 'root' })
@@ -203,6 +224,20 @@ export class DeliveryService {
   readonly liquidacionesMeta = signal<PageMeta>({ ...META_INICIAL });
   readonly liquidacionesCargando = signal<boolean>(false);
   readonly liquidacionesError = signal<string | null>(null);
+
+  // Pedidos externos entregados/servidos que todavía no entran en una
+  // liquidación. La liquidación es el "cobro" de las apps: se concilia contra
+  // el depósito que hace la plataforma.
+  private readonly demoLiquidados = new Set<number>();
+  readonly pendientesLiquidar = signal<DeliveryExternoVista[]>([]);
+  readonly pendientesLiquidarMeta = signal<PendientesLiquidarMeta>({
+    ...META_INICIAL,
+    bruto: 0,
+    comision: 0,
+    neto: 0,
+  });
+  readonly pendientesLiquidarCargando = signal<boolean>(false);
+  readonly pendientesLiquidarError = signal<string | null>(null);
 
   readonly repartidores = computed(() =>
     MOCK_USUARIOS.filter((usuario) => usuario.roles.includes('Repartidor')),
@@ -434,6 +469,163 @@ export class DeliveryService {
       if (!silencioso) {
         this.liquidacionesCargando.set(false);
       }
+    }
+  }
+
+  async cargarPendientesLiquidar(
+    opciones: PendientesLiquidarQuery = {},
+    silencioso = false,
+  ): Promise<boolean> {
+    const plataforma = opciones.plataforma;
+
+    if (!USE_API) {
+      const filtrados = this.demoExternos
+        .filter((pedido) => !plataforma || pedido.plataforma === plataforma)
+        .filter((pedido) => pedido.estado !== 'cancelado')
+        .filter((pedido) => !this.demoLiquidados.has(pedido.id))
+        .filter(
+          (pedido) =>
+            (!opciones.desde || pedido.fecha.slice(0, 10) >= opciones.desde) &&
+            (!opciones.hasta || pedido.fecha.slice(0, 10) <= opciones.hasta),
+        );
+      const bruto = round2(filtrados.reduce((suma, pedido) => suma + pedido.montoBruto, 0));
+      const comision = round2(
+        filtrados.reduce((suma, pedido) => suma + pedido.comision, 0),
+      );
+      this.pendientesLiquidar.set(filtrados.map((pedido) => ({ ...pedido })));
+      this.pendientesLiquidarMeta.set({
+        ...META_INICIAL,
+        total: filtrados.length,
+        bruto,
+        comision,
+        neto: round2(bruto - comision),
+      });
+      this.pendientesLiquidarError.set(null);
+      return true;
+    }
+
+    if (!silencioso) {
+      this.pendientesLiquidarCargando.set(true);
+      this.pendientesLiquidarError.set(null);
+    }
+    try {
+      const lista = await firstValueFrom(
+        this.api.get<ApiList<DeliveryExternoPedidoDto> & { meta: PendientesLiquidarMetaDto }>(
+          '/delivery-externo/pendientes-liquidar',
+          {
+            plataforma,
+            desde: opciones.desde || undefined,
+            hasta: opciones.hasta || undefined,
+          },
+        ),
+      );
+      this.pendientesLiquidar.set(lista.data.map(toDeliveryExterno));
+      this.pendientesLiquidarMeta.set({
+        page: 1,
+        limit: lista.data.length,
+        total: Number(lista.meta?.total ?? lista.data.length),
+        pages: 1,
+        bruto: Number(lista.meta?.bruto ?? 0),
+        comision: Number(lista.meta?.comision ?? 0),
+        neto: Number(lista.meta?.neto ?? 0),
+      });
+      this.pendientesLiquidarError.set(null);
+      return true;
+    } catch (error) {
+      if (!silencioso || this.pendientesLiquidar().length === 0) {
+        this.pendientesLiquidarError.set(mensajeError(error));
+      }
+      return false;
+    } finally {
+      if (!silencioso) {
+        this.pendientesLiquidarCargando.set(false);
+      }
+    }
+  }
+
+  /**
+   * Registra una liquidación por pedidos y la concilia contra el depósito.
+   * El bruto y la comisión los calcula el backend desde los pedidos.
+   */
+  async liquidarPedidos(
+    entrada: LiquidarPedidosEntrada,
+  ): Promise<LiquidacionVista | null> {
+    if (!USE_API) {
+      const pedidos = this.demoExternos.filter((pedido) =>
+        entrada.pedidoIds.includes(pedido.id),
+      );
+      const bruto = round2(pedidos.reduce((suma, pedido) => suma + pedido.montoBruto, 0));
+      const comision = round2(
+        pedidos.reduce((suma, pedido) => suma + pedido.comision, 0),
+      );
+      const neto = round2(bruto - comision);
+      const nueva: LiquidacionVista = {
+        id: ++this.secuencia,
+        plataforma: entrada.plataforma,
+        fecha: entrada.fecha,
+        montoBruto: bruto,
+        comision,
+        montoNeto: neto,
+        montoDepositado: round2(entrada.montoDepositado),
+        diferencia: round2(entrada.montoDepositado - neto),
+        estado: 'conciliada',
+        pedidos: pedidos.length,
+        referencia: entrada.referencia || 'Registro manual',
+        origen: 'demo',
+      };
+      for (const pedido of pedidos) {
+        this.demoLiquidados.add(pedido.id);
+      }
+      this.pendientesLiquidar.update((lista) =>
+        lista.filter((pedido) => !entrada.pedidoIds.includes(pedido.id)),
+      );
+      this.demoLiquidaciones.unshift(nueva);
+      this.liquidaciones.update((lista) => [nueva, ...lista]);
+      this.liquidacionesMeta.update((meta) => ({ ...meta, total: meta.total + 1 }));
+      return nueva;
+    }
+
+    this.liquidacionesError.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.post<LiquidacionDeliveryDto>('/delivery-externo/liquidaciones', {
+          plataforma: entrada.plataforma,
+          fecha: entrada.fecha,
+          pedido_ids: entrada.pedidoIds,
+          monto_depositado: round2(entrada.montoDepositado),
+          referencia: entrada.referencia?.trim() || undefined,
+        }),
+      );
+      const vista = toLiquidacion(dto);
+      this.liquidaciones.update((lista) => [vista, ...lista]);
+      this.liquidacionesMeta.update((meta) => ({ ...meta, total: meta.total + 1 }));
+      return vista;
+    } catch (error) {
+      this.liquidacionesError.set(mensajeError(error));
+      return null;
+    }
+  }
+
+  /** Marca el pedido externo como entregado/recogido por el rider. */
+  async marcarEntregadoExterno(pedidoId: number): Promise<boolean> {
+    if (!USE_API) {
+      this.actualizarExternoLocal(pedidoId, { estado: 'servido' });
+      return true;
+    }
+
+    this.externosError.set(null);
+    try {
+      const dto = await firstValueFrom(
+        this.api.patch<DeliveryExternoPedidoDto>(
+          `/delivery-externo/pedidos/${pedidoId}/entrega`,
+          {},
+        ),
+      );
+      this.reemplazarExterno(toDeliveryExterno(dto));
+      return true;
+    } catch (error) {
+      this.externosError.set(mensajeError(error));
+      return false;
     }
   }
 
@@ -733,6 +925,9 @@ export class DeliveryService {
         montoBruto: round2(montoBruto),
         comision,
         montoNeto: round2(montoBruto - comision),
+        montoDepositado: round2(montoBruto - comision),
+        diferencia: 0,
+        estado: 'registrada',
         pedidos: 0,
         referencia: 'Registro manual',
         origen: 'demo',

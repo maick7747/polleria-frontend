@@ -27,6 +27,7 @@ import {
 import { ChipComponent } from '../../shared/components/chip/chip';
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { ModoVentaComponent } from '../../shared/components/modo-venta/modo-venta';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
@@ -60,6 +61,7 @@ const TAMANO_FILA = 5;
     ChipComponent,
     DarkPanelComponent,
     IconComponent,
+    ModoVentaComponent,
     PanelComponent,
     SectionHeaderComponent,
   ],

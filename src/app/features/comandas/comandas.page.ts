@@ -1,3 +1,4 @@
+// LEGACY (19/11/2026): /comandas redirige a /pedidos (bandeja única).
 import {
   ChangeDetectionStrategy,
   Component,

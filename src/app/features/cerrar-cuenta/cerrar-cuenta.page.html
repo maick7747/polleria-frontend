@@ -1,4 +1,4 @@
-﻿<app-shell title="Caja · cobros pendientes" subtitle="Todo lo que falta cobrar · mesa, mostrador y delivery">
+﻿<app-shell [title]="tituloCaja()" [subtitle]="subtituloCaja()">
   <div actions class="header-actions">
     @if (cajaAbierta()) {
       <span class="caja">
@@ -22,6 +22,27 @@
     </a>
   </div>
 
+  <nav class="caja-tabs" aria-label="Secciones de caja">
+    <button
+      type="button"
+      class="caja-tab"
+      [class.is-active]="tab() === 'cobros'"
+      (click)="cambiarTab('cobros')"
+    >
+      Cobros pendientes
+      <span class="caja-tab__n">{{ totalCuentas() }}</span>
+    </button>
+    <button
+      type="button"
+      class="caja-tab"
+      [class.is-active]="tab() === 'apps'"
+      (click)="cambiarTab('apps')"
+    >
+      Liquidaciones de apps
+    </button>
+  </nav>
+
+  @if (tab() === 'cobros') {
   <app-section-header
     title="Cobros pendientes"
     [meta]="totalCuentas() + ' cobros · ' + dineroAbierto() + ' por cobrar'"
@@ -449,6 +470,9 @@
     </span>
     <span class="pie__note">El cobro se registra una sola vez, con un solo comprobante.</span>
   </div>
+  } @else {
+    <app-liquidaciones-apps />
+  }
 
   @if (toast()) {
     <div class="toast" role="status">

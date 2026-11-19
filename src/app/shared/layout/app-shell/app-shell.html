@@ -8,8 +8,7 @@
         <a
           class="rail-item"
           [routerLink]="item.route"
-          [routerLinkActive]="'is-active'"
-          [routerLinkActiveOptions]="{ exact: item.exact }"
+          [class.is-active]="esActivo(item)"
           [title]="item.label"
           [attr.aria-label]="item.label"
           (click)="marcarLeidos(item)"

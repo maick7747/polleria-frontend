@@ -1,0 +1,468 @@
+<app-shell title="Pedidos" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    <button
+      type="button"
+      class="ghost-btn"
+      [disabled]="cargandoInicial()"
+      (click)="actualizar()"
+    >
+      <app-icon name="arrow-clockwise" [size]="14" />
+      Actualizar
+    </button>
+    <a class="ghost-btn" routerLink="/historial-pedidos">
+      <app-icon name="clock" [size]="14" />
+      Historial
+    </a>
+  </div>
+
+  @if (error()) {
+  <div class="aviso-error" role="alert">
+    <app-icon name="warning-circle" [size]="16" />
+    <span>{{ error() }}</span>
+    <button type="button" (click)="reintentar()">Reintentar</button>
+  </div>
+  }
+
+  <div class="board">
+    <app-panel class="inbox">
+      <div class="inbox__inner">
+        <div class="inbox__toolbar">
+          <div
+            class="chips"
+            role="group"
+            aria-label="Filtrar pedidos por canal"
+          >
+            @for (opcion of canales; track opcion.id) {
+            <button
+              type="button"
+              class="chipf"
+              [class.is-active]="filtroCanal() === opcion.id"
+              [attr.aria-pressed]="filtroCanal() === opcion.id"
+              (click)="cambiarCanal(opcion.id)"
+            >
+              {{ opcion.label }}
+              <span class="chipf__count">{{ conteo(opcion.id) }}</span>
+            </button>
+            }
+          </div>
+
+          <div class="tools">
+            <select
+              class="select"
+              [value]="filtroEstado()"
+              aria-label="Filtrar pedidos por estado"
+              (change)="onEstado($event)"
+            >
+              @for (opcion of estados; track opcion.id) {
+              <option [value]="opcion.id">{{ opcion.label }}</option>
+              }
+            </select>
+
+            <label class="search">
+              <app-icon name="magnifying-glass" [size]="14" />
+              <input
+                type="search"
+                placeholder="Buscar pedido, cliente o mesa…"
+                aria-label="Buscar pedido, cliente o mesa"
+                [value]="busqueda()"
+                (input)="onBuscar($event)"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div class="tabla">
+          <div class="tabla__head" aria-hidden="true">
+            <span>Pedido</span>
+            <span>Canal</span>
+            <span>Destino</span>
+            <span class="center">Ítems</span>
+            <span>Tiempo</span>
+            <span>Estado</span>
+            <span class="right">Total</span>
+            <span class="right">Acción</span>
+          </div>
+
+          <div class="tabla__body">
+            @if (cargandoInicial()) {
+            <div class="tabla__vacio" role="status">Cargando pedidos…</div>
+            } @else { @for (fila of visibles(); track fila.id) {
+            <div
+              class="fila"
+              role="button"
+              tabindex="0"
+              [class.is-sel]="seleccionadoId() === fila.id"
+              [attr.aria-pressed]="seleccionadoId() === fila.id"
+              (click)="seleccionar(fila.id)"
+              (keydown.enter)="seleccionar(fila.id)"
+              (keydown.space)="seleccionar(fila.id); $event.preventDefault()"
+            >
+              <span class="fila__num">{{ fila.numero }}</span>
+
+              <span [class]="'canal canal--' + fila.canal">
+                <span class="canal__dot"></span>
+                {{ fila.canalLabel }}
+              </span>
+
+              <span class="fila__dest">
+                <b>{{ fila.destinoTitulo }}</b>
+                <span>{{ fila.destinoMeta }}</span>
+              </span>
+
+              <span class="fila__items">{{ fila.items }}</span>
+
+              <span class="fila__tiempo" [class.is-hot]="fila.minutos >= 30">
+                {{ fila.minutos }} min
+              </span>
+
+              <span class="fila__estado">
+                <app-chip [variant]="fila.tono"
+                  >{{ fila.estadoLabel }}</app-chip
+                >
+              </span>
+
+              <span class="fila__total">{{ moneda(fila.total) }}</span>
+
+              <span class="fila__accion">
+                <button
+                  type="button"
+                  [class]="'mini mini--' + fila.accionTono"
+                  [disabled]="!puedeAccion(fila) || accionando() !== null"
+                  [title]="etiquetaAccion(fila)"
+                  [attr.aria-label]="fila.accionLabel + ' ' + fila.numero"
+                  (click)="ejecutarAccion(fila, $event)"
+                >
+                  {{ fila.accionLabel }}
+                </button>
+              </span>
+            </div>
+            } @empty {
+            <div class="tabla__vacio">
+              <app-empty-state
+                icon="clipboard-text"
+                title="Sin pedidos"
+                [description]="mensajeVacio()"
+              >
+                <button
+                  type="button"
+                  class="ghost-btn"
+                  (click)="limpiarFiltros()"
+                >
+                  Limpiar filtros
+                </button>
+              </app-empty-state>
+            </div>
+            } }
+          </div>
+
+          <div class="tabla__foot">
+            <span>
+              Mostrando <b>{{ visibles().length }}</b> de {{ totalVivas() }}
+              órdenes vivas
+            </span>
+            <span>
+              {{ actualizado() === '—' ? 'Sin actualizar' : 'Actualizado ' +
+              actualizado() }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="detalle">
+      @if (seleccionada(); as sel) {
+      <div class="detalle__inner">
+        <header class="detalle__head">
+          <div class="detalle__titles">
+            <span class="detalle__kicker">{{ sel.canalLabel }}</span>
+            <h2>{{ sel.numero }}</h2>
+            <p>{{ sel.destinoTitulo }} · {{ sel.destinoMeta }}</p>
+          </div>
+          <button
+            type="button"
+            class="detalle__close"
+            aria-label="Cerrar detalle"
+            (click)="cerrarDetalle()"
+          >
+            <app-icon name="x" [size]="14" />
+          </button>
+        </header>
+
+        <div class="detalle__chips">
+          <app-chip [variant]="sel.tono">{{ sel.estadoLabel }}</app-chip>
+          <span [class]="'canal canal--' + sel.canal">
+            <span class="canal__dot"></span>
+            {{ sel.canalLabel }}
+          </span>
+        </div>
+
+        <div class="detalle__body">
+          <span class="detalle__eyebrow">Ítems del pedido</span>
+
+          <div class="items">
+            @for (item of sel.pedido.items; track item.id) {
+            <div class="item">
+              <span class="item__nombre">
+                {{ item.nombre }}
+                <em>×{{ item.cantidad }}</em>
+              </span>
+              <b>{{ moneda(item.subtotal) }}</b>
+            </div>
+            } @empty {
+            <span class="items__vacio">Sin ítems registrados</span>
+            }
+            <div class="item item--igv">
+              <span>IGV 18%</span>
+              <b>{{ moneda(sel.pedido.igv) }}</b>
+            </div>
+          </div>
+
+          @if (sel.grupo === 'apps') {
+          <div class="fee">
+            <div class="fee__row">
+              <span>Total del pedido</span>
+              <b>{{ moneda(sel.total) }}</b>
+            </div>
+            <div class="fee__row">
+              <span>Comisión {{ sel.canalLabel }} {{ sel.comisionPct }}%</span>
+              <b>− {{ moneda(sel.comision) }}</b>
+            </div>
+            <div class="fee__row fee__row--net">
+              <span>Neto a depositar</span>
+              <b>{{ moneda(sel.neto) }}</b>
+            </div>
+          </div>
+          <p class="detalle__note">
+            Aceptar envía a cocina y descuenta stock. La comisión ya está
+            calculada; no se digita.
+          </p>
+          } @else if (sel.grupo === 'delivery') {
+          <div class="fee">
+            <div class="fee__row">
+              <span>Delivery</span>
+              <b>{{ moneda(sel.pedido.costoDelivery) }}</b>
+            </div>
+            <div class="fee__row fee__row--net">
+              <span>Total a cobrar</span>
+              <b>{{ moneda(sel.total) }}</b>
+            </div>
+          </div>
+          <p class="detalle__note">
+            {{ sel.pedido.repartidorId ? 'Repartidor asignado. La entrega se
+            confirma desde esta bandeja.' : 'Asigna un repartidor para despachar
+            el pedido.' }}
+          </p>
+          } @else {
+          <div class="fee">
+            <div class="fee__row">
+              <span>Subtotal</span>
+              <b>{{ moneda(sel.pedido.subtotal) }}</b>
+            </div>
+            <div class="fee__row fee__row--net">
+              <span>Total de la ronda</span>
+              <b>{{ moneda(sel.total) }}</b>
+            </div>
+          </div>
+          <p class="detalle__note">
+            Mesa y mostrador se cobran en Caja, con un comprobante único por
+            cuenta.
+          </p>
+          } @if (sel.grupo === 'delivery' && sel.estado !== 'entregado') {
+          <div class="asignar">
+            <label class="asignar__label" for="repartidor-detalle"
+              >Repartidor</label
+            >
+            <div class="asignar__row">
+              <select
+                id="repartidor-detalle"
+                class="select select--dark"
+                [value]="repartidor()"
+                [disabled]="!puedeDelivery || accionando() !== null"
+                (change)="onRepartidor($event)"
+              >
+                <option value="">Selecciona repartidor</option>
+                @for (repartidor of repartidoresDisponibles(); track
+                repartidor.id) {
+                <option [value]="repartidor.id">{{ repartidor.nombre }}</option>
+                }
+              </select>
+              <button
+                type="button"
+                class="mini mini--dark"
+                [disabled]="!puedeDelivery || accionando() !== null"
+                (click)="asignarRepartidor()"
+              >
+                Asignar
+              </button>
+            </div>
+            @if (sel.pedido.repartidorId != null) {
+            <span class="asignar__meta">
+              Asignado: {{ nombreRepartidor(sel.pedido.repartidorId) }}
+            </span>
+            }
+          </div>
+          }
+
+          <span class="detalle__eyebrow">Seguimiento</span>
+          <div class="tl">
+            @for (etapa of etapas(); track etapa.label) {
+            <div
+              class="tl__item"
+              [class.is-done]="etapa.done"
+              [class.is-active]="etapa.active"
+            >
+              <span class="tl__dot"></span>
+              <div class="tl__texto">
+                <b>{{ etapa.label }}</b>
+                <span>{{ etapa.detalle }}</span>
+              </div>
+            </div>
+            }
+          </div>
+        </div>
+
+        <div class="detalle__actions">
+          @if (sel.grupo === 'apps' && sel.estado === 'borrador') {
+          <button
+            type="button"
+            class="dark-btn dark-btn--brand"
+            [disabled]="!puedeApps || accionando() !== null"
+            (click)="aceptarSeleccionado()"
+          >
+            <app-icon name="check" [size]="15" />
+            Aceptar pedido
+          </button>
+          } @else if (sel.grupo === 'apps') {
+          <button
+            type="button"
+            class="dark-btn dark-btn--brand"
+            [disabled]="!puedeApps && !puedeCaja"
+            (click)="liquidar()"
+          >
+            <app-icon name="cash-register" [size]="15" />
+            Liquidar en Caja
+          </button>
+          } @else if (sel.grupo === 'delivery') { @if (sel.estado !==
+          'entregado') {
+          <button
+            type="button"
+            class="dark-btn dark-btn--brand"
+            [disabled]="!puedeDelivery || accionando() !== null || sel.pedido.repartidorId == null"
+            (click)="entregarSeleccionado()"
+          >
+            <app-icon name="check" [size]="15" />
+            Marcar entregado
+          </button>
+          } } @else {
+          <button
+            type="button"
+            class="dark-btn dark-btn--brand"
+            [disabled]="!puedeCaja"
+            (click)="cobrarSeleccionado()"
+          >
+            <app-icon name="cash-register" [size]="15" />
+            Cobrar en Caja
+          </button>
+          } @if (puedeCancelar(sel)) {
+          <a
+            class="dark-btn dark-btn--ghost"
+            [routerLink]="['/cancelacion-delivery', sel.id]"
+          >
+            <app-icon name="x" [size]="14" />
+            Cancelar pedido
+          </a>
+          }
+
+          <span class="detalle__foot-note">{{ notaAccion(sel) }}</span>
+        </div>
+      </div>
+      } @else {
+      <div class="resumen">
+        <header class="detalle__head">
+          <div class="detalle__titles">
+            <span class="detalle__kicker">BANDEJA ÚNICA</span>
+            <h2>Resumen del turno</h2>
+            <p>{{ turnoCapitalizado() }} · {{ totalVivas() }} órdenes vivas</p>
+          </div>
+        </header>
+
+        <div class="resumen__cifra">
+          <strong>{{ resumen().total }}</strong>
+          <span
+            >{{ resumen().total === 1 ? 'orden viva' : 'órdenes vivas' }}</span
+          >
+        </div>
+
+        <div class="resumen__rows">
+          <div class="resumen__row">
+            <span [class]="'canal canal--mesa'">
+              <span class="canal__dot"></span>Mesas
+            </span>
+            <b>{{ resumen().mesas }}</b>
+          </div>
+          <div class="resumen__row">
+            <span [class]="'canal canal--mostrador'">
+              <span class="canal__dot"></span>Mostrador
+            </span>
+            <b>{{ resumen().mostrador }}</b>
+          </div>
+          <div class="resumen__row">
+            <span [class]="'canal canal--delivery'">
+              <span class="canal__dot"></span>Delivery
+            </span>
+            <b>{{ resumen().delivery }}</b>
+          </div>
+          <div class="resumen__row">
+            <span [class]="'canal canal--rappi'">
+              <span class="canal__dot"></span>Apps
+            </span>
+            <b>{{ resumen().apps }}</b>
+          </div>
+        </div>
+
+        <span class="resumen__sep"></span>
+
+        <div class="resumen__kpis">
+          <div class="resumen__kpi">
+            <span>Por aceptar</span>
+            <b [class.is-hot]="resumen().porAceptar > 0"
+              >{{ resumen().porAceptar }}</b
+            >
+          </div>
+          <div class="resumen__kpi">
+            <span>Mayor espera</span>
+            <b>{{ resumen().mayorEspera }} min</b>
+          </div>
+        </div>
+
+        <div class="resumen__total">
+          <span>Total en curso</span>
+          <strong>{{ moneda(resumen().totalMonto) }}</strong>
+        </div>
+
+        <p class="resumen__hint">
+          Selecciona un pedido de la tabla para ver sus ítems, la comisión de
+          apps y el seguimiento por etapas.
+        </p>
+      </div>
+      }
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span>
+      Mesa, mostrador, delivery propio y apps en un solo listado: cada fila trae
+      la acción de su canal.
+    </span>
+    <span class="pie__meta">
+      {{ totalVivas() }} vivas · {{ resumen().porAceptar }} por aceptar
+    </span>
+  </div>
+
+  @if (toast()) {
+  <div class="toast" [class.toast--error]="toastError()" role="status">
+    <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+    {{ toast() }}
+  </div>
+  }
+</app-shell>

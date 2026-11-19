@@ -1,3 +1,5 @@
+// LEGACY (19/11/2026): /delivery-propio redirige a /pedidos; el alta vive en
+// /venta?modo=delivery. Se conserva como referencia.
 import { crearGuardiaUrl } from '../../core/utils/url-sync';
 import {
   ChangeDetectionStrategy,
@@ -24,6 +26,7 @@ import { ChipComponent, type ChipVariant } from '../../shared/components/chip/ch
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { ModoVentaComponent } from '../../shared/components/modo-venta/modo-venta';
 import { PaginadorComponent } from '../../shared/components/paginador/paginador';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { SelectorPlatosComponent } from '../../shared/components/selector-platos/selector-platos';
@@ -79,6 +82,7 @@ const HASTA_INICIAL = USE_API ? HOY : '';
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    ModoVentaComponent,
     PaginadorComponent,
     PanelComponent,
     SelectorPlatosComponent,

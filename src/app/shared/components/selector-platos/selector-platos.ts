@@ -30,6 +30,9 @@ export class SelectorPlatosComponent {
   readonly titulo = input<string>('Platos del pedido');
   readonly descripcion = input<string>('');
   readonly bloqueado = input<boolean>(false);
+  // En el compositor de venta el carrito visible es el panel oscuro; aquí solo
+  // se muestra el menú para no duplicar la lista de líneas.
+  readonly mostrarCarrito = input<boolean>(true);
 
   readonly moneda = formatearMoneda;
 

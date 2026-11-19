@@ -1,3 +1,5 @@
+// LEGACY (19/11/2026): /venta-local/para-llevar redirige a /venta?modo=mostrador.
+// Se conserva como referencia; la pantalla activa es `features/venta`.
 import {
   ChangeDetectionStrategy,
   Component,
@@ -22,6 +24,7 @@ import { ChipComponent, type ChipVariant } from '../../shared/components/chip/ch
 import { DarkPanelComponent } from '../../shared/components/dark-panel/dark-panel';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state';
 import { IconComponent } from '../../shared/components/icon/icon';
+import { ModoVentaComponent } from '../../shared/components/modo-venta/modo-venta';
 import { PanelComponent } from '../../shared/components/panel/panel';
 import { SelectorPlatosComponent } from '../../shared/components/selector-platos/selector-platos';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
@@ -48,6 +51,7 @@ const ESTADOS: readonly { valor: EstadoPedido; texto: string; tono: ChipVariant 
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    ModoVentaComponent,
     PanelComponent,
     SelectorPlatosComponent,
   ],

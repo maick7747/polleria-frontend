@@ -1033,9 +1033,24 @@ export interface LiquidacionDeliveryDto {
   monto_bruto: number;
   comision: number;
   monto_neto: number;
+  monto_depositado?: number | null;
+  diferencia?: number | null;
+  estado?: string | null;
   pedidos?: number;
   referencia?: string | null;
   origen?: string | null;
   persistido?: boolean;
   limitacion?: string | null;
+}
+
+export interface PendientesLiquidarMetaDto {
+  total: number;
+  bruto: number;
+  comision: number;
+  neto: number;
+  filtros?: {
+    plataforma?: string | null;
+    desde?: string | null;
+    hasta?: string | null;
+  };
 }

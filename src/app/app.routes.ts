@@ -1,7 +1,7 @@
 import type { Routes } from '@angular/router';
 import { inject } from '@angular/core';
 import { AuthService } from './core/auth/auth.service';
-import { guestGuard, roleGuard } from './core/auth/role.guard';
+import { guestGuard, modoVentaGuard, roleGuard } from './core/auth/role.guard';
 import type { RolNombre } from './core/models';
 
 const roles = (...valores: RolNombre[]): RolNombre[] => valores;
@@ -26,12 +26,16 @@ export const routes: Routes = [
   },
 
   {
+    path: 'venta',
+    title: "Venta · Fratelli's",
+    canActivate: [roleGuard, modoVentaGuard],
+    data: { roles: roles('Mozo', 'Cajero', 'Dueño/Admin') },
+    loadComponent: () => import('./features/venta/venta.page').then((m) => m.VentaPage),
+  },
+  {
     path: 'venta-local/para-llevar',
     title: "Para llevar · Fratelli's",
-    canActivate: [roleGuard],
-    data: { roles: roles('Mozo', 'Cajero', 'Dueño/Admin') },
-    loadComponent: () =>
-      import('./features/venta-local/para-llevar.page').then((m) => m.ParaLlevarPage),
+    redirectTo: () => '/venta?modo=mostrador',
   },
   {
     path: 'venta-local/pedido/:mesaId',
@@ -68,7 +72,7 @@ export const routes: Routes = [
   },
   {
     path: 'cerrar-cuenta',
-    title: "Mesas Abiertas · Fratelli's",
+    title: "Caja · Fratelli's",
     canActivate: [roleGuard],
     data: { roles: roles('Cajero', 'Dueño/Admin') },
     loadComponent: () =>
@@ -76,12 +80,18 @@ export const routes: Routes = [
   },
 
   {
-    path: 'comandas',
-    title: "Comandas · Fratelli's",
+    path: 'pedidos',
+    title: "Pedidos · Fratelli's",
     canActivate: [roleGuard],
-    data: { roles: roles('Mozo', 'Cajero', 'Cocinero', 'Dueño/Admin') },
+    data: { roles: roles('Mozo', 'Cajero', 'Cocinero', 'Dueño/Admin', 'Repartidor') },
     loadComponent: () =>
-      import('./features/comandas/comandas.page').then((m) => m.ComandasPage),
+      import('./features/pedidos/pedidos.page').then((m) => m.PedidosPage),
+  },
+  {
+    path: 'comandas',
+    title: "Pedidos · Fratelli's",
+    redirectTo: 'pedidos',
+    pathMatch: 'full',
   },
 
   {
@@ -108,23 +118,15 @@ export const routes: Routes = [
 
   {
     path: 'delivery-propio',
-    title: "Delivery Propio · Fratelli's",
-    canActivate: [roleGuard],
-    data: { roles: roles('Repartidor', 'Cajero', 'Dueño/Admin') },
-    loadComponent: () =>
-      import('./features/delivery-propio/delivery-propio.page').then(
-        (m) => m.DeliveryPropioPage,
-      ),
+    title: "Pedidos · Fratelli's",
+    redirectTo: 'pedidos',
+    pathMatch: 'full',
   },
   {
     path: 'delivery-externo',
-    title: "Delivery Externo · Fratelli's",
-    canActivate: [roleGuard],
-    data: { roles: roles('Cajero', 'Dueño/Admin') },
-    loadComponent: () =>
-      import('./features/delivery-externo/delivery-externo.page').then(
-        (m) => m.DeliveryExternoPage,
-      ),
+    title: "Pedidos · Fratelli's",
+    redirectTo: 'pedidos',
+    pathMatch: 'full',
   },
   {
     path: 'cancelacion-delivery/:pedidoId',

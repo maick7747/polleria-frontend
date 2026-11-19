@@ -13,6 +13,8 @@
     </a>
   </div>
 
+  <app-modo-venta activo="mostrador" />
+
   @if (!cajaAbierta() && !cajaVerificando()) {
     <div class="banner" role="alert">
       <app-icon name="warning-circle" [size]="18" />

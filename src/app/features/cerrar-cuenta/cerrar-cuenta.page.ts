@@ -8,7 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { esApiError, mensajeError } from '../../core/api/api.helpers';
 import { CuadreService } from '../../core/data/cuadre.service';
 import { CuentasService } from '../../core/data/cuentas.service';
@@ -29,6 +29,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { IconComponent } from '../../shared/components/icon/icon';
 import { SectionHeaderComponent } from '../../shared/components/section-header/section-header';
 import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
+import { LiquidacionesAppsComponent } from './liquidaciones-apps/liquidaciones-apps.component';
 
 const UMBRAL_DEMORA = 30;
 
@@ -62,6 +63,7 @@ interface CuentaVista {
     DarkPanelComponent,
     EmptyStateComponent,
     IconComponent,
+    LiquidacionesAppsComponent,
     SectionHeaderComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,6 +76,7 @@ export class CerrarCuentaPage {
   private readonly notificaciones = inject(NotificacionesService);
   private readonly realtime = inject(RealtimeService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
   private toastTimer: number | null = null;
@@ -90,6 +93,15 @@ export class CerrarCuentaPage {
     const estado = this.cuadre.estado();
     return estado === 'cerrada' || estado === 'sin_cuadre';
   });
+  readonly tab = signal<'cobros' | 'apps'>('cobros');
+  readonly tituloCaja = computed<string>(() =>
+    this.tab() === 'apps' ? 'Caja · liquidaciones de apps' : 'Caja · cobros pendientes',
+  );
+  readonly subtituloCaja = computed<string>(() =>
+    this.tab() === 'apps'
+      ? 'Rappi y LlamaFood · conciliación contra el depósito'
+      : 'Todo lo que falta cobrar · mesa, mostrador y delivery',
+  );
   readonly filtro = signal<FiltroCuentas>('todas');
   readonly seleccionadaId = signal<number | null>(null);
   readonly liberando = signal(false);
@@ -144,6 +156,7 @@ export class CerrarCuentaPage {
   readonly dineroAbierto = computed<string>(() => formatearMoneda(this.totalAbierto()));
 
   constructor() {
+    this.tab.set(this.route.snapshot.queryParamMap.get('tab') === 'apps' ? 'apps' : 'cobros');
     const reloj = setInterval(() => this.ahora.set(Date.now()), 30000);
     const refresco = setInterval(() => void this.refrescar(), 15000);
     this.realtime.iniciar();
@@ -214,6 +227,19 @@ export class CerrarCuentaPage {
   @HostListener('document:keydown.escape')
   limpiarConEscape(): void {
     this.limpiarSeleccion();
+  }
+
+  cambiarTab(tab: 'cobros' | 'apps'): void {
+    if (this.tab() === tab) {
+      return;
+    }
+    this.tab.set(tab);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: tab === 'apps' ? 'apps' : null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   cambiarFiltro(filtro: FiltroCuentas): void {

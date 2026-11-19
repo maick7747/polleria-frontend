@@ -944,19 +944,27 @@ export interface LiquidacionVista {
   montoBruto: number;
   comision: number;
   montoNeto: number;
+  montoDepositado: number;
+  diferencia: number;
+  estado: string;
   pedidos: number;
   referencia: string;
   origen: string;
 }
 
 export function toLiquidacion(dto: LiquidacionDeliveryDto): LiquidacionVista {
+  const neto = Number(dto.monto_neto ?? 0);
+  const depositado = Number(dto.monto_depositado ?? neto);
   return {
     id: dto.id,
     plataforma: dto.plataforma,
     fecha: dto.fecha ?? '',
     montoBruto: Number(dto.monto_bruto ?? 0),
     comision: Number(dto.comision ?? 0),
-    montoNeto: Number(dto.monto_neto ?? 0),
+    montoNeto: neto,
+    montoDepositado: depositado,
+    diferencia: Number(dto.diferencia ?? depositado - neto),
+    estado: dto.estado ?? 'registrada',
     pedidos: Number(dto.pedidos ?? 0),
     referencia: dto.referencia ?? '',
     origen: dto.origen ?? '',

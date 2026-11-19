@@ -1,0 +1,258 @@
+<section class="liq">
+  <header class="liq__head">
+    <div class="liq__title">
+      <span class="bar"></span>
+      <div>
+        <h2>Pedidos por liquidar</h2>
+        <p>Rappi y LlamaFood no se cobran en caja: se concilian contra el depósito.</p>
+      </div>
+    </div>
+    <div class="liq__filters">
+      <div class="plat" role="group" aria-label="Plataforma">
+        <button
+          type="button"
+          [class.is-on]="plataforma() === 'rappi'"
+          (click)="cambiarPlataforma('rappi')"
+        >
+          Rappi
+        </button>
+        <button
+          type="button"
+          [class.is-on]="plataforma() === 'llamafood'"
+          (click)="cambiarPlataforma('llamafood')"
+        >
+          LlamaFood
+        </button>
+      </div>
+      <label class="fecha">
+        <span>Desde</span>
+        <input type="date" [value]="desde()" (change)="onDesde($event)" />
+      </label>
+      <label class="fecha">
+        <span>Hasta</span>
+        <input type="date" [value]="hasta()" (change)="onHasta($event)" />
+      </label>
+    </div>
+  </header>
+
+  @if (error(); as mensaje) {
+    <div class="banner" role="alert">
+      <app-icon name="warning-circle" [size]="16" />
+      <span>{{ mensaje }}</span>
+      <button type="button" (click)="cargar()">Reintentar</button>
+    </div>
+  }
+
+  <div class="liq__grid">
+    <div class="panel lista">
+      <div class="lista__head">
+        <div>
+          <b>Pedidos pendientes</b>
+          <span>{{ meta().total }} pedidos · {{ moneda(meta().neto) }} neto</span>
+        </div>
+        <button type="button" class="mini" (click)="alternarTodos()">
+          {{ todosSeleccionados() ? 'Quitar todos' : 'Seleccionar todos' }}
+        </button>
+      </div>
+
+      <div class="lista__rows">
+        @for (pedido of pendientes(); track pedido.id) {
+          <button
+            type="button"
+            class="fila"
+            [class.is-sel]="estaSeleccionado(pedido.id)"
+            [attr.aria-pressed]="estaSeleccionado(pedido.id)"
+            (click)="toggle(pedido.id)"
+          >
+            <span class="check" aria-hidden="true">
+              @if (estaSeleccionado(pedido.id)) {
+                <app-icon name="check" [size]="10" />
+              }
+            </span>
+            <span class="chip" [class.chip--llama]="plataforma() === 'llamafood'">
+              <i></i>{{ plataformaTexto(pedido.plataforma) }}
+            </span>
+            <span class="quien">
+              <b>{{ pedido.numero }} · {{ pedido.clienteNombre }}</b>
+              <span>{{ pedido.fecha | slice: 0 : 10 }} · {{ pedido.direccion }}</span>
+            </span>
+            <span class="monto">
+              <b>{{ moneda(pedido.montoBruto) }}</b>
+              <span>bruto</span>
+            </span>
+            <span class="monto">
+              <b>{{ moneda(pedido.comision) }}</b>
+              <span>com.</span>
+            </span>
+            <span class="monto">
+              <b>{{ moneda(pedido.montoNeto) }}</b>
+              <span>neto</span>
+            </span>
+          </button>
+        } @empty {
+          @if (cargando()) {
+            <div class="vacio">Cargando pedidos por liquidar…</div>
+          } @else {
+            <app-empty-state
+              icon="package"
+              title="Sin pedidos por liquidar"
+              description="Todos los pedidos de esta plataforma y rango ya están en una liquidación."
+            />
+          }
+        }
+      </div>
+
+      <div class="lista__foot">
+        <span>
+          <b>{{ pedidosSeleccionados().length }}</b> pedidos seleccionados · bruto
+          <b>{{ moneda(bruto()) }}</b>
+        </span>
+        <span>
+          comisión <b>{{ moneda(comision()) }}</b> · neto
+          <b>{{ moneda(neto()) }}</b>
+        </span>
+      </div>
+    </div>
+
+    <div class="panel formulario">
+      <h3>Nueva liquidación</h3>
+      <p class="sub">El bruto y la comisión se calculan desde los pedidos seleccionados.</p>
+
+      <label class="campo">
+        <span>Plataforma</span>
+        <input [value]="plataformaTexto(plataforma())" readonly />
+      </label>
+      <label class="campo">
+        <span>Periodo</span>
+        <input [value]="desde() + ' – ' + hasta()" readonly />
+      </label>
+      <label class="campo">
+        <span>N° de operación / depósito</span>
+        <input
+          [value]="referencia()"
+          (input)="onReferencia($event)"
+          placeholder="Ej. RAPPI-2026-11-18-009"
+        />
+      </label>
+
+      <div class="calc">
+        <div class="calc__row">
+          <span>Bruto de los pedidos</span>
+          <b>{{ moneda(bruto()) }}</b>
+        </div>
+        <div class="calc__row">
+          <span>Comisión</span>
+          <b>− {{ moneda(comision()) }}</b>
+        </div>
+        <div class="calc__row calc__row--neto">
+          <span>Neto esperado</span>
+          <b>{{ moneda(neto()) }}</b>
+        </div>
+      </div>
+
+      <label class="campo">
+        <span>Monto depositado</span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          [value]="montoDepositado()"
+          (input)="onMontoDepositado($event)"
+          placeholder="0.00"
+        />
+      </label>
+
+      <div
+        class="diferencia"
+        [class.diferencia--ok]="pedidosSeleccionados().length > 0 && diferencia() === 0"
+        [class.diferencia--mal]="pedidosSeleccionados().length > 0 && diferencia() !== 0"
+      >
+        <span>Diferencia</span>
+        <b>
+          {{
+            pedidosSeleccionados().length > 0
+              ? moneda(diferencia())
+              : '—'
+          }}
+        </b>
+      </div>
+
+      <button
+        type="button"
+        class="btn-primario"
+        [disabled]="!puedeRegistrar()"
+        (click)="registrar()"
+      >
+        <app-icon name="check" [size]="15" />
+        {{ guardando() ? 'Registrando…' : 'Registrar y conciliar' }}
+      </button>
+      <p class="nota">
+        El depósito <b>no entra a la caja física</b>. Es dinero que la plataforma
+        transfiere a la cuenta del negocio.
+      </p>
+    </div>
+  </div>
+
+  <div class="panel historial">
+    <div class="historial__head">
+      <div>
+        <b>Historial de liquidaciones</b>
+        <span>{{ liquidaciones().length }} registros · {{ moneda(totalHistorico()) }} neto</span>
+      </div>
+      @if (liquidacionesCargando()) {
+        <span class="cargando">Cargando…</span>
+      }
+    </div>
+
+    @if (liquidacionesError(); as mensaje) {
+      <div class="banner banner--inline" role="alert">
+        <span>{{ mensaje }}</span>
+        <button type="button" (click)="cargar()">Reintentar</button>
+      </div>
+    }
+
+    <div class="tabla">
+      <div class="tabla__head">
+        <span>Fecha</span>
+        <span>Plataforma</span>
+        <span>Pedidos</span>
+        <span class="right">Bruto</span>
+        <span class="right">Comisión</span>
+        <span class="right">Neto</span>
+        <span class="right">Depositado</span>
+        <span class="right">Diferencia</span>
+        <span>Estado</span>
+      </div>
+      @for (fila of liquidaciones(); track fila.id ?? fila.fecha + fila.plataforma) {
+        <div class="tabla__row">
+          <span>{{ fila.fecha | slice: 0 : 10 }}</span>
+          <span class="chip" [class.chip--llama]="fila.plataforma === 'llamafood'">
+            <i></i>{{ plataformaTexto(fila.plataforma) }}
+          </span>
+          <span>{{ fila.pedidos || '—' }}</span>
+          <span class="right">{{ moneda(fila.montoBruto) }}</span>
+          <span class="right">− {{ moneda(fila.comision) }}</span>
+          <span class="right">{{ moneda(fila.montoNeto) }}</span>
+          <span class="right">{{ moneda(fila.montoDepositado) }}</span>
+          <span
+            class="right"
+            [class.ok]="fila.diferencia === 0"
+            [class.mal]="fila.diferencia !== 0"
+          >
+            {{ moneda(fila.diferencia) }}
+          </span>
+          <span class="estado">{{ fila.estado }}</span>
+        </div>
+      } @empty {
+        <div class="vacio">Aún no hay liquidaciones registradas.</div>
+      }
+    </div>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <span class="toast__dot"></span>
+      {{ toast() }}
+    </div>
+  }
+</section>

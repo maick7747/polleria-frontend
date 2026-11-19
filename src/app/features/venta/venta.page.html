@@ -1,0 +1,419 @@
+<app-shell title="Venta" [subtitle]="subtitulo()">
+  <div actions class="header-actions">
+    @if (cajaVerificando()) {
+      <app-chip variant="neutral" [dot]="true">Caja · verificando</app-chip>
+    } @else if (cajaAbierta()) {
+      <app-chip variant="success" [dot]="true">Caja abierta · {{ turno }}</app-chip>
+    } @else {
+      <app-chip variant="warning" [dot]="true">Caja cerrada</app-chip>
+    }
+    <a class="ghost-link" routerLink="/cerrar-cuenta">
+      <app-icon name="cash-register" [size]="14" />
+      Ir a Caja
+    </a>
+  </div>
+
+  @if (!cajaAbierta() && !cajaVerificando()) {
+    <div class="banner" role="alert">
+      <app-icon name="warning-circle" [size]="18" />
+      <div class="banner__texto">
+        <strong>
+          {{ cajaError() ? 'No se pudo verificar la caja' : 'La caja está cerrada' }}
+        </strong>
+        <span>
+          {{
+            cajaError() ||
+              'Abre la caja del día para registrar pedidos de mostrador, delivery o apps.'
+          }}
+        </span>
+      </div>
+      @if (cajaError()) {
+        <button type="button" class="banner__btn" (click)="reintentarCaja()">
+          Reintentar
+        </button>
+      } @else {
+        <a class="banner__btn" routerLink="/cuadre-caja/apertura">Abrir caja</a>
+      }
+    </div>
+  }
+
+  <app-modo-venta [activo]="modo()" />
+
+  @if (error(); as mensaje) {
+    <div class="error-banner" role="alert">
+      <span>{{ mensaje }}</span>
+      <button type="button" (click)="enviar()">Reintentar</button>
+    </div>
+  }
+
+  <div class="board">
+    <app-panel class="compositor">
+      <div class="compositor__inner">
+        <header class="origen__head">
+          <div class="origen__titles">
+            <span class="origen__eyebrow">Origen del pedido</span>
+            <h2 class="origen__title">{{ modoInfo().label }}</h2>
+            <p class="origen__sub">{{ modoInfo().detalle }}</p>
+          </div>
+          <app-chip variant="neutral">{{ resumenLineas() }}</app-chip>
+        </header>
+
+        <form class="origen__grid" (submit)="$event.preventDefault(); enviar()">
+          @switch (modo()) {
+            @case ('mostrador') {
+              <label class="campo campo--full">
+                <span class="campo__label">Cliente <em>opcional</em></span>
+                <input
+                  class="input"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Nombre para llamar al cliente"
+                  [value]="cliente()"
+                  (input)="onCliente($event)"
+                />
+              </label>
+
+              <label class="campo campo--full">
+                <span class="campo__label">Observaciones</span>
+                <textarea
+                  class="input input--area"
+                  maxlength="300"
+                  placeholder="Indicaciones para cocina"
+                  [value]="observaciones()"
+                  (input)="onObservaciones($event)"
+                ></textarea>
+              </label>
+            }
+
+            @case ('delivery') {
+              <div class="campo">
+                <span class="campo__label">Canal</span>
+                <div class="segmento" role="group" aria-label="Canal del delivery">
+                  <button
+                    type="button"
+                    class="segmento__btn"
+                    [class.is-on]="canal() === 'whatsapp'"
+                    [attr.aria-pressed]="canal() === 'whatsapp'"
+                    (click)="canal.set('whatsapp')"
+                  >
+                    <span class="punto punto--whatsapp"></span>
+                    WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    class="segmento__btn"
+                    [class.is-on]="canal() === 'telefono'"
+                    [attr.aria-pressed]="canal() === 'telefono'"
+                    (click)="canal.set('telefono')"
+                  >
+                    <span class="punto punto--telefono"></span>
+                    Teléfono
+                  </button>
+                </div>
+              </div>
+
+              <label class="campo">
+                <span class="campo__label">Cliente <b class="req">*</b></span>
+                <input
+                  class="input"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Nombre del cliente"
+                  [value]="cliente()"
+                  (input)="onCliente($event)"
+                />
+              </label>
+
+              <label class="campo">
+                <span class="campo__label">Teléfono</span>
+                <input
+                  class="input"
+                  type="tel"
+                  maxlength="20"
+                  placeholder="9xx xxx xxx"
+                  [value]="telefono()"
+                  (input)="onTelefono($event)"
+                />
+              </label>
+
+              <label class="campo">
+                <span class="campo__label">Costo delivery</span>
+                <input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  [value]="costoDelivery()"
+                  (input)="onCosto($event)"
+                />
+              </label>
+
+              <label class="campo campo--full">
+                <span class="campo__label">Dirección de entrega <b class="req">*</b></span>
+                <input
+                  class="input"
+                  type="text"
+                  maxlength="200"
+                  placeholder="Calle, número, distrito"
+                  [value]="direccion()"
+                  (input)="onDireccion($event)"
+                />
+              </label>
+
+              <label class="campo campo--full">
+                <span class="campo__label">Referencia</span>
+                <input
+                  class="input"
+                  type="text"
+                  maxlength="150"
+                  placeholder="Portón, piso, color de fachada"
+                  [value]="referencia()"
+                  (input)="onReferencia($event)"
+                />
+              </label>
+
+              <label class="campo campo--full">
+                <span class="campo__label">Observaciones</span>
+                <textarea
+                  class="input input--area"
+                  maxlength="300"
+                  placeholder="Indicaciones para cocina o el repartidor"
+                  [value]="observaciones()"
+                  (input)="onObservaciones($event)"
+                ></textarea>
+              </label>
+            }
+
+            @default {
+              <div class="campo">
+                <span class="campo__label">Plataforma</span>
+                <div class="segmento" role="group" aria-label="Plataforma de delivery">
+                  <button
+                    type="button"
+                    class="segmento__btn"
+                    [class.is-on]="plataforma() === 'rappi'"
+                    [attr.aria-pressed]="plataforma() === 'rappi'"
+                    (click)="plataforma.set('rappi')"
+                  >
+                    <span class="punto punto--rappi"></span>
+                    Rappi
+                  </button>
+                  <button
+                    type="button"
+                    class="segmento__btn"
+                    [class.is-on]="plataforma() === 'llamafood'"
+                    [attr.aria-pressed]="plataforma() === 'llamafood'"
+                    (click)="plataforma.set('llamafood')"
+                  >
+                    <span class="punto punto--llamafood"></span>
+                    LlamaFood
+                  </button>
+                </div>
+              </div>
+
+              <label class="campo">
+                <span class="campo__label">Cliente <b class="req">*</b></span>
+                <input
+                  class="input"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Nombre del cliente"
+                  [value]="cliente()"
+                  (input)="onCliente($event)"
+                />
+              </label>
+
+              <label class="campo campo--full">
+                <span class="campo__label">Dirección de entrega <b class="req">*</b></span>
+                <input
+                  class="input"
+                  type="text"
+                  maxlength="200"
+                  placeholder="Calle, número, distrito"
+                  [value]="direccion()"
+                  (input)="onDireccion($event)"
+                />
+              </label>
+
+              <label class="campo campo--full">
+                <span class="campo__label">Referencia</span>
+                <input
+                  class="input"
+                  type="text"
+                  maxlength="150"
+                  placeholder="Portón, piso, color de fachada"
+                  [value]="referencia()"
+                  (input)="onReferencia($event)"
+                />
+              </label>
+
+              <label class="campo campo--full">
+                <span class="campo__label">Observaciones</span>
+                <textarea
+                  class="input input--area"
+                  maxlength="300"
+                  placeholder="Indicaciones para cocina o el repartidor"
+                  [value]="observaciones()"
+                  (input)="onObservaciones($event)"
+                ></textarea>
+              </label>
+            }
+          }
+
+          <div class="origen__ayuda campo--full">
+            <app-icon name="note-pencil" [size]="15" />
+            <span>
+              @switch (modo()) {
+                @case ('apps') {
+                  La comisión ({{ plataformaTexto() }} {{ comisionPct() }} %) la descuenta la
+                  plataforma al liquidar; el neto es solo un estimado.
+                }
+                @case ('delivery') {
+                  El costo de delivery se suma al total del pedido; el envío no lleva IGV.
+                }
+                @default {
+                  El pedido se envía a cocina al guardarlo y el stock se descuenta en ese
+                  momento.
+                }
+              }
+            </span>
+          </div>
+        </form>
+
+        <div class="origen__divisor"></div>
+
+        <app-selector-platos
+          [(items)]="items"
+          [bloqueado]="!cajaAbierta() || enviando() || !puedeOperar()"
+          [mostrarCarrito]="false"
+          [titulo]="modoInfo().menuTitulo"
+          [descripcion]="modoInfo().menuDescripcion"
+        />
+      </div>
+    </app-panel>
+
+    <app-dark-panel class="resumen">
+      <div class="resumen__inner">
+        <header class="resumen__head">
+          <div class="resumen__titles">
+            <h2 class="resumen__title">Pedido · {{ modoInfo().label }}</h2>
+            <p class="resumen__sub">{{ resumenLineas() }}</p>
+          </div>
+          <app-chip variant="neutral">{{ origenChip() }}</app-chip>
+        </header>
+
+        <span class="resumen__sep"></span>
+
+        @if (items().length > 0) {
+          <div class="resumen__items">
+            @for (item of items(); track item.id) {
+              <div class="resumen__item">
+                <button
+                  type="button"
+                  class="resumen__minus"
+                  [disabled]="enviando()"
+                  [attr.aria-label]="'Quitar ' + item.nombre"
+                  (click)="quitar(item.id)"
+                >
+                  −
+                </button>
+                <span class="resumen__item-nombre">{{ item.cantidad }}× {{ item.nombre }}</span>
+                <strong>{{ moneda(item.subtotal) }}</strong>
+              </div>
+            }
+          </div>
+          <span class="resumen__sep"></span>
+        }
+
+        <div class="resumen__rows">
+          <div>
+            <span>Subtotal platos</span>
+            <strong>{{ moneda(subtotal()) }}</strong>
+          </div>
+          <div>
+            <span>IGV 18%</span>
+            <strong>{{ moneda(igv()) }}</strong>
+          </div>
+          @if (modo() === 'delivery') {
+            <div>
+              <span>Costo delivery</span>
+              <strong>{{ moneda(envio()) }}</strong>
+            </div>
+          }
+          @if (modo() === 'apps') {
+            <div class="resumen__row--descuento">
+              <span>Comisión {{ plataformaTexto() }} {{ comisionPct() }}%</span>
+              <strong>− {{ moneda(comision()) }}</strong>
+            </div>
+            <div class="resumen__row--neto">
+              <span>Neto estimado</span>
+              <strong>{{ moneda(neto()) }}</strong>
+            </div>
+          }
+        </div>
+
+        <div class="resumen__total">
+          <span class="resumen__label">Total del pedido</span>
+          <div class="resumen__amount">
+            <span class="cur">S/</span>
+            <span class="big">{{ total().toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <p class="resumen__tax">
+          {{
+            modo() === 'apps'
+              ? 'La autoridad es el backend; la comisión se confirma con la liquidación.'
+              : 'La autoridad es el backend: recalcula IGV y total al guardar.'
+          }}
+        </p>
+
+        <div class="resumen__grow"></div>
+
+        @if (mostrarMotivo()) {
+          <p class="resumen__motivo" role="status">
+            <app-icon name="warning-circle" [size]="13" />
+            {{ motivo() }}
+          </p>
+        }
+
+        <button
+          type="button"
+          class="enviar"
+          [disabled]="!puedeEnviar()"
+          (click)="enviar()"
+        >
+          <app-icon [name]="modoInfo().icon" [size]="15" />
+          {{ enviando() ? 'Guardando…' : modoInfo().boton }}
+        </button>
+
+        <button
+          type="button"
+          class="btn-ghost-dark"
+          [disabled]="items().length === 0 || enviando()"
+          (click)="vaciar()"
+        >
+          <app-icon name="x" [size]="14" />
+          Vaciar carrito
+        </button>
+
+        <p class="resumen__nota">{{ modoInfo().nota }}</p>
+      </div>
+    </app-dark-panel>
+  </div>
+
+  <div class="pie">
+    <span class="pie__note">
+      <app-icon name="cash-register" [size]="12" />
+      Todos los canales se cobran en una sola Caja.
+    </span>
+    <span class="pie__note">Pedidos y Caja reciben todos los canales.</span>
+  </div>
+
+  @if (toast()) {
+    <div class="toast" [class.toast--error]="toastError()" role="status">
+      <app-icon [name]="toastError() ? 'warning-circle' : 'check'" [size]="15" />
+      {{ toast() }}
+    </div>
+  }
+</app-shell>
