@@ -142,8 +142,11 @@ export class HistorialCuentasPage {
     });
   }
 
-  mesa(cuenta: Cuenta): string {
-    return `Mesa ${cuenta.mesaNumero ?? cuenta.mesaId}`;
+  ubicacion(cuenta: Cuenta): string {
+    if ((cuenta.tipoServicio ?? 'sala') === 'sala') {
+      return `Mesa ${cuenta.mesaNumero ?? cuenta.mesaId ?? '—'}`;
+    }
+    return cuenta.pedidoNumero ?? (cuenta.tipoServicio === 'para_llevar' ? 'Mostrador' : 'Delivery');
   }
 
   comprobante(cuenta: Cuenta): string {

@@ -32,18 +32,24 @@ import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 
 const UMBRAL_DEMORA = 30;
 
-type FiltroCuentas = 'todas' | 'demora' | 'mayor';
+type FiltroCuentas = 'todas' | 'sala' | 'para_llevar' | 'delivery';
+type CanalCuenta = 'sala' | 'para_llevar' | 'delivery';
 
 interface CuentaVista {
   cuenta: Cuenta;
-  numero: string;
+  tipo: CanalCuenta;
+  titulo: string;
+  subtitulo: string;
   minutos: number;
   rondas: number;
+  platos: number;
   mozo: string;
   listos: number;
   prioritaria: boolean;
   subtotal: number;
   igv: number;
+  cliente: string;
+  repartidor: string;
 }
 
 @Component({
@@ -97,20 +103,24 @@ export class CerrarCuentaPage {
   readonly avisoCarga = this.cuentas.aviso;
 
   readonly vistas = computed<CuentaVista[]>(() => {
-    const lista = this.cuentas
-      .abiertas()
-      .map((cuenta) => this.vista(cuenta));
+    const lista = this.cuentas.abiertas().map((cuenta) => this.vista(cuenta));
     const filtro = this.filtro();
-    if (filtro === 'demora') {
-      return lista.filter((item) => item.prioritaria);
+    if (filtro === 'todas') {
+      return lista;
     }
-    if (filtro === 'mayor') {
-      return [...lista].sort((a, b) => b.cuenta.total - a.cuenta.total);
-    }
-    return lista;
+    return lista.filter((item) => item.tipo === filtro);
   });
 
   readonly totalCuentas = computed<number>(() => this.cuentas.abiertas().length);
+  readonly totalMesas = computed<number>(
+    () => this.cuentas.abiertas().filter((cuenta) => this.tipoDe(cuenta) === 'sala').length,
+  );
+  readonly totalMostrador = computed<number>(
+    () => this.cuentas.abiertas().filter((cuenta) => this.tipoDe(cuenta) === 'para_llevar').length,
+  );
+  readonly totalDelivery = computed<number>(
+    () => this.cuentas.abiertas().filter((cuenta) => this.tipoDe(cuenta) === 'delivery').length,
+  );
   readonly enDemora = computed<number>(
     () => this.cuentas.abiertas().filter((cuenta) => this.minutos(cuenta) > UMBRAL_DEMORA).length,
   );
@@ -183,7 +193,7 @@ export class CerrarCuentaPage {
       const ultimo = nuevos[nuevos.length - 1];
       this.mostrarToast(
         nuevos.length === 1
-          ? `Mesa ${String(ultimo.mesaNumero).padStart(2, '0')} · ${ultimo.plato} listo`
+          ? `${ultimo.ubicacion} · ${ultimo.plato} listo`
           : `${nuevos.length} platos listos en cocina`,
       );
     }
@@ -233,7 +243,7 @@ export class CerrarCuentaPage {
   // Libera la mesa cuando la cuenta se creó por error y todavía no tiene pedidos.
   async liberar(): Promise<void> {
     const seleccionada = this.seleccionada();
-    if (!seleccionada || seleccionada.rondas > 0 || this.liberando()) {
+    if (!seleccionada || seleccionada.tipo !== 'sala' || seleccionada.rondas > 0 || this.liberando()) {
       return;
     }
     this.liberando.set(true);
@@ -257,12 +267,15 @@ export class CerrarCuentaPage {
     }
   }
 
+  private tipoDe(cuenta: Cuenta): CanalCuenta {
+    return cuenta.tipoServicio ?? 'sala';
+  }
+
   private vista(cuenta: Cuenta): CuentaVista {
     const minutos = this.minutos(cuenta);
     // El backend ya envía subtotal/IGV calculados sobre el total de la cuenta.
     // El fallback solo cubre respuestas antiguas o el modo demo.
     const subtotal = cuenta.subtotal ?? round2(cuenta.total / 1.18);
-    const igv = cuenta.igv ?? round2(cuenta.total - subtotal);
     const listos = cuenta.rondas.reduce(
       (total, ronda) =>
         total +
@@ -271,16 +284,36 @@ export class CerrarCuentaPage {
         ).length,
       0,
     );
+    const tipo = this.tipoDe(cuenta);
+    const primera = cuenta.rondas[0];
+    const platos = cuenta.rondas.reduce(
+      (total, ronda) => total + ronda.items.reduce((suma, item) => suma + item.cantidad, 0),
+      0,
+    );
+    const titulo = tipo === 'sala'
+      ? `Mesa ${String(cuenta.mesaNumero ?? cuenta.mesaId ?? 0).padStart(2, '0')}`
+      : (primera?.numeroPedido ?? `Cuenta ${cuenta.id}`);
+    const subtitulo = tipo === 'sala'
+      ? 'Salón principal'
+      : tipo === 'para_llevar'
+        ? 'Mostrador · pago al recoger'
+        : `Delivery · ${cuenta.direccionEntrega ?? 'sin dirección'}`;
+
     return {
       cuenta,
-      numero: String(cuenta.mesaId).padStart(2, '0'),
+      tipo,
+      titulo,
+      subtitulo,
       minutos,
       rondas: cuenta.rondas.length,
+      platos,
       mozo: abreviarNombre(cuenta.usuarioAperturaNombre ?? ''),
       listos,
       prioritaria: minutos > UMBRAL_DEMORA,
       subtotal,
       igv: round2(cuenta.total - subtotal),
+      cliente: cuenta.clienteNombre ?? cuenta.cliente?.nombre ?? 'Mostrador',
+      repartidor: cuenta.repartidorNombre ?? '',
     };
   }
 

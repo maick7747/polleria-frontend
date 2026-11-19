@@ -374,34 +374,20 @@
 
           <span class="resumen__sep"></span>
 
-          <span class="detalle__label">Cobro contraentrega</span>
-          <div class="pagos__chips">
-            @for (metodo of metodos; track metodo.valor) {
-              <button
-                type="button"
-                class="pago"
-                [class.pago--active]="metodoPago() === metodo.valor"
-                (click)="onMetodo(metodo.valor)"
-              >
-                {{ metodo.texto }}
-              </button>
-            }
+          <div class="aviso-caja">
+            <app-icon name="cash-register" [size]="16" />
+            <div>
+              <strong>Contraentrega · {{ moneda(pedido.total) }}</strong>
+              <span>
+                El repartidor cobra en la puerta. Al volver, el cajero registra el cobro en
+                <b>Caja</b>.
+              </span>
+            </div>
           </div>
-          <div class="accion-linea">
-            <input
-              class="input input--dark"
-              type="number"
-              min="0"
-              step="0.1"
-              placeholder="Monto recibido"
-              [value]="montoRecibido()"
-              (input)="onMontoRecibido($event)"
-            />
-            <button type="button" class="enviar" [disabled]="!puedeCobrar()" (click)="cobrar()">
-              <app-icon name="cash-register" [size]="15" />
-              Cobrar
-            </button>
-          </div>
+          <a class="btn-ghost-dark btn-ghost-dark--bloque" routerLink="/cerrar-cuenta">
+            <app-icon name="cash-register" [size]="14" />
+            Registrar cobro en Caja
+          </a>
 
           @if (pedido.estadoPago === 'pagado') {
             <p class="detalle__vacio">Pedido ya cobrado · {{ moneda(pedido.total) }}</p>
@@ -420,7 +406,7 @@
       <app-icon name="warning-circle" [size]="12" />
       El KDS avisa al mozo cuando el pedido está listo; umbral 30 min.
     </span>
-    <span class="pie__note">Delivery propio · S/ {{ costoFijo.toFixed(2) }} fijo · cobro contraentrega</span>
+    <span class="pie__note">Delivery propio · S/ {{ costoFijo.toFixed(2) }} fijo · el cobro se registra en Caja</span>
   </div>
 
   @if (toast()) {

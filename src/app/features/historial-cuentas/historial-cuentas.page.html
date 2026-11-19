@@ -2,7 +2,7 @@
   <div actions class="header-actions">
     <a class="ghost-link" routerLink="/cerrar-cuenta">
       <app-icon name="cash-register" [size]="14" />
-      Mesas abiertas
+      Volver a caja
     </a>
   </div>
 
@@ -29,7 +29,7 @@
     <div class="panel__inner">
       <div class="grid grid--head">
         <span>CUENTA</span>
-        <span>MESA</span>
+        <span>UBICACIÓN</span>
         <span>ESTADO</span>
         <span>APERTURA</span>
         <span>MOZO</span>
@@ -56,7 +56,7 @@
           @for (cuenta of filas(); track cuenta.id) {
             <div class="grid row">
               <span class="numero">#{{ cuenta.id }}</span>
-              <span>{{ mesa(cuenta) }}</span>
+              <span>{{ ubicacion(cuenta) }}</span>
               <span>
                 <app-chip [variant]="estadoTono(cuenta.estado)">{{ estadoTexto(cuenta.estado) }}</app-chip>
               </span>
@@ -68,7 +68,7 @@
                 <a
                   class="ver-detalle"
                   [routerLink]="['/cerrar-cuenta', cuenta.id]"
-                  [attr.aria-label]="'Ver detalle de la cuenta ' + cuenta.id + ' de ' + mesa(cuenta)"
+                  [attr.aria-label]="'Ver detalle de la cuenta ' + cuenta.id + ' de ' + ubicacion(cuenta)"
                 >
                   <app-icon name="arrow-right" [size]="13" />
                   Ver detalle

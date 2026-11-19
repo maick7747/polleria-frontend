@@ -18,7 +18,7 @@
     }
     <a class="ghost-link" routerLink="/cerrar-cuenta">
       <app-icon name="arrow-left" [size]="14" />
-      Volver a mesas
+      Volver a caja
     </a>
   </div>
 
@@ -53,8 +53,8 @@
         <div class="detalle__inner">
           <div class="detalle__main">
             <header class="detalle__head">
-              <h2 class="detalle__title">Detalle de la cuenta</h2>
-              <span class="detalle__pill">Mesa {{ numeroMesa() }}</span>
+              <h2 class="detalle__title">{{ esSala() ? 'Detalle de la cuenta' : 'Detalle del pedido' }}</h2>
+              <span class="detalle__pill">{{ ubicacion() }}</span>
             </header>
 
             <div class="rondas">
@@ -205,17 +205,18 @@
               <strong>{{ total().toFixed(2) }}</strong>
             </div>
             <span class="cobro__meta">
-              {{ platos() }} platos · {{ rondas() }} rondas · Mesa {{ numeroMesa() }}
+              {{ platos() }} platos · {{ rondas() }} rondas · {{ ubicacion() }}
             </span>
           </div>
 
           <span class="cobro__grow"></span>
 
           @if (abierta()) {
-            @if (faltanEntrega() > 0) {
+            @if (!listoParaCobrar()) {
               <div class="entrega-pendiente" role="status">
-                <app-icon name="warning-circle" [size]="16" />
-                <div class="entrega-pendiente__texto">
+              <app-icon name="warning-circle" [size]="16" />
+              <div class="entrega-pendiente__texto">
+                @if (tipo() === 'sala') {
                   <strong>Faltan {{ faltanEntrega() }} platos por entregar</strong>
                   <span>
                     El cobro se habilita cuando todo esté entregado. Si ya los llevaste,
@@ -224,9 +225,20 @@
                   <a class="entrega-pendiente__link" routerLink="/pedidos-listos">
                     Ir a Pedidos listos
                   </a>
-                </div>
+                } @else if (tipo() === 'para_llevar') {
+                  <strong>Faltan {{ faltanListos() }} platos por estar listos</strong>
+                  <span>
+                    El cobro se habilita cuando cocina marque el pedido como listo.
+                  </span>
+                } @else {
+                  <strong>El pedido aún no está entregado</strong>
+                  <span>
+                    Se habilita cuando el repartidor confirme la entrega.
+                  </span>
+                }
               </div>
-            }
+            </div>
+          }
 
             <span class="cobro__label">Método de pago</span>
             <div class="metodos">
@@ -362,7 +374,7 @@
       title="Cuenta no encontrada"
       description="La cuenta solicitada no existe o ya fue cerrada."
     >
-      <a class="ghost-link" routerLink="/cerrar-cuenta">Volver a mesas abiertas</a>
+      <a class="ghost-link" routerLink="/cerrar-cuenta">Volver a caja</a>
     </app-empty-state>
   }
 

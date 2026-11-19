@@ -63,6 +63,14 @@ export interface PedidoDetalle {
 export interface Ronda {
   id: number;
   numero: number;
+  numeroPedido?: string;
+  canal?: CanalPedido;
+  tipoConsumo?: TipoConsumo;
+  clienteNombre?: string;
+  repartidorNombre?: string;
+  direccionEntrega?: string;
+  estadoPago?: EstadoPago;
+  estadoEntrega?: EstadoEntrega;
   creadaEn: string;
   estado: EstadoPedido;
   items: PedidoDetalle[];
@@ -71,8 +79,9 @@ export interface Ronda {
 
 export interface Cuenta {
   id: number;
-  mesaId: number;
+  mesaId: number | null;
   mesaNumero?: number;
+  tipoServicio?: TipoConsumo;
   estado: EstadoCuenta;
   total: number;
   // IGV calculado sobre el total de la cuenta (no por ronda). Opcional para
@@ -87,6 +96,10 @@ export interface Cuenta {
   comprobanteTipo: ComprobanteTipo;
   comprobanteNumero?: string;
   cliente?: DatosCliente;
+  pedidoNumero?: string;
+  clienteNombre?: string;
+  repartidorNombre?: string;
+  direccionEntrega?: string;
   rondas: Ronda[];
 }
 

@@ -1,4 +1,4 @@
-<app-shell title="Para llevar" subtitle="Mostrador · pedidos sin mesa">
+<app-shell title="Para llevar" subtitle="Arma el pedido · el cobro se registra en Caja">
   <div actions class="header-actions">
     @if (cajaVerificando()) {
       <app-chip variant="neutral" [dot]="true">Caja · verificando</app-chip>
@@ -61,8 +61,8 @@
         <div class="resumen__inner">
           <header class="resumen__head">
             <div>
-              <h2 class="resumen__title">Cobrar pedido</h2>
-              <p class="resumen__sub">{{ pedido.numero }} · {{ horaPedido(pedido) }}</p>
+              <h2 class="resumen__title">Pedido {{ pedido.numero }}</h2>
+              <p class="resumen__sub">{{ horaPedido(pedido) }} · {{ pedido.items.length }} líneas</p>
             </div>
             <app-chip variant="neutral">Sin mesa</app-chip>
           </header>
@@ -76,7 +76,11 @@
             </div>
             <div class="detalle__row">
               <span>Ítems</span>
-              <strong>{{ totalUnidades(pedido) }} und. · {{ pedido.items.length }} líneas</strong>
+              <strong>{{ totalUnidades(pedido) }} und.</strong>
+            </div>
+            <div class="detalle__row">
+              <span>Estado</span>
+              <strong>{{ estadoTexto(pedido.estado) }}</strong>
             </div>
           </div>
 
@@ -94,70 +98,31 @@
           </div>
 
           <div class="resumen__total">
-            <span class="resumen__label">Total a cobrar</span>
+            <span class="resumen__label">Total a cobrar en Caja</span>
             <div class="resumen__amount">
               <span class="cur">S/</span>
               <span class="big">{{ pedido.total.toFixed(2) }}</span>
             </div>
           </div>
 
-          <span class="resumen__sep"></span>
-
-          <span class="detalle__label">Método de pago</span>
-          <div class="pagos__chips">
-            @for (item of metodos; track item.valor) {
-              <button
-                type="button"
-                class="pago"
-                [class.pago--active]="metodo() === item.valor"
-                [attr.aria-pressed]="metodo() === item.valor"
-                (click)="metodo.set(item.valor)"
-              >
-                {{ item.texto }}
-              </button>
-            }
-          </div>
-
-          <label class="campo">
-            <span class="campo__label">Monto recibido</span>
-            <input
-              class="input input--dark"
-              type="number"
-              min="0"
-              step="0.1"
-              inputmode="decimal"
-              [value]="montoRecibido()"
-              (input)="onMonto($event)"
-            />
-          </label>
-
-          <div class="detalle__row detalle__row--vuelto">
-            <span>Vuelto</span>
-            <strong>{{ moneda(vuelto()) }}</strong>
-          </div>
-
           <div class="resumen__grow"></div>
+
+          <div class="aviso-caja">
+            <app-icon name="cash-register" [size]="16" />
+            <span>
+              El cobro se registra en <strong>Caja</strong> cuando el cliente recoja el pedido.
+            </span>
+          </div>
 
           <div class="accion-linea accion-linea--split">
             <button type="button" class="btn-ghost-dark" (click)="cancelarSeleccion()">
               Volver
             </button>
-            @if (puedeCobrar) {
-              <button
-                type="button"
-                class="enviar"
-                [disabled]="!cobroValido()"
-                (click)="confirmarCobro()"
-              >
-                <app-icon name="cash-register" [size]="15" />
-                {{ cobrando() ? 'Cobrando…' : 'Confirmar cobro' }}
-              </button>
-            }
+            <a class="enviar" routerLink="/cerrar-cuenta">
+              <app-icon name="cash-register" [size]="15" />
+              Ir a Caja
+            </a>
           </div>
-
-          @if (!puedeCobrar) {
-            <p class="detalle__vacio">Tu rol no tiene permiso para cobrar pedidos.</p>
-          }
         </div>
       } @else {
         <div class="resumen__inner">
@@ -226,17 +191,9 @@
             {{ enviando() ? 'Enviando…' : 'Enviar a cocina' }}
           </button>
           <p class="detalle__vacio">
-            El pedido se cobra en mostrador con su ticket; el stock se descuenta al
-            enviarlo a cocina.
+            El pedido se cobra en Caja cuando el cliente lo recoja; el stock se descuenta
+            al enviarlo a cocina.
           </p>
-
-          @if (ultimoComprobante(); as comprobante) {
-            <div class="comprobante">
-              <span class="comprobante__label">Último cobro</span>
-              <strong>{{ comprobante.numero }}</strong>
-              <span>{{ moneda(comprobante.total) }} · {{ hora(comprobante.fecha) }}</span>
-            </div>
-          }
         </div>
       }
     </app-dark-panel>
@@ -301,15 +258,11 @@
                     Enviar a cocina
                   </button>
                 }
-                @if (puedeCobrar) {
-                  <button
-                    type="button"
-                    class="mini-btn mini-btn--brand"
-                    (click)="cobrar(pedido)"
-                  >
+                @if (pedido.estado !== 'borrador') {
+                  <a class="mini-btn" routerLink="/cerrar-cuenta">
                     <app-icon name="cash-register" [size]="13" />
-                    Cobrar
-                  </button>
+                    Ver en Caja
+                  </a>
                 }
               </span>
             </div>
@@ -322,9 +275,9 @@
   <div class="pie">
     <span class="pie__note">
       <app-icon name="warning-circle" [size]="12" />
-      Cobra en mostrador: el pedido sale de la cola al generar su ticket.
+      El cobro se registra en Caja cuando el cliente recoge el pedido.
     </span>
-    <span class="pie__note">Para llevar · sin mesa ni cuenta</span>
+    <span class="pie__note">Para llevar · sin mesa · una sola caja</span>
   </div>
 
   @if (toast()) {

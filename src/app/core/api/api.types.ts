@@ -137,6 +137,8 @@ export interface PedidoDto {
   comprobante_tipo: string;
   comprobante_numero: string | null;
   cliente_nombre?: string | null;
+  repartidor_nombre?: string | null;
+  mesa_numero?: number | null;
   fecha_entrega: string | null;
   estado_entrega?: string | null;
   detalles?: DetallePedidoDto[];
@@ -197,7 +199,8 @@ export interface PagosResponseDto {
 
 export interface CuentaResumenDto {
   id: number;
-  mesa_id: number;
+  mesa_id: number | null;
+  tipo_servicio?: string | null;
   estado: string;
   total: number;
   fecha_apertura: string;
@@ -208,6 +211,7 @@ export interface CuentaResumenDto {
   comprobante_tipo: string;
   comprobante_numero: string | null;
   mesa_numero?: number | null;
+  pedido_numero?: string | null;
   cliente_id?: number | null;
   cliente?: ClienteDto | null;
   subtotal?: number;
@@ -219,7 +223,8 @@ export interface CuentaResumenDto {
 
 export interface CuentaDto {
   id: number;
-  mesa_id: number;
+  mesa_id: number | null;
+  tipo_servicio?: string | null;
   estado: string;
   total: number;
   fecha_apertura: string;
@@ -230,6 +235,7 @@ export interface CuentaDto {
   comprobante_tipo: string;
   comprobante_numero: string | null;
   mesa_numero?: number | null;
+  pedido_numero?: string | null;
   cliente_id?: number | null;
   cliente?: ClienteDto | null;
   subtotal?: number;

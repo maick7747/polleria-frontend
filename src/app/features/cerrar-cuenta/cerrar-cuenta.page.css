@@ -115,7 +115,7 @@
   flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-auto-rows: minmax(320px, auto);
   gap: 18px;
 }
@@ -346,6 +346,16 @@
 .punto--demora {
   border: 1.5px solid var(--c-warning);
   background: var(--c-warning-soft);
+}
+
+.punto--mostrador {
+  border: 1.5px solid #93b4f5;
+  background: #e8f0ff;
+}
+
+.punto--delivery {
+  border: 1.5px solid #c4c4ce;
+  background: #f0f0f5;
 }
 
 .punto--sel {

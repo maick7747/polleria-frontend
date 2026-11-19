@@ -7,11 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { ComprobanteDto } from '../../core/api/api.types';
-import { AuthService } from '../../core/auth/auth.service';
 import { CuadreService } from '../../core/data/cuadre.service';
 import { PedidosService } from '../../core/data/pedidos.service';
-import type { EstadoPedido, MetodoPago, Pedido, PedidoDetalle } from '../../core/models';
+import type { EstadoPedido, Pedido, PedidoDetalle } from '../../core/models';
 import {
   formatearMoneda,
   hora,
@@ -31,13 +29,6 @@ import { AppShellComponent } from '../../shared/layout/app-shell/app-shell';
 // Misma regla que el backend: 18 % de IGV sobre el subtotal, con mínimo de S/ 70.
 const IGV_PCT = 18;
 const IGV_MIN = 70;
-
-const METODOS: readonly { valor: MetodoPago; texto: string }[] = [
-  { valor: 'efectivo', texto: 'Efectivo' },
-  { valor: 'yape', texto: 'Yape' },
-  { valor: 'plin', texto: 'Plin' },
-  { valor: 'tarjeta', texto: 'Tarjeta' },
-];
 
 const ESTADOS: readonly { valor: EstadoPedido; texto: string; tono: ChipVariant }[] = [
   { valor: 'borrador', texto: 'Borrador', tono: 'neutral' },
@@ -67,16 +58,13 @@ const ESTADOS: readonly { valor: EstadoPedido; texto: string; tono: ChipVariant 
 export class ParaLlevarPage {
   private readonly pedidos = inject(PedidosService);
   private readonly cuadre = inject(CuadreService);
-  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   private toastTimer: number | null = null;
 
   readonly moneda = formatearMoneda;
   readonly hora = hora;
-  readonly metodos = METODOS;
   readonly turno = turnoActual();
-  readonly puedeCobrar = this.auth.hasPermission('caja.cobrar');
 
   // Carrito y alta del pedido.
   readonly items = signal<PedidoDetalle[]>([]);
@@ -84,12 +72,8 @@ export class ParaLlevarPage {
   readonly observaciones = signal<string>('');
   readonly enviando = signal<boolean>(false);
 
-  // Cobro del pedido elegido.
+  // Pedido recién enviado a cocina: el panel derecho muestra su resumen.
   readonly seleccionado = signal<Pedido | null>(null);
-  readonly metodo = signal<MetodoPago>('efectivo');
-  readonly montoRecibido = signal<string>('');
-  readonly cobrando = signal<boolean>(false);
-  readonly ultimoComprobante = signal<ComprobanteDto | null>(null);
 
   readonly error = signal<string | null>(null);
   readonly toast = signal<string>('');
@@ -130,27 +114,6 @@ export class ParaLlevarPage {
     () => this.cajaAbierta() && this.items().length > 0 && !this.enviando(),
   );
 
-  readonly vuelto = computed<number>(() => {
-    const pedido = this.seleccionado();
-    if (!pedido) {
-      return 0;
-    }
-    const monto = Number(this.montoRecibido());
-    if (!Number.isFinite(monto)) {
-      return 0;
-    }
-    return round2(Math.max(0, monto - pedido.total));
-  });
-
-  readonly cobroValido = computed<boolean>(() => {
-    const pedido = this.seleccionado();
-    if (!pedido || this.cobrando()) {
-      return false;
-    }
-    const monto = Number(this.montoRecibido());
-    return Number.isFinite(monto) && round2(monto) + 0.009 >= pedido.total;
-  });
-
   constructor() {
     void this.cuadre.cargar();
     void this.cargarCola();
@@ -176,10 +139,6 @@ export class ParaLlevarPage {
 
   onObservaciones(event: Event): void {
     this.observaciones.set((event.target as HTMLTextAreaElement).value);
-  }
-
-  onMonto(event: Event): void {
-    this.montoRecibido.set((event.target as HTMLInputElement).value);
   }
 
   reintentar(): void {
@@ -223,69 +182,13 @@ export class ParaLlevarPage {
     this.items.set([]);
     this.cliente.set('');
     this.observaciones.set('');
+    this.seleccionado.set(creado);
     this.avisar(`${creado.numero} enviado a cocina`);
     await this.cargarCola(true);
   }
 
-  cobrar(pedido: Pedido): void {
-    if (!this.puedeCobrar) {
-      this.avisar('Tu rol no tiene permiso para cobrar pedidos.', true);
-      return;
-    }
-    this.seleccionado.set(pedido);
-    this.metodo.set('efectivo');
-    this.montoRecibido.set(pedido.total.toFixed(2));
-    this.error.set(null);
-  }
-
   cancelarSeleccion(): void {
     this.seleccionado.set(null);
-    this.montoRecibido.set('');
-  }
-
-  async confirmarCobro(): Promise<void> {
-    if (!this.puedeCobrar) {
-      this.avisar('Tu rol no tiene permiso para cobrar pedidos.', true);
-      return;
-    }
-    const pedido = this.seleccionado();
-    if (!pedido) {
-      return;
-    }
-    const monto = Number(this.montoRecibido());
-    if (!Number.isFinite(monto) || round2(monto) + 0.009 < pedido.total) {
-      this.avisar('El monto recibido no cubre el total del pedido.', true);
-      return;
-    }
-    if (this.cobrando()) {
-      return;
-    }
-
-    this.cobrando.set(true);
-    this.error.set(null);
-    const respuesta = await this.pedidos.cobrarPedido(
-      pedido.id,
-      this.metodo(),
-      round2(Math.max(0, monto)),
-    );
-    this.cobrando.set(false);
-
-    if (!respuesta) {
-      const mensaje = this.pedidos.paraLLevarError() ?? 'No se pudo cobrar el pedido.';
-      this.error.set(mensaje);
-      this.avisar(mensaje, true);
-      // Otra terminal pudo cobrarlo: refresca la cola para no dejar el pedido viejo.
-      await this.cargarCola(true);
-      return;
-    }
-
-    this.ultimoComprobante.set(respuesta.comprobante);
-    this.seleccionado.set(null);
-    this.montoRecibido.set('');
-    this.avisar(
-      `${respuesta.comprobante.numero} · ${this.moneda(respuesta.comprobante.total)} · vuelto ${this.moneda(respuesta.vuelto)}`,
-    );
-    await this.cargarCola(true);
   }
 
   /** Reintenta el envío a cocina de un pedido que quedó en borrador. */

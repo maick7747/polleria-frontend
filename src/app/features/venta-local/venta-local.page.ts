@@ -248,7 +248,7 @@ export class VentaLocalPage {
       const ultimo = nuevos[nuevos.length - 1];
       this.avisar(
         nuevos.length === 1
-          ? `Mesa ${String(ultimo.mesaNumero).padStart(2, '0')} · ${ultimo.plato} listo`
+          ? `${ultimo.ubicacion} · ${ultimo.plato} listo`
           : `${nuevos.length} platos listos en cocina`,
       );
     }

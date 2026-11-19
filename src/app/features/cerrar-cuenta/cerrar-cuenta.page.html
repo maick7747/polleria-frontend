@@ -1,4 +1,4 @@
-﻿<app-shell title="Mesas abiertas" subtitle="Cerrar cuenta · comprobante único">
+﻿<app-shell title="Caja · cobros pendientes" subtitle="Todo lo que falta cobrar · mesa, mostrador y delivery">
   <div actions class="header-actions">
     @if (cajaAbierta()) {
       <span class="caja">
@@ -23,10 +23,10 @@
   </div>
 
   <app-section-header
-    title="Cuentas abiertas"
-    [meta]="totalCuentas() + ' mesas · ' + dineroAbierto() + ' por cobrar'"
+    title="Cobros pendientes"
+    [meta]="totalCuentas() + ' cobros · ' + dineroAbierto() + ' por cobrar'"
   >
-    <div class="filtros" role="group" aria-label="Filtrar cuentas">
+    <div class="filtros" role="group" aria-label="Filtrar cobros por canal">
       <button
         type="button"
         class="filtro"
@@ -38,18 +38,26 @@
       <button
         type="button"
         class="filtro"
-        [class.is-active]="filtro() === 'demora'"
-        (click)="cambiarFiltro('demora')"
+        [class.is-active]="filtro() === 'sala'"
+        (click)="cambiarFiltro('sala')"
       >
-        +30 min <span>{{ enDemora() }}</span>
+        Mesas <span>{{ totalMesas() }}</span>
       </button>
       <button
         type="button"
         class="filtro"
-        [class.is-active]="filtro() === 'mayor'"
-        (click)="cambiarFiltro('mayor')"
+        [class.is-active]="filtro() === 'para_llevar'"
+        (click)="cambiarFiltro('para_llevar')"
       >
-        Mayor total
+        Mostrador <span>{{ totalMostrador() }}</span>
+      </button>
+      <button
+        type="button"
+        class="filtro"
+        [class.is-active]="filtro() === 'delivery'"
+        (click)="cambiarFiltro('delivery')"
+      >
+        Delivery <span>{{ totalDelivery() }}</span>
       </button>
     </div>
   </app-section-header>
@@ -58,7 +66,7 @@
     <div class="estado estado--error" role="alert">
       <app-icon name="warning-circle" [size]="16" />
       <div class="estado__texto">
-        <strong>No se pudieron actualizar las cuentas</strong>
+        <strong>No se pudieron actualizar los cobros</strong>
         <span>{{ error() }}</span>
       </div>
       <button type="button" class="estado__btn" (click)="reintentar()">
@@ -73,7 +81,7 @@
       <span>
         {{ avisoLento()
           ? 'El servidor está despertando… puede tardar hasta un minuto.'
-          : 'Cargando cuentas abiertas…' }}
+          : 'Cargando cobros pendientes…' }}
       </span>
     </div>
   }
@@ -99,28 +107,38 @@
           class="cuenta"
           [class.is-sel]="esSeleccionada(item.cuenta.id)"
           [attr.aria-pressed]="esSeleccionada(item.cuenta.id)"
-          [attr.aria-label]="'Cuenta de la mesa ' + item.numero"
+          [attr.aria-label]="'Cobro de ' + item.titulo + ' · ' + item.subtitulo"
           (click)="seleccionar(item.cuenta.id)"
         >
           <header class="cuenta__head">
             <div class="cuenta__titles">
-              <h3 class="cuenta__mesa">Mesa {{ item.numero }}</h3>
-              <span class="cuenta__sub">Salón principal</span>
+              <h3 class="cuenta__mesa">{{ item.titulo }}</h3>
+              <span class="cuenta__sub">{{ item.subtitulo }}</span>
             </div>
             <div class="cuenta__chips">
+              @if (item.tipo === 'sala') {
+                <app-chip variant="danger">Mesa</app-chip>
+              } @else if (item.tipo === 'para_llevar') {
+                <app-chip variant="info">Mostrador</app-chip>
+              } @else {
+                <app-chip variant="neutral">Delivery</app-chip>
+              }
               @if (item.prioritaria) {
                 <app-chip variant="warning" [dot]="true">
                   +{{ item.minutos - umbral }} min
                 </app-chip>
               }
               @if (item.listos > 0) {
-                <app-chip variant="success" [dot]="true">Listo</app-chip>
+                <app-chip variant="success" [dot]="true">
+                  {{ item.listos === 1 ? 'Listo' : item.listos + ' listos' }}
+                </app-chip>
               }
-              <app-chip variant="danger">Ocupada</app-chip>
             </div>
           </header>
 
-          <span class="cuenta__label">Total acumulado</span>
+          <span class="cuenta__label">
+            {{ item.tipo === 'sala' ? 'Total acumulado' : 'Total a cobrar' }}
+          </span>
           <div class="cuenta__total">
             <span class="cuenta__cur">S/</span>
             <strong>{{ item.cuenta.total.toFixed(2) }}</strong>
@@ -129,28 +147,60 @@
           <span class="cuenta__divider"></span>
 
           <div class="cuenta__rows">
-            <div class="cuenta__row">
-              <span>Tiempo abierta</span>
-              <strong [class.cuenta__alert]="item.prioritaria">{{ item.minutos }} min</strong>
-            </div>
-            <div class="cuenta__row">
-              <span>Ingreso</span>
-              <strong>{{ hora(item.cuenta.fechaApertura) }}</strong>
-            </div>
-            <div class="cuenta__row">
-              <span>Rondas</span>
-              <strong>{{ item.rondas }}</strong>
-            </div>
-            <div class="cuenta__row">
-              <span>Mozo</span>
-              <strong>{{ item.mozo }}</strong>
-            </div>
+            @if (item.tipo === 'sala') {
+              <div class="cuenta__row">
+                <span>Tiempo abierta</span>
+                <strong [class.cuenta__alert]="item.prioritaria">{{ item.minutos }} min</strong>
+              </div>
+              <div class="cuenta__row">
+                <span>Rondas</span>
+                <strong>{{ item.rondas }}</strong>
+              </div>
+              <div class="cuenta__row">
+                <span>Mozo</span>
+                <strong>{{ item.mozo }}</strong>
+              </div>
+            } @else if (item.tipo === 'para_llevar') {
+              <div class="cuenta__row">
+                <span>Espera</span>
+                <strong [class.cuenta__alert]="item.prioritaria">{{ item.minutos }} min</strong>
+              </div>
+              <div class="cuenta__row">
+                <span>Platos</span>
+                <strong>{{ item.platos }}</strong>
+              </div>
+              <div class="cuenta__row">
+                <span>Cliente</span>
+                <strong>{{ item.cliente }}</strong>
+              </div>
+            } @else {
+              <div class="cuenta__row">
+                <span>Espera</span>
+                <strong [class.cuenta__alert]="item.prioritaria">{{ item.minutos }} min</strong>
+              </div>
+              <div class="cuenta__row">
+                <span>Repartidor</span>
+                <strong>{{ item.repartidor || 'Por asignar' }}</strong>
+              </div>
+              <div class="cuenta__row">
+                <span>Cliente</span>
+                <strong>{{ item.cliente }}</strong>
+              </div>
+            }
           </div>
 
           <span class="cuenta__grow"></span>
 
           <div class="cuenta__foot">
-            <span class="cuenta__hint">Cobro único al cerrar</span>
+            <span>
+              @if (item.tipo === 'sala') {
+                Cobro único al cerrar
+              } @else if (item.tipo === 'para_llevar') {
+                Boleta al cobrar
+              } @else {
+                Contraentrega
+              }
+            </span>
             <app-icon name="caret-right" [size]="13" />
           </div>
         </button>
@@ -162,14 +212,14 @@
               <span>
                 {{ avisoLento()
                   ? 'El servidor está despertando… puede tardar hasta un minuto.'
-                  : 'Cargando cuentas abiertas…' }}
+                  : 'Cargando cobros pendientes…' }}
               </span>
             </div>
           } @else if (error()) {
             <div class="estado estado--error estado--bloque" role="alert">
               <app-icon name="warning-circle" [size]="20" />
               <div class="estado__texto">
-                <strong>No se pudieron cargar las cuentas</strong>
+                <strong>No se pudieron cargar los cobros</strong>
                 <span>{{ error() }}</span>
               </div>
               <button type="button" class="estado__btn" (click)="reintentar()">
@@ -180,8 +230,8 @@
           } @else {
             <app-empty-state
               icon="cash-register"
-              title="Sin cuentas en este filtro"
-              description="No hay mesas ocupadas que coincidan con el filtro seleccionado."
+              title="Sin cobros en este filtro"
+              description="No hay mesas, pedidos de mostrador ni deliveries pendientes que coincidan con el filtro."
             />
           }
         </div>
@@ -192,15 +242,19 @@
         <div class="leyenda__items">
           <span class="leyenda__item">
             <span class="punto punto--ocupada"></span>
-            Ocupada
+            Mesa
+          </span>
+          <span class="leyenda__item">
+            <span class="punto punto--mostrador"></span>
+            Mostrador
+          </span>
+          <span class="leyenda__item">
+            <span class="punto punto--delivery"></span>
+            Delivery
           </span>
           <span class="leyenda__item">
             <span class="punto punto--demora"></span>
             +30 min
-          </span>
-          <span class="leyenda__item">
-            <span class="punto punto--sel"></span>
-            Seleccionada
           </span>
         </div>
         <p class="leyenda__hint">
@@ -209,7 +263,7 @@
         </p>
         <span class="leyenda__grow"></span>
         <div class="leyenda__foot">
-          <span>{{ totalCuentas() }} cuentas abiertas</span>
+          <span>{{ totalMesas() }} mesas · {{ totalMostrador() }} mostrador · {{ totalDelivery() }} delivery</span>
           <strong>{{ promedioRondas() }} rondas promedio</strong>
         </div>
       </div>
@@ -221,7 +275,15 @@
           <header class="resumen__head">
             <h2 class="resumen__title">Cobro</h2>
             <div class="resumen__head-actions">
-              <span class="resumen__pill">Cuenta única</span>
+              <span class="resumen__pill">
+                @if (sel.tipo === 'sala') {
+                  Cuenta única
+                } @else if (sel.tipo === 'para_llevar') {
+                  Mostrador
+                } @else {
+                  Delivery
+                }
+              </span>
               <button
                 type="button"
                 class="resumen__close"
@@ -235,9 +297,17 @@
           </header>
 
           <div class="resumen__mesa">
-            <span class="resumen__eyebrow">MESA</span>
+            <span class="resumen__eyebrow">
+              @if (sel.tipo === 'sala') {
+                MESA
+              } @else if (sel.tipo === 'para_llevar') {
+                MOSTRADOR
+              } @else {
+                DELIVERY
+              }
+            </span>
             <div class="resumen__mesa-row">
-              <h3>Mesa {{ sel.numero }}</h3>
+              <h3>{{ sel.titulo }}</h3>
               <span [class]="'resumen__estado' + (sel.prioritaria ? ' resumen__estado--alert' : '')">
                 {{ sel.minutos }} min
               </span>
@@ -247,22 +317,58 @@
           <span class="resumen__divider"></span>
 
           <div class="resumen__rows">
-            <div class="resumen__row">
-              <span>Rondas</span>
-              <strong>{{ sel.rondas }}</strong>
-            </div>
-            <div class="resumen__row">
-              <span>Hora de ingreso</span>
-              <strong>{{ hora(sel.cuenta.fechaApertura) }}</strong>
-            </div>
-            <div class="resumen__row">
-              <span>Mozo</span>
-              <strong>{{ sel.mozo }}</strong>
-            </div>
-            <div class="resumen__row">
-              <span>Estado</span>
-              <strong>Ocupada</strong>
-            </div>
+            @if (sel.tipo === 'sala') {
+              <div class="resumen__row">
+                <span>Rondas</span>
+                <strong>{{ sel.rondas }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Hora de ingreso</span>
+                <strong>{{ hora(sel.cuenta.fechaApertura) }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Mozo</span>
+                <strong>{{ sel.mozo }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Estado</span>
+                <strong>Ocupada</strong>
+              </div>
+            } @else if (sel.tipo === 'para_llevar') {
+              <div class="resumen__row">
+                <span>Cliente</span>
+                <strong>{{ sel.cliente }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Platos</span>
+                <strong>{{ sel.platos }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Espera</span>
+                <strong>{{ sel.minutos }} min</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Cajero</span>
+                <strong>{{ sel.mozo }}</strong>
+              </div>
+            } @else {
+              <div class="resumen__row">
+                <span>Cliente</span>
+                <strong>{{ sel.cliente }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Repartidor</span>
+                <strong>{{ sel.repartidor || 'Por asignar' }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Dirección</span>
+                <strong>{{ sel.cuenta.direccionEntrega || '—' }}</strong>
+              </div>
+              <div class="resumen__row">
+                <span>Platos</span>
+                <strong>{{ sel.platos }}</strong>
+              </div>
+            }
             <div class="resumen__row">
               <span>Comprobante</span>
               <strong>{{ sel.cuenta.comprobanteTipo === 'ticket' ? 'Ticket' : 'Boleta' }}</strong>
@@ -272,7 +378,9 @@
           <span class="resumen__grow"></span>
 
           <div class="resumen__total">
-            <span class="resumen__total-label">Total por cobrar</span>
+            <span class="resumen__total-label">
+              {{ sel.tipo === 'sala' ? 'Total por cobrar' : 'Total a cobrar' }}
+            </span>
             <div class="resumen__amount">
               <span class="resumen__cur">S/</span>
               <strong>{{ sel.cuenta.total.toFixed(2) }}</strong>
@@ -285,11 +393,11 @@
           <span class="resumen__divider"></span>
 
           <div class="resumen__global">
-            <span>{{ totalCuentas() }} cuentas abiertas</span>
+            <span>{{ totalCuentas() }} cobros abiertos</span>
             <strong>{{ dineroAbierto() }}</strong>
           </div>
 
-          @if (sel.rondas === 0) {
+          @if (sel.tipo === 'sala' && sel.rondas === 0) {
             <button
               type="button"
               class="liberar"
@@ -307,7 +415,15 @@
               <app-icon name="cash-register" [size]="16" />
               Cobrar
             </button>
-            <p class="resumen__note">Un solo comprobante · sin split · SUNAT simulado.</p>
+            <p class="resumen__note">
+              @if (sel.tipo === 'sala') {
+                Un solo comprobante · sin split · SUNAT simulado.
+              } @else if (sel.tipo === 'para_llevar') {
+                Boleta de 80 mm · se cobra al recoger el pedido.
+              } @else {
+                Contraentrega · el repartidor cobra y tú registras aquí.
+              }
+            </p>
           }
 
           @if (aviso()) {
@@ -317,8 +433,8 @@
       } @else {
         <app-empty-state
           icon="cash-register"
-          title="Sin cuenta seleccionada"
-          description="Selecciona una mesa ocupada para revisar su cuenta y cobrar. Vuelve a hacer click o pulsa Esc para quitar la selección."
+          title="Sin cobro seleccionado"
+          description="Selecciona una mesa, un pedido de mostrador o un delivery para revisar su cuenta y cobrar. Vuelve a hacer click o pulsa Esc para quitar la selección."
         />
       }
     </app-dark-panel>
@@ -326,9 +442,9 @@
 
   <div class="pie">
     <span>
-      {{ totalCuentas() }} cuentas abiertas · {{ dineroAbierto() }} · {{ enDemora() }} en demora
+      {{ totalCuentas() }} cobros · {{ dineroAbierto() }} · {{ enDemora() }} en demora
     </span>
-    <span class="pie__note">El cobro se realiza una sola vez al cerrar la cuenta.</span>
+    <span class="pie__note">El cobro se registra una sola vez, con un solo comprobante.</span>
   </div>
 
   @if (toast()) {

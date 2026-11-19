@@ -164,22 +164,47 @@ export class CuentaDetallePage {
   readonly numeroMesa = computed<string>(() =>
     String(this.cuenta()?.mesaId ?? 0).padStart(2, '0'),
   );
-  readonly titulo = computed<string>(() =>
-    this.abierta()
-      ? `Cerrar cuenta · Mesa ${this.numeroMesa()}`
-      : `Detalle de cuenta · Mesa ${this.numeroMesa()}`,
+  readonly tipo = computed<'sala' | 'para_llevar' | 'delivery'>(
+    () => this.cuenta()?.tipoServicio ?? 'sala',
   );
+  readonly esSala = computed<boolean>(() => this.tipo() === 'sala');
+  readonly ubicacion = computed<string>(() => {
+    const cuenta = this.cuenta();
+    if (!cuenta) {
+      return 'Cuenta';
+    }
+    if (this.esSala()) {
+      return `Mesa ${this.numeroMesa()}`;
+    }
+    return cuenta.pedidoNumero ?? `Cuenta ${cuenta.id}`;
+  });
+  readonly titulo = computed<string>(() => {
+    if (!this.abierta()) {
+      return `Detalle de cuenta · ${this.ubicacion()}`;
+    }
+    return this.esSala()
+      ? `Cerrar cuenta · ${this.ubicacion()}`
+      : `Cobrar · ${this.ubicacion()}`;
+  });
   readonly subtitulo = computed<string>(() => {
     const cuenta = this.cuenta();
     if (!cuenta) {
       return 'Cuenta no encontrada';
     }
     const mozo = abreviarNombre(cuenta.usuarioAperturaNombre ?? '');
+    const rol = this.esSala() ? 'Mozo' : 'Cajero';
     if (cuenta.estado !== 'abierta') {
-      return `${this.estadoEtiqueta()} · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
+      return `${this.estadoEtiqueta()} · ${cuenta.rondas.length} rondas · ${rol} ${mozo}`;
     }
     const minutos = minutosEntre(cuenta.fechaApertura, this.ahora());
-    return `Abierta ${minutos} min · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
+    if (this.esSala()) {
+      return `Abierta ${minutos} min · ${cuenta.rondas.length} rondas · Mozo ${mozo}`;
+    }
+    const canal = this.tipo() === 'para_llevar' ? 'Mostrador' : 'Delivery';
+    return `${canal} · ${minutos} min · ${cuenta.rondas.reduce(
+      (total, ronda) => total + ronda.items.reduce((suma, item) => suma + item.cantidad, 0),
+      0,
+    )} platos`;
   });
 
   readonly abierta = computed<boolean>(() => this.cuenta()?.estado === 'abierta');
@@ -219,6 +244,27 @@ export class CuentaDetallePage {
     () => this.lineas().length > 0 && this.pendientesEntrega().length === 0,
   );
   readonly faltanEntrega = computed<number>(() => this.pendientesEntrega().length);
+  readonly pendientesListos = computed(() =>
+    this.lineas().filter(
+      (item) => !item.entregadoEn && item.estadoPreparacion !== 'listo',
+    ),
+  );
+  readonly faltanListos = computed<number>(() => this.pendientesListos().length);
+  readonly lineasListas = computed<boolean>(
+    () => this.lineas().length > 0 && this.pendientesListos().length === 0,
+  );
+  readonly pedidoEntregado = computed<boolean>(
+    () => (this.cuenta()?.rondas ?? []).every((ronda) => ronda.estadoEntrega === 'entregado'),
+  );
+  readonly listoParaCobrar = computed<boolean>(() => {
+    if (this.tipo() === 'sala') {
+      return this.todoEntregado();
+    }
+    if (this.tipo() === 'para_llevar') {
+      return this.lineasListas();
+    }
+    return this.pedidoEntregado() || this.todoEntregado();
+  });
 
   readonly mozo = computed<string>(() =>
     abreviarNombre(this.cuenta()?.usuarioAperturaNombre ?? ''),
@@ -302,7 +348,7 @@ export class CuentaDetallePage {
     if (!this.abierta() || this.procesando()) {
       return false;
     }
-    if (!this.todoEntregado()) {
+    if (!this.listoParaCobrar()) {
       return false;
     }
     if (this.metodo() === 'efectivo') {
@@ -523,13 +569,17 @@ export class CuentaDetallePage {
       this.avisar('Guarda o cierra los datos del cliente primero.', true);
       return;
     }
-    if (!this.todoEntregado()) {
-      this.avisar(
-        this.faltanEntrega() === 1
+    if (!this.listoParaCobrar()) {
+      const mensaje = this.tipo() === 'sala'
+        ? (this.faltanEntrega() === 1
           ? 'Falta entregar 1 plato antes de cobrar.'
-          : `Faltan entregar ${this.faltanEntrega()} platos antes de cobrar.`,
-        true,
-      );
+          : `Faltan entregar ${this.faltanEntrega()} platos antes de cobrar.`)
+        : this.tipo() === 'para_llevar'
+          ? (this.faltanListos() === 1
+            ? 'Falta que 1 plato esté listo antes de cobrar.'
+            : `Faltan ${this.faltanListos()} platos por estar listos antes de cobrar.`)
+          : 'El pedido aún no figura como entregado.';
+      this.avisar(mensaje, true);
       return;
     }
     if (this.metodo() === 'efectivo' && this.recibidoNumero() < cuenta.total) {

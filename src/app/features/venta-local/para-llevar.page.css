@@ -358,6 +358,29 @@
   flex: 1 1 0;
 }
 
+a.enviar {
+  text-decoration: none;
+}
+
+.aviso-caja {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(14, 159, 110, 0.28);
+  border-radius: 11px;
+  background: rgba(14, 159, 110, 0.1);
+  color: #8fe3bf;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.aviso-caja strong {
+  color: var(--c-white);
+  font-weight: 600;
+}
+
 .btn-ghost-dark {
   height: 36px;
   display: inline-flex;

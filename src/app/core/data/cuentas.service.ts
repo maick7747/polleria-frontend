@@ -428,7 +428,9 @@ export class CuentasService {
     if (!cuenta || cuenta.estado !== 'abierta') {
       return null;
     }
-    this.clientesPendientes.delete(cuenta.mesaId);
+    if (cuenta.mesaId != null) {
+      this.clientesPendientes.delete(cuenta.mesaId);
+    }
 
     if (USE_API) {
       try {
@@ -440,7 +442,9 @@ export class CuentasService {
         );
         const cerrada = toCuenta(respuesta.cuenta);
         this.upsert(cerrada);
-        this.mesas.cambiarEstado(cerrada.mesaId, 'libre');
+        if (cerrada.mesaId != null) {
+          this.mesas.cambiarEstado(cerrada.mesaId, 'libre');
+        }
         this.pagos.registrarPago(toPago(respuesta.pago));
         return cerrada;
       } catch (error) {
@@ -470,7 +474,9 @@ export class CuentasService {
     if (!cuenta || cuenta.estado !== 'abierta' || cuenta.rondas.length > 0) {
       return false;
     }
-    this.clientesPendientes.delete(cuenta.mesaId);
+    if (cuenta.mesaId != null) {
+      this.clientesPendientes.delete(cuenta.mesaId);
+    }
 
     if (USE_API) {
       try {
@@ -480,7 +486,9 @@ export class CuentasService {
           }),
         );
         this.cuentas.update((lista) => lista.filter((actual) => actual.id !== cuentaId));
-        this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+        if (cuenta.mesaId != null) {
+          this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+        }
         return true;
       } catch (error) {
         if (!esFalloRed(error)) {
@@ -494,7 +502,9 @@ export class CuentasService {
     }
 
     this.cuentas.update((lista) => lista.filter((actual) => actual.id !== cuentaId));
-    this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+    if (cuenta.mesaId != null) {
+      this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+    }
     return true;
   }
 
@@ -596,7 +606,9 @@ export class CuentasService {
     this.cuentas.update((lista) =>
       lista.map((actual) => (actual.id === cuentaId ? cerrada : actual)),
     );
-    this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+    if (cuenta.mesaId != null) {
+      this.mesas.cambiarEstado(cuenta.mesaId, 'libre');
+    }
     this.pagos.registrar({
       pedidoId: null,
       cuentaId,

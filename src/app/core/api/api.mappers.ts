@@ -208,6 +208,14 @@ export function toRonda(dto: PedidoDto, numero: number): Ronda {
   return {
     id: dto.id,
     numero,
+    numeroPedido: dto.numero,
+    canal: toCanal(dto.canal),
+    tipoConsumo: toTipoConsumo(dto.tipo_consumo),
+    clienteNombre: dto.cliente_nombre ?? undefined,
+    repartidorNombre: dto.repartidor_nombre ?? undefined,
+    direccionEntrega: dto.direccion_entrega ?? undefined,
+    estadoPago: toEstadoPago(dto.estado_pago),
+    estadoEntrega: toEstadoEntrega(dto.estado_entrega),
     creadaEn: dto.fecha_pedido,
     estado: toEstadoPedido(dto.estado),
     items: (dto.detalles ?? []).map(toDetalle),
@@ -300,8 +308,9 @@ export function toCuenta(dto: CuentaDto): Cuenta {
   const rondas = (dto.pedidos ?? []).map((pedido, indice) => toRonda(pedido, indice + 1));
   return {
     id: dto.id,
-    mesaId: dto.mesa_id,
+    mesaId: dto.mesa_id ?? null,
     mesaNumero: dto.mesa_numero ?? undefined,
+    tipoServicio: toTipoConsumo(dto.tipo_servicio ?? 'sala'),
     estado: toEstadoCuenta(dto.estado),
     total: dto.total,
     subtotal: dto.subtotal ?? undefined,
@@ -314,6 +323,10 @@ export function toCuenta(dto: CuentaDto): Cuenta {
     comprobanteTipo: toComprobanteTipo(dto.comprobante_tipo),
     comprobanteNumero: dto.comprobante_numero ?? undefined,
     ...(dto.cliente ? { cliente: toDatosCliente(dto.cliente) } : {}),
+    pedidoNumero: rondas[0]?.numeroPedido,
+    clienteNombre: rondas[0]?.clienteNombre ?? dto.cliente?.nombre,
+    repartidorNombre: rondas[0]?.repartidorNombre,
+    direccionEntrega: rondas[0]?.direccionEntrega,
     rondas,
   };
 }
@@ -323,8 +336,9 @@ export function toCuenta(dto: CuentaDto): Cuenta {
 export function toCuentaResumen(dto: CuentaResumenDto): Cuenta {
   return {
     id: dto.id,
-    mesaId: dto.mesa_id,
+    mesaId: dto.mesa_id ?? null,
     mesaNumero: dto.mesa_numero ?? undefined,
+    tipoServicio: toTipoConsumo(dto.tipo_servicio ?? 'sala'),
     estado: toEstadoCuenta(dto.estado),
     total: dto.total,
     subtotal: dto.subtotal ?? undefined,
@@ -337,6 +351,8 @@ export function toCuentaResumen(dto: CuentaResumenDto): Cuenta {
     comprobanteTipo: toComprobanteTipo(dto.comprobante_tipo),
     comprobanteNumero: dto.comprobante_numero ?? undefined,
     ...(dto.cliente ? { cliente: toDatosCliente(dto.cliente) } : {}),
+    pedidoNumero: dto.pedido_numero ?? undefined,
+    clienteNombre: dto.cliente?.nombre,
     rondas: [],
   };
 }

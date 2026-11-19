@@ -39,7 +39,6 @@ type EstadoFiltro =
   | 'cancelado';
 
 type CanalPropio = 'whatsapp' | 'telefono';
-type MetodoEntrega = 'efectivo' | 'yape' | 'plin' | 'tarjeta';
 
 const LIMITES = [10, 20, 50, 100];
 // Misma regla que el backend (`igv_pct` / `igv_min_soles`): el preview es
@@ -55,13 +54,6 @@ const ESTADOS: readonly { valor: EstadoFiltro; texto: string }[] = [
   { valor: 'en_camino', texto: 'En camino' },
   { valor: 'entregado', texto: 'Entregado' },
   { valor: 'cancelado', texto: 'Cancelado' },
-];
-
-const METODOS: readonly { valor: MetodoEntrega; texto: string }[] = [
-  { valor: 'efectivo', texto: 'Efectivo' },
-  { valor: 'yape', texto: 'Yape' },
-  { valor: 'plin', texto: 'Plin' },
-  { valor: 'tarjeta', texto: 'Tarjeta' },
 ];
 
 const fechaLima = (fecha: Date): string =>
@@ -109,7 +101,6 @@ export class DeliveryPropioPage {
 
   readonly moneda = formatearMoneda;
   readonly estados = ESTADOS;
-  readonly metodos = METODOS;
   readonly costoFijo = COSTO_DELIVERY_PROPIO;
   // El menú exige `menu.gestionar`, `venta.registrar` o `cocina.kds`; el
   // Repartidor solo tiene `delivery.propio`, así que no puede armar pedidos.
@@ -146,8 +137,6 @@ export class DeliveryPropioPage {
   readonly items = signal<PedidoDetalle[]>([]);
 
   readonly repartidorId = signal<string>('');
-  readonly metodoPago = signal<MetodoEntrega>('efectivo');
-  readonly montoRecibido = signal<string>('');
 
   readonly toast = signal<string>('');
   readonly toastError = signal<boolean>(false);
@@ -204,16 +193,6 @@ export class DeliveryPropioPage {
   private nombreCliente(): string {
     return this.cliente()?.nombre ?? this.busquedaCliente().trim();
   }
-
-  readonly puedeCobrar = computed<boolean>(() => {
-    const pedido = this.seleccionado();
-    return (
-      pedido !== null &&
-      pedido.estado !== 'cancelado' &&
-      pedido.estadoPago !== 'pagado' &&
-      Number(this.montoRecibido() || pedido.total) >= pedido.total - 0.009
-    );
-  });
 
   readonly puedeCancelar = computed<boolean>(() => {
     const pedido = this.seleccionado();
@@ -290,7 +269,6 @@ export class DeliveryPropioPage {
 
   seleccionar(id: number): void {
     this.seleccionId.set(id);
-    this.montoRecibido.set('');
     this.sincronizarUrl();
   }
 
@@ -365,14 +343,6 @@ export class DeliveryPropioPage {
 
   onRepartidorInput(event: Event): void {
     this.repartidorId.set((event.target as HTMLInputElement).value);
-  }
-
-  onMetodo(metodo: MetodoEntrega): void {
-    this.metodoPago.set(metodo);
-  }
-
-  onMontoRecibido(event: Event): void {
-    this.montoRecibido.set((event.target as HTMLInputElement).value);
   }
 
   async crearPedido(): Promise<void> {
@@ -465,30 +435,6 @@ export class DeliveryPropioPage {
     if (ok) {
       await this.cargar();
     }
-  }
-
-  async cobrar(): Promise<void> {
-    const pedido = this.seleccionado();
-    if (!pedido) {
-      return;
-    }
-    if (!this.puedeCobrar()) {
-      this.avisar('El monto recibido no cubre el total del pedido.', true);
-      return;
-    }
-    const monto = Number(this.montoRecibido() || pedido.total);
-    const vuelto = await this.delivery.registrarEntrega(
-      pedido.id,
-      this.metodoPago(),
-      Number.isFinite(monto) ? round2(monto) : pedido.total,
-    );
-    if (vuelto === null) {
-      this.avisar(this.error() ?? 'No se pudo registrar la entrega.', true);
-      return;
-    }
-    this.montoRecibido.set('');
-    this.avisar(`Entrega cobrada · vuelto ${this.moneda(vuelto)}`);
-    await this.cargar();
   }
 
   estadoTexto(estado: string): string {

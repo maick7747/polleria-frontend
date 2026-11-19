@@ -5,8 +5,9 @@ import { MesasService } from './mesas.service';
 export interface AvisoListo {
   clave: string;
   cuentaId: number;
-  mesaId: number;
-  mesaNumero: number;
+  mesaId: number | null;
+  mesaNumero: number | null;
+  ubicacion: string;
   pedidoId: number;
   detalleId: number;
   plato: string;
@@ -41,7 +42,13 @@ export class NotificacionesService {
       if (cuenta.estado !== 'abierta') {
         continue;
       }
-      const mesaNumero = this.mesas.porId(cuenta.mesaId)?.numero ?? cuenta.mesaId;
+      const tipo = cuenta.tipoServicio ?? 'sala';
+      const mesaNumero = tipo === 'sala'
+        ? (this.mesas.porId(cuenta.mesaId ?? 0)?.numero ?? cuenta.mesaNumero ?? cuenta.mesaId ?? null)
+        : null;
+      const ubicacion = tipo === 'sala'
+        ? `Mesa ${String(mesaNumero ?? '').padStart(2, '0')}`
+        : (cuenta.pedidoNumero ?? (tipo === 'para_llevar' ? 'Mostrador' : 'Delivery'));
       for (const ronda of cuenta.rondas) {
         if (ronda.estado === 'cancelado' || ronda.estado === 'cobrado') {
           continue;
@@ -56,6 +63,7 @@ export class NotificacionesService {
             cuentaId: cuenta.id,
             mesaId: cuenta.mesaId,
             mesaNumero,
+            ubicacion,
             pedidoId: ronda.id,
             detalleId: item.id,
             plato: item.nombre,
@@ -99,8 +107,8 @@ export class NotificacionesService {
     const primero = nuevos[0];
     const cuerpo =
       nuevos.length === 1
-        ? `Mesa ${primero.mesaNumero} · ${primero.plato}`
-        : `${nuevos.length} platos listos (Mesa ${primero.mesaNumero} y más)`;
+        ? `${primero.ubicacion} · ${primero.plato}`
+        : `${nuevos.length} platos listos (${primero.ubicacion} y más)`;
     try {
       new Notification('Pedido listo en cocina', { body: cuerpo });
     } catch {

@@ -739,6 +739,32 @@
   flex-wrap: wrap;
 }
 
+.aviso-caja {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 12px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(14, 159, 110, 0.28);
+  border-radius: 11px;
+  background: rgba(14, 159, 110, 0.1);
+  color: #8fe3bf;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.aviso-caja strong {
+  display: block;
+  color: var(--c-white);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.aviso-caja b {
+  color: var(--c-white);
+  font-weight: 600;
+}
+
 .pago {
   padding: 4px 10px;
   border: 1px solid var(--c-dark-line);
