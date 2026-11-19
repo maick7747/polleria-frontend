@@ -431,11 +431,14 @@
           }
         </div>
       } @else {
-        <app-empty-state
-          icon="cash-register"
-          title="Sin cobro seleccionado"
-          description="Selecciona una mesa, un pedido de mostrador o un delivery para revisar su cuenta y cobrar. Vuelve a hacer click o pulsa Esc para quitar la selección."
-        />
+        <div class="resumen__vacio">
+          <app-icon name="cash-register" [size]="28" />
+          <strong>Sin cobro seleccionado</strong>
+          <p>
+            Selecciona una mesa, un pedido de mostrador o un delivery para revisar su
+            cuenta y cobrar. Vuelve a hacer click o pulsa Esc para quitar la selección.
+          </p>
+        </div>
       }
     </app-dark-panel>
   </div>
