@@ -86,7 +86,7 @@ export class CuentaDetallePage {
 
   readonly cuenta = computed(() => this.cuentas.porId(this.cuentaId) ?? null);
   readonly metodo = signal<MetodoPago>('efectivo');
-  readonly recibido = signal('100');
+  readonly recibido = signal('');
   readonly procesando = signal(false);
   readonly cargando = signal(true);
   readonly avisoLento = signal(false);

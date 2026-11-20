@@ -407,7 +407,8 @@
               <strong>{{ sel.cuenta.total.toFixed(2) }}</strong>
             </div>
             <span class="resumen__meta">
-              Subtotal {{ moneda(sel.subtotal) }} · IGV 18% {{ moneda(sel.igv) }}
+              Subtotal {{ moneda(sel.subtotal) }} ·
+              {{ sel.igv > 0 ? 'IGV 18% ' + moneda(sel.igv) : 'Exonerado de IGV (subtotal menor a S/ 70)' }}
             </span>
           </div>
 

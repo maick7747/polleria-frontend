@@ -107,8 +107,11 @@
               </div>
               <div class="resumen__row">
                 <span>IGV (18%)</span>
-                <strong>{{ moneda(igv()) }}</strong>
+                <strong>{{ igv() > 0 ? moneda(igv()) : 'Exonerado' }}</strong>
               </div>
+              @if (igv() === 0) {
+                <p class="resumen__nota">El IGV se aplica desde un subtotal de S/ 70.</p>
+              }
               <span class="resumen__sep"></span>
               <div class="resumen__total">
                 <span>Total</span>
